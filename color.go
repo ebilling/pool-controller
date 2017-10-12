@@ -1,3 +1,5 @@
+package pool-controller
+
 import (
 	"fmt"
 )

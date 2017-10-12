@@ -1,4 +1,4 @@
-package main
+package pool-controller
 
 import (
 	"encoding/json"

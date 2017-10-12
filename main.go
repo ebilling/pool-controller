@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/brutella/hc"
 	"os"
+	"pool-controller"
 )
 
 func main() {

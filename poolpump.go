@@ -1,4 +1,4 @@
-package main
+package pool-controller
 
 import (
 	"github.com/brutella/hc/accessory"
@@ -8,7 +8,7 @@ import (
 )
 
 type PoolPumpController struct {
-	config      Config
+	config      JSONmap
 	pump        *accessory.Switch
 	sweep       *accessory.Switch
 	temp        *Thermometer
@@ -19,7 +19,8 @@ type PoolPumpController struct {
 
 func NewPoolPumpController(path string) *PoolPumpController {
 	mftr := "Bonnie Labs"
-	config := *NewConfig(path)
+	config := *NewJSONmap()
+	config.readFile(path)
 	ppc := PoolPumpController {
 		config:    config,
 		done:      make(chan bool),

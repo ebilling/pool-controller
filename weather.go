@@ -1,45 +1,57 @@
-import json
-import httplib
-import temp
-import time
-import log
-import requests
-import config
+package pool-controller
+
+import (
+	"encoding/json"
+	"errors"
+	"time"
+	"net/http"
+)
 
 // Current Weather API
 // http://api.wunderground.com/api/ccf828d572d7846c/conditions/q/95032.json
 
-MAX_AGE = 900
-cache = {}
-appid = None
+type Weather struct {
+	ttl Time, // Set TTL MAX_AGE := 15 minutes
+	appId  string,
+	zip    string,
+	updated Time,
+	data JSONmap
+}
 
-def setAppid(id):
-    global appid
-    appid = id
+func (w *Weather) setAppid(appId) {
+	w.appId = appId
+}
 
-def getWeatherByZip(zipcode):
-    global cache
-    global appid
-    
-    if appid == None:
-        log.error("Must call weather.setAppid()")
-        return None
+func (w *Weather) setZip(zip) {
+	w.zip = zip
+}
 
-    # Return cached value
-    if zipcode in cache and cache[zipcode][0] > time.time() - MAX_AGE:
-        return cache[zipcode][1]
+func (w *Weather) setTtl(ttl) {
+	w.ttl = ttl
+}
 
-    r = None
-    typeQuery = "http://api.wunderground.com/api/%s/conditions/q/%d.json" % (
-        appid, zipcode)
-    try:
+func (w *Weather) getWeather() (config, error) {
+	if appid == None {
+		return nil, errors.New("Must call Weather.setAppid()")
+	}
+
+	// Return cached value
+	if time.Before(updated + ttl) && data != nil {
+		return data, nil
+	}
+
+	query := fmt.Sprintf("http://api.wunderground.com/api/%s/conditions/q/%d.json",
+		appid, zipcode)
         log.debug("Updating Weather Forecast for " + str(zipcode))
-        r = requests.get(typeQuery)
-        if r.status_code != 200:
-            log.error("WeatherUnderground returned error: %d %s" % (
-                r.status_code, r.text))
-        else:
-            data = json.loads(r.text)
+	resp, err := http.Get(typeQuery)
+        if err != nil {
+		log.error("WeatherUnderground returned error: " + err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	
+		data = json.loads(r.text)
             cache[zipcode] = (time.time(), data)
             return data
     except Exception as e:
