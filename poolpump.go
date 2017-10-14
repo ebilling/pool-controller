@@ -1,4 +1,4 @@
-package pool-controller
+package main
 
 import (
 	"github.com/brutella/hc/accessory"
@@ -7,23 +7,47 @@ import (
 	"time"
 )
 
+var mftr = "Bonnie Labs"
+
+type Temp struct {
+	therm *Thermometer
+	acc   *accessory.Thermometer
+}
+
 type PoolPumpController struct {
-	config      JSONmap
+	config      Config
 	pump        *accessory.Switch
 	sweep       *accessory.Switch
-	temp        *Thermometer
-	thermometer *accessory.Thermometer
+	waterTemp   *Temp
+	roofTemp    *Temp
 	pin         string
 	done        chan bool
 }
 
+func NewTemp(data Config, key string, name string) *Temp {
+	info := accessory.Info{
+		Name: name,
+		Manufacturer: mftr,
+	}
+	th := NewThermometer(key)
+	t := Temp{
+		therm: th,
+		acc:   accessory.NewTemperatureSensor(info, th.Temperature(), 0.0, 100.0, 1.0),
+	}
+	return &t
+}
+
+func (t *Temp) Update(data *Config) {
+	t.acc.TempSensor.CurrentTemperature.SetValue(t.therm.Update(data))
+}
+
 func NewPoolPumpController(path string) *PoolPumpController {
-	mftr := "Bonnie Labs"
-	config := *NewJSONmap()
-	config.readFile(path)
+	config := *NewConfig(path)
 	ppc := PoolPumpController {
 		config:    config,
 		done:      make(chan bool),
+		waterTemp: nil,
+		roofTemp:  nil,
 	}
 
 	pumpinfo := accessory.Info{
@@ -54,75 +78,81 @@ func NewPoolPumpController(path string) *PoolPumpController {
 		}
 	})
 
-	tpath, _ := config.Get("path.temperature")
-	ppc.temp = NewThermometer(tpath)
-
-	ppc.thermometer = accessory.NewTemperatureSensor(accessory.Info{
-		Name:         "Pool Temp",
-		Manufacturer: mftr,
-	}, ppc.temp.Temperature(), 0.0, 100.0, 1.0)
-
-	ppc.pin, _ = config.Get("homekit.pin")
-	log.info("Homekit Pin:" + ppc.pin)
+	ppc.pin = config.Get("homekit.pin").(string)
+	Info("Homekit Pin: %s", ppc.pin)
 
 	return &ppc
 }
 
 func (ppc *PoolPumpController) cmd(command string) {
-	path, exists := ppc.config.Get("path.cmdfifo")
-	if !exists {
-		log.fatal("path.cmdfifo not specified in the configuration file")
+	if !ppc.config.Contains("path.cmdfifo") {
+		Error("path.cmdfifo not specified in the configuration file")
 		return
 	}
+	path := ppc.config.Get("path.cmdfifo").(string)
 	fifo, err := os.OpenFile(path, os.O_RDWR, 0666)
 	if err != nil {
-		log.error("Command Open Error: " + err.Error())
+		Error("Command Open Error: %s", err.Error())
 		return
 	}
 	defer fifo.Close()
+	Debug("Writing command: %s", command)
 	_, err = fifo.WriteString(command + "\n")
 	if err != nil {
-		log.error("Command Write Error: " + err.Error())
+		Error("Command Write Error: %s", err.Error())
 	}
 }
 
 func (ppc *PoolPumpController) turnPumpOn() {
+	Info("Turning Pump On")
 	ppc.cmd("PUMP_ON")
-	log.info("Turning Pump On")
 }
 
 func (ppc *PoolPumpController) turnSweepOn() {
+	Info("Turning Sweep On")
 	ppc.cmd("SWEEP_ON")
-	log.info("Turning Sweep On")
 }
 
 func (ppc *PoolPumpController) turnAllOff() {
+	Info("Turning Pumps Off")
 	ppc.cmd("OFF")
-	log.info("Turning Pumps Off")
 }
 
 //TODO update the temperature in the accessory
 func (ppc *PoolPumpController) Update() {
-	ppc.temp.readTemperature()
-	ppc.thermometer.TempSensor.CurrentTemperature.SetValue(ppc.temp.Temperature())
-	path, _ := ppc.config.Get("path.status")
-	file, err := os.Open(path)
+	tdatapath := ppc.config.Get("path.temperature").(string)
+	tdata := NewConfig(tdatapath)
+	if tdata != nil {
+		if ppc.waterTemp == nil {
+			ppc.waterTemp = NewTemp(*tdata, "waterTempC", "Water Temp")
+		}
+		if ppc.roofTemp == nil {
+			ppc.roofTemp = NewTemp(*tdata, "roofTempC", "Roof Temp")
+		}
+		ppc.waterTemp.Update(tdata)
+		ppc.roofTemp.Update(tdata)
+	}
+
+	statusPath := ppc.config.Get("path.status").(string)
+	file, err := os.Open(statusPath)
 	if err != nil {
-		log.error(err)
+		Error("Error opening file %s: %s", statusPath, err.Error())
+		return
 	}
 	defer file.Close()
 	data := make([]byte, 100)
 	count, err := file.Read(data)
 	if err != nil {
-		log.error(err)
+		Error("Error reading file %s: %s", statusPath, err.Error())
+		return
 	}
 	if count < 1 {
-		log.error("Status doesn't seem to be valid")
+		Error("Read status doesn't seem to be valid (%d): for %s", count, statusPath)
 	}
 
 	status, err := strconv.ParseInt(string(data[:count]), 10, 64)
 	if err != nil {
-		log.error("Could not convert status: " + err.Error())
+		Error("Could not convert status: %s", err.Error())
 	}
 	if status <= 0 {
 		ppc.pump.Switch.On.SetValue(false)
@@ -138,13 +168,18 @@ func (ppc *PoolPumpController) Update() {
 
 func (ppc *PoolPumpController) RunLoop() {
 	interval := 5 * time.Second
+	tries := 0
 	for {
+		if tries % 12 == 0 {
+			Info("Homekit service for PoolPumpController still running")
+		}
 		select {
 		case <- time.After(interval):
 			ppc.Update()
 		case <- ppc.done:
 			break
 		}
+		tries++
 	}
 }
 

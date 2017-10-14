@@ -1,22 +1,22 @@
-package pool-controller
+package main
 
 import (
-	"os"
 	"strconv"
 )
 
 type Thermometer struct {
 	path      string
+	key       string
 	temperature float64
 	done        chan bool
 }
 
-func NewThermometer(path string) *Thermometer {
+func NewThermometer(key string) *Thermometer {
 	th := Thermometer{
-		path: path,
+		key: key,
 		done: make(chan bool),
+		temperature: 0.0,
 	}
-	th.readTemperature()
 	return &th
 }
 
@@ -28,27 +28,18 @@ func (t *Thermometer) Temperature() float64 {
 	return t.temperature
 }
 
-func (t *Thermometer) readTemperature() float64 {
-	file, err := os.Open(t.path)
-	if err != nil {
-		log.error(err)
+func (t *Thermometer) Update(data *Config) float64 {
+	if data.Contains(t.key) {
+		temp := data.Get(t.key).(string)
+		celsius, err := strconv.ParseFloat(temp, 64)
+		if err != nil {
+			Error("Temperature doesn't seem valid: key(%s) %s", t.key, temp)
+		}
+		t.temperature = celsius
+		return celsius
+	} else {
+		Error("Could not fetch temp for key(%s)", t.key)
 	}
-	defer file.Close()
-
-	data := make([]byte, 100)
-	count, err := file.Read(data)
-	if err != nil {
-		log.error(err)
-	}
-	if count < 3 {
-		log.error("Temperature doesn't seem to be valid")
-	}
-
-	celsius, err := strconv.ParseFloat(string(data[:count]), 64)
-	if err != nil {
-		log.error("Could not convert temperature from device: " + err.Error())
-	}
-	t.temperature = celsius
 	
-	return t.temperature
+	return t.temperature	
 }

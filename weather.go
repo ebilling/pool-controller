@@ -1,96 +1,97 @@
-package pool-controller
+package main
 
 import (
-	"encoding/json"
-	"errors"
+	"io/ioutil"
+	"fmt"
 	"time"
 	"net/http"
 )
 
 // Current Weather API
 // http://api.wunderground.com/api/ccf828d572d7846c/conditions/q/95032.json
-
-type Weather struct {
-	ttl Time, // Set TTL MAX_AGE := 15 minutes
-	appId  string,
-	zip    string,
-	updated Time,
-	data JSONmap
+type WeatherData struct {
+	zipcode     string
+	updated time.Time
+	data    JSONmap
 }
 
-func (w *Weather) setAppid(appId) {
+type Weather struct {
+	appId   string
+	ttl     time.Duration
+	cache   map[string]*WeatherData
+}
+
+func NewWeather(ttl time.Duration, appId string) (*Weather){
+	w := Weather{
+		ttl: ttl,
+		appId: appId,
+		cache: make(map[string]*WeatherData),
+	}
+	return &w
+}
+
+func newWeatherData(zip string) (*WeatherData){
+	data := WeatherData {
+		zipcode: zip,
+		data:    NewJSONmap(),
+	}
+	return &data
+}
+
+func (w *Weather) SetAppid(appId string) {
 	w.appId = appId
 }
 
-func (w *Weather) setZip(zip) {
-	w.zip = zip
-}
-
-func (w *Weather) setTtl(ttl) {
+func (w *Weather) SetTtl(ttl time.Duration) {
 	w.ttl = ttl
 }
 
-func (w *Weather) getWeather() (config, error) {
-	if appid == None {
-		return nil, errors.New("Must call Weather.setAppid()")
+func (w *Weather) GetWeatherByZip(zipcode string) (*JSONmap) {
+	data, present := w.cache[zipcode]
+	if present {
+		return data.GetWeather(w.appId, w.ttl)
 	}
+	data = newWeatherData(zipcode)
+	return data.GetWeather(w.appId, w.ttl)
+}
 
+func (w *WeatherData) GetWeather(appId string, ttl time.Duration) (*JSONmap) {
 	// Return cached value
-	if time.Before(updated + ttl) && data != nil {
-		return data, nil
+	if time.Now().Before(w.updated.Add(ttl)) {
+		return &w.data
 	}
 
 	query := fmt.Sprintf("http://api.wunderground.com/api/%s/conditions/q/%d.json",
-		appid, zipcode)
-        log.debug("Updating Weather Forecast for " + str(zipcode))
-	resp, err := http.Get(typeQuery)
+		appId, w.zipcode)
+        Debug("Updating Weather Forecast for %s", w.zipcode)
+	resp, err := http.Get(query)
         if err != nil {
-		log.error("WeatherUnderground returned error: " + err.Error())
-		return nil, err
+		Error("WeatherUnderground returned error: %s", err.Error())
+		return nil
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	
-		data = json.loads(r.text)
-            cache[zipcode] = (time.time(), data)
-            return data
-    except Exception as e:
-        txt = ""
-        if r != None:
-            txt = r.text
-        log.error( "Unexpected weather error: (%s) %s" % (e, txt))
+	err = w.data.readBytes(body)
+	if err != nil {
+		Error("Issue reading data from WeatherUnderground: %s", err.Error())
+		return nil
+	}
+	return &w.data
+}
 
-    return None
+func (w *Weather) GetCurrentTempC(zipcode string) (float64) {
+	co := w.GetWeatherByZip(zipcode)
+	if co == nil {
+		return 0.0
+	}
+	return co.Get("current_observation.temp_c").(float64)
+}
 
-
-def getCurrentTempC(zipcode):
-    co = getWeatherByZip(zipcode)
-    if co == None:
-        return 0.0
-    return float(co['current_observation']['temp_c'])
-
-def getSolarRadiation(zipcode):
-    co = getWeatherByZip(zipcode)
-    if co != None:
-        co = co['current_observation']
-        if 'solarradiation' in co:
-            return float(co['solarradiation'])
-    return 0.0
-
-def printDict(d):
-    for key in sorted(d.keys()):
-        print "\t", key, ": ", d[key]
-
-
-if __name__ == "__main__":
-    import config
-    conf = config.config('config.json')
-    z = int(conf.get('weather.zip'))
-    setAppid(conf.get('weather.appid'))
-    print "Temp(%0.1fC) SolarRadiation(%0.2f)w/sqm" % (
-        getCurrentTempC(z), getSolarRadiation(z))
-    print "FullReport:"
-    printDict(getWeatherByZip(z))
-
-
-
+func (w *Weather) GetSolarRadiation(zipcode string) (float64) {
+	co := w.GetWeatherByZip(zipcode)
+	if co == nil {
+		return 0.0
+	}
+        return co.Get("current_observation.solarradiation").(float64)
+}

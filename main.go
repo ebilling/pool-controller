@@ -2,24 +2,34 @@ package main
 
 import (
 	"github.com/brutella/hc"
+	"time"
 	"os"
-	"pool-controller"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		log.fatal("Usage: pi-go-homekit CONFIG")
+		Fatal("Usage: pi-go-homekit CONFIG")
 	}
 	ppc := NewPoolPumpController(os.Args[1])
 	ppc.Start()
-
-	transport, err := hc.NewIPTransport(hc.Config{Pin: ppc.pin},
-		ppc.thermometer.Accessory,
+	hcConfig := hc.Config{
+		Pin: ppc.pin,
+		StoragePath: "/var/cache/homekit",
+	}
+	for ppc.waterTemp == nil || ppc.roofTemp == nil {
+		Info("Waiting for temperatures to be recorded")
+		time.Sleep(5 * time.Second)
+	}
+	transport, err := hc.NewIPTransport(
+		hcConfig,
 		ppc.pump.Accessory,
-		ppc.sweep.Accessory)
+		ppc.sweep.Accessory,
+		ppc.waterTemp.acc.Accessory,
+		ppc.roofTemp.acc.Accessory)
+
 
 	if err != nil {
-		log.fatal(err)
+		Fatal("Could not start IP Transport: %s", err.Error())
 	}
 
 	hc.OnTermination(func() {
@@ -28,5 +38,5 @@ func main() {
 	})
 
 	transport.Start()
-	log.info("Exiting")
+	Info("Exiting")
 }
