@@ -9,7 +9,7 @@ import (
 )
 
 var __logger__ *syslog.Writer = nil
-var __debug__ bool = true
+var __debug__ bool = false
 
 func _init() {
 	if __logger__ == nil {
@@ -62,8 +62,12 @@ func Info(format string, a ...interface{}) (error) {
 	return __logger__.Info(fmt.Sprintf(format, a...))
 }
 
-func EnableDebug(shouldEnable bool) {
-	__debug__ = shouldEnable
+func EnableDebug() {
+	__debug__ = true
+}
+
+func DisableDebug() {
+	__debug__ = false
 }
 
 func Debug(format string, a ...interface{}) (error) {
