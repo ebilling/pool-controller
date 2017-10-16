@@ -3,95 +3,140 @@ package main
 import (
 	"io/ioutil"
 	"fmt"
+	"reflect"
+	"strconv"
 	"time"
 	"net/http"
 )
 
-// Current Weather API
-// http://api.wunderground.com/api/ccf828d572d7846c/conditions/q/95032.json
+// For Testing
+type Service interface {
+	Read(string) string
+}
+
 type WeatherData struct {
-	zipcode     string
-	updated time.Time
-	data    JSONmap
+	zipcode  string
+	updated  time.Time
+	data     JSONmap
+	service  Service
 }
 
 type Weather struct {
-	appId   string
+	service Service
 	ttl     time.Duration
 	cache   map[string]*WeatherData
 }
 
-func NewWeather(ttl time.Duration, appId string) (*Weather){
+func NewWeather(appId string, ttl time.Duration) (*Weather){
+	service := WUService{appId: appId}
 	w := Weather{
-		ttl: ttl,
-		appId: appId,
-		cache: make(map[string]*WeatherData),
+		service: &service,
+		ttl:     ttl,
+		cache:   make(map[string]*WeatherData),
 	}
 	return &w
 }
 
-func newWeatherData(zip string) (*WeatherData){
+// Weather Underground Service API
+type WUService struct {
+	appId string
+}
+
+func (w *WUService) Read(zip string) (string) {
+	// Return cached value
+	url := fmt.Sprintf("http://api.wunderground.com/api/%s/conditions/q/%s.json",
+		w.appId, zip)
+	Debug("Sending request to WeatherUnderground: %s", url)
+	resp, err := http.Get(url)
+        if err != nil {
+		Error("WeatherUnderground returned error: %s",
+			err.Error())
+		return ""
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	str := string(body[:])
+	Debug("Weather Underground returned: %s", str)
+	return str
+}
+
+func newWeatherData(zip string, service Service) (*WeatherData){
 	data := WeatherData {
 		zipcode: zip,
+		updated: time.Now().Add(-24 * time.Hour),
 		data:    NewJSONmap(),
+		service: service,
 	}
 	return &data
 }
 
-func (w *Weather) SetAppid(appId string) {
-	w.appId = appId
-}
-
-func (w *Weather) SetTtl(ttl time.Duration) {
-	w.ttl = ttl
-}
-
 func (w *Weather) GetWeatherByZip(zipcode string) (*JSONmap) {
 	data, present := w.cache[zipcode]
-	if present {
-		return data.GetWeather(w.appId, w.ttl)
+	Debug("GetWeatherByZip cached(%t)", present)
+	if present && time.Now().After(data.updated.Add(w.ttl)) {
+		return &data.data
 	}
-	data = newWeatherData(zipcode)
-	return data.GetWeather(w.appId, w.ttl)
+	if !present {
+		data = newWeatherData(zipcode, w.service)
+		w.cache[zipcode] = data
+	}
+	Debug("GetWeatherByZip - Getting new data")
+	err := data.Update()
+	if err != nil {
+		Error("Failed to get data for %s: %s", zipcode, err.Error())
+		return nil
+	}
+	return &data.data
 }
 
-func (w *WeatherData) GetWeather(appId string, ttl time.Duration) (*JSONmap) {
-	// Return cached value
-	if time.Now().Before(w.updated.Add(ttl)) {
-		return &w.data
+func (w *WeatherData) Update() (error) {
+	Debug("Updating Weather Forecast for %s", w.zipcode)
+	response := w.service.Read(w.zipcode)
+	if response == "" {
+		return fmt.Errorf("Error getting data from weather service")
 	}
-
-	query := fmt.Sprintf("http://api.wunderground.com/api/%s/conditions/q/%d.json",
-		appId, w.zipcode)
-        Debug("Updating Weather Forecast for %s", w.zipcode)
-	resp, err := http.Get(query)
-        if err != nil {
-		Error("WeatherUnderground returned error: %s", err.Error())
-		return nil
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	
-	err = w.data.readBytes(body)
+	err := w.data.readString(response)
 	if err != nil {
-		Error("Issue reading data from WeatherUnderground: %s", err.Error())
-		return nil
+		return fmt.Errorf("Issue reading data from weather service: %s",
+			err.Error())
 	}
-	return &w.data
+	w.updated = time.Now()
+	Debug("WeatherData Updated: %v", w)
+	return nil
+}
+
+func (w *Weather) getFloat(zipcode string, name string) (float64) {
+	co := w.GetWeatherByZip(zipcode)
+	if co == nil {
+		Error("Could not retrieve weather data for %s", zipcode)
+		return 0.0
+	}
+	x := co.Get(name)
+	if x == nil {
+		Error("No value returned for %s", name)
+		return 0.0
+	}
+	kind := reflect.TypeOf(x).Kind()
+	switch kind {
+	case reflect.Float64:
+		return x.(float64)
+	case reflect.Float32:
+		return float64(x.(float32))
+	case reflect.String:
+		val, err := strconv.ParseFloat(x.(string), 64)
+		if err == nil {
+			return val
+		}
+	default:
+		Error("Could not parse value for %s, (%v) (%v)", name, x, kind)
+	}
+	return 0.0
 }
 
 func (w *Weather) GetCurrentTempC(zipcode string) (float64) {
-	co := w.GetWeatherByZip(zipcode)
-	if co == nil {
-		return 0.0
-	}
-	return co.Get("current_observation.temp_c").(float64)
+	return w.getFloat(zipcode, "current_observation.temp_c")
 }
 
 func (w *Weather) GetSolarRadiation(zipcode string) (float64) {
-	co := w.GetWeatherByZip(zipcode)
-	if co == nil {
-		return 0.0
-	}
-        return co.Get("current_observation.solarradiation").(float64)
+        return w.getFloat(zipcode, "current_observation.solarradiation")
 }

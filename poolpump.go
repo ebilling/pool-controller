@@ -10,7 +10,8 @@ import (
 var mftr = "Bonnie Labs"
 
 type Temp struct {
-	therm *Thermometer
+	name   string
+	therm *JsonThermometer
 	acc   *accessory.Thermometer
 }
 
@@ -24,21 +25,12 @@ type PoolPumpController struct {
 	done        chan bool
 }
 
-func NewTemp(data Config, key string, name string) *Temp {
-	info := accessory.Info{
-		Name: name,
-		Manufacturer: mftr,
+func (t *Temp) Update() {
+	err := t.therm.Update()
+	if err != nil {
+		Error("Problem updating %s: %s", t.name, err.Error())
 	}
-	th := NewThermometer(key)
-	t := Temp{
-		therm: th,
-		acc:   accessory.NewTemperatureSensor(info, th.Temperature(), 0.0, 100.0, 1.0),
-	}
-	return &t
-}
-
-func (t *Temp) Update(data *Config) {
-	t.acc.TempSensor.CurrentTemperature.SetValue(t.therm.Update(data))
+	t.acc.TempSensor.CurrentTemperature.SetValue(t.therm.Temperature())
 }
 
 func NewPoolPumpController(path string) *PoolPumpController {
@@ -46,8 +38,8 @@ func NewPoolPumpController(path string) *PoolPumpController {
 	ppc := PoolPumpController {
 		config:    config,
 		done:      make(chan bool),
-		waterTemp: nil,
-		roofTemp:  nil,
+		waterTemp: NewTemp(config, "waterTempC", "Water Temp"),
+		roofTemp:  NewTemp(config, "roofTempC", "Roof Temp"),
 	}
 
 	pumpinfo := accessory.Info{
@@ -82,6 +74,21 @@ func NewPoolPumpController(path string) *PoolPumpController {
 	Info("Homekit Pin: %s", ppc.pin)
 
 	return &ppc
+}
+
+func NewTemp(config Config, key string, name string) *Temp {
+	info := accessory.Info{
+		Name: name,
+		Manufacturer: mftr,
+	}
+	path := config.Get("path.temperature").(string)
+	th := NewJsonThermometer(path, key)
+	t := Temp{
+		name: name,
+		therm: th,
+		acc:   accessory.NewTemperatureSensor(info, th.Temperature(), 0.0, 100.0, 1.0),
+	}
+	return &t
 }
 
 func (ppc *PoolPumpController) cmd(command string) {
@@ -120,19 +127,9 @@ func (ppc *PoolPumpController) turnAllOff() {
 
 //TODO update the temperature in the accessory
 func (ppc *PoolPumpController) Update() {
-	tdatapath := ppc.config.Get("path.temperature").(string)
-	tdata := NewConfig(tdatapath)
-	if tdata != nil {
-		if ppc.waterTemp == nil {
-			ppc.waterTemp = NewTemp(*tdata, "waterTempC", "Water Temp")
-		}
-		if ppc.roofTemp == nil {
-			ppc.roofTemp = NewTemp(*tdata, "roofTempC", "Roof Temp")
-		}
-		ppc.waterTemp.Update(tdata)
-		ppc.roofTemp.Update(tdata)
-	}
-
+	ppc.waterTemp.Update()
+	ppc.roofTemp.Update()
+	
 	statusPath := ppc.config.Get("path.status").(string)
 	file, err := os.Open(statusPath)
 	if err != nil {
