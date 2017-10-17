@@ -3,8 +3,6 @@ package main
 import (
 	"io/ioutil"
 	"fmt"
-	"reflect"
-	"strconv"
 	"time"
 	"net/http"
 )
@@ -111,26 +109,7 @@ func (w *Weather) getFloat(zipcode string, name string) (float64) {
 		Error("Could not retrieve weather data for %s", zipcode)
 		return 0.0
 	}
-	x := co.Get(name)
-	if x == nil {
-		Error("No value returned for %s", name)
-		return 0.0
-	}
-	kind := reflect.TypeOf(x).Kind()
-	switch kind {
-	case reflect.Float64:
-		return x.(float64)
-	case reflect.Float32:
-		return float64(x.(float32))
-	case reflect.String:
-		val, err := strconv.ParseFloat(x.(string), 64)
-		if err == nil {
-			return val
-		}
-	default:
-		Error("Could not parse value for %s, (%v) (%v)", name, x, kind)
-	}
-	return 0.0
+	return co.GetFloat(name)
 }
 
 func (w *Weather) GetCurrentTempC(zipcode string) (float64) {

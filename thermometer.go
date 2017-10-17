@@ -1,103 +1,55 @@
 package main
 
 import (
+        "github.com/brutella/hc/accessory"
 	"github.com/stianeikeland/go-rpio"
 	"fmt"
 	"math"
-	"strconv"
 	"sync"
 	"time"
 )
 
 type Thermometer interface {
+	Name() string
 	Temperature() float64
 	Update() error
-	Stop()
-	Done() bool	
-}
-
-// JsonThermometer gets a temperature from a file saved in JSON format
-type JsonThermometer struct {
-	path        string
-	key         string
-	temperature float64
-	done        bool
-}
-
-func NewJsonThermometer(path string, key string) *JsonThermometer {
-	th := JsonThermometer{
-		path:        path,
-		key:         key,
-		done:        false,
-		temperature: 0.0,
-	}
-	return &th
-}
-
-func (t *JsonThermometer) Stop() {
-	t.done = true
-}
-
-func (t *JsonThermometer) Done() bool {
-	return t.done
-}
-
-func (t *JsonThermometer) Temperature() float64 {
-	return t.temperature
-}
-
-func (t *JsonThermometer) Update() error {
-	data := NewJSONmap()
-	data.readFile(t.path)
-	if data.Contains(t.key) {
-		temp := data.Get(t.key).(string)
-		celsius, err := strconv.ParseFloat(temp, 64)
-		if err != nil {
-			return fmt.Errorf("Temperature not valid: key(%s) %s",
-				t.key, temp)
-		}
-		t.temperature = celsius
-		return nil
-	} else {
-		return fmt.Errorf("Could not fetch temp for key(%s)", t.key)
-	}
-	
-	return nil	
-}
-
-// To enable testing
-type PiPin interface {
-	Input()
-	Output()
-	High()
-	Low()
-	Read() rpio.State
-	PullUp()
-	PullDown()
-	PullOff()
+	Accessory() *accessory.Accessory
 }
 
 type GpioThermometer struct {
+	name        string
 	mutex       sync.Mutex
 	pin         PiPin
 	gpio        uint32
 	microfarads float64
 	temperature float64
 	updated     time.Time
-	done        bool	
+	accessory   *accessory.Thermometer
 }
 
-func NewGpioThermometer(gpio uint32, capacitance_uF float64) (*GpioThermometer) {
+func NewGpioThermometer(name string, manufacturer string,
+	gpio uint32, capacitance_uF float64) (*GpioThermometer) {
+	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
+		0.0, -20.0, 100.0, 1.0)
 	th := GpioThermometer{
+		name:        name,
 		mutex:       sync.Mutex{},
 		pin:         rpio.Pin(gpio),
 		gpio:        gpio,
 		microfarads: capacitance_uF,
-		temperature: float64(0.0),
-		updated:     time.Now().Add(-24 * time.Hour), // yesterday
-		done:        false,
+		temperature: float64(0.0), // TODO: Remove and use accessory storage only
+		updated:     time.Now().Add(-24 * time.Hour),
+		accessory:   acc,
 	}
 	return &th
+}
+
+func (t *GpioThermometer) Name() string {
+	return t.name
+}
+
+func (t *GpioThermometer) Accessory() (*accessory.Accessory) {
+	return t.accessory.Accessory
 }
 
 func (t *GpioThermometer) getDischargeTime() (time.Duration) {
@@ -154,14 +106,6 @@ func (t *GpioThermometer) Temperature() (float64) {
 	return t.temperature
 }
 
-func (t *GpioThermometer) Stop() {
-	t.done = true
-}
-
-func (t *GpioThermometer) Done() bool {
-	return t.done
-}
-
 func (t *GpioThermometer) Update() (error) {
 	var dischargeTime time.Duration
 	// Ignore bad results, try again
@@ -174,6 +118,7 @@ func (t *GpioThermometer) Update() (error) {
 	temp := t.getTemp(t.getOhms(dischargeTime))
 	if temp != 0.0 {
 		t.temperature = temp
+		t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
 		t.updated = time.Now()
 		return nil
 	}

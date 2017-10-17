@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"reflect"
+	"strconv"
 	"strings"
-	"os"	
+	"os"
 )
 
 type JSONmap struct {
@@ -81,3 +83,25 @@ func (m *JSONmap) Contains(fullname string) bool {
 	return ret == nil
 }
 
+func (m *JSONmap) GetFloat(fullname string) (float64) {
+	x, err := m.get(fullname)
+	if err != nil {
+		Error("Problem fetching %s, %s", fullname, err.Error())
+		return 0.0
+	}
+	kind := reflect.TypeOf(x).Kind()
+	switch kind {
+	case reflect.Float64:
+		return x.(float64)
+	case reflect.Float32:
+		return float64(x.(float32))
+	case reflect.String:
+		val, err := strconv.ParseFloat(x.(string), 64)
+		if err == nil {
+			return val
+		}
+	default:
+		Error("Could not parse value for %s, (%v) (%v)", fullname, x, kind)
+	}
+	return 0.0
+}
