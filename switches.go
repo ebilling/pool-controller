@@ -71,6 +71,7 @@ func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) (*Swit
 		solarLed: solarLed,
 		manualOp: time.Now().Add(time.Hour * -24),
 	}
+	solarLed.Output()
 	return &p
 }
 

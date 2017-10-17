@@ -181,6 +181,7 @@ func pumpTest(t *testing.T, pumps *Switches, state State, pumpState rpio.State,
 	checkPinState(t, pumps.pump.pin, rpio.Output, pumpState)
 	checkPinState(t, pumps.sweep.pin, rpio.Output, sweepState)
 	checkPinState(t, pumps.solar.pin, rpio.Output, solarState)
+	checkPinState(t, pumps.solarLed, rpio.Output, solarState)
 	if !pumps.pump.GetStartTime().Equal(pumps.GetStartTime()) {
 		t.Errorf("Start time should be same as pump")
 	}
@@ -206,13 +207,15 @@ func pumpTest(t *testing.T, pumps *Switches, state State, pumpState rpio.State,
 }
 
 func TestGpioSwitchesBasic(t *testing.T) {
-	pumpPin  := &TestPin{}
-	sweepPin := &TestPin{}
-	solarPin := &TestPin{}
+	pumpPin     := &TestPin{}
+	sweepPin    := &TestPin{}
+	solarPin    := &TestPin{}
+	solarLedPin := &TestPin{}
 	pumps := newSwitches(
 		newRelay(pumpPin, "Test Pump", mftr),
 		newRelay(sweepPin, "Test Sweep", mftr),
-		newRelay(solarPin, "Test Solar", mftr))
+		newRelay(solarPin, "Test Solar", mftr),
+		solarLedPin)
 
 	startTime := pumps.GetStartTime()
 	stopTime := pumps.GetStopTime()
