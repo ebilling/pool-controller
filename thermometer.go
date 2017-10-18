@@ -16,6 +16,46 @@ type Thermometer interface {
 	Accessory() *accessory.Accessory
 }
 
+type SelectiveThermometer struct {
+	name        string
+	filter      func () (bool)
+	thermometer Thermometer
+	accessory   *accessory.Thermometer
+	temperature float64
+}
+
+func NewSelectiveThermometer(name string, manufacturer string, thermometer Thermometer,
+	filter func () bool) (*SelectiveThermometer) {
+	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
+		0.0, -20.0, 100.0, 1.0)
+	return &SelectiveThermometer{
+		name:         name,
+		thermometer:  thermometer,
+		filter:       filter,
+		temperature:  0.0,
+		accessory:    acc,
+	}
+}
+
+func (t *SelectiveThermometer) Name() string {
+	return t.name
+}
+
+func (t *SelectiveThermometer) Temperature() float64 {
+	return t.temperature
+}
+
+func (t *SelectiveThermometer) Update() error {
+	if (t.filter()) {
+		t.temperature = t.thermometer.Temperature()
+	}
+	return nil
+}
+
+func (t *SelectiveThermometer) Accessory() *accessory.Accessory {
+	return t.accessory.Accessory
+}
+
 type GpioThermometer struct {
 	name        string
 	mutex       sync.Mutex

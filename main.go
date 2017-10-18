@@ -22,6 +22,7 @@ func main() {
 		ppc.switches.sweep.Accessory(),
 		ppc.switches.solar.Accessory(),
 		ppc.waterTemp.Accessory(),
+		ppc.runningTemp.Accessory(),
 		ppc.roofTemp.Accessory())
 
 

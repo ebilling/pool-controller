@@ -11,7 +11,7 @@ type State uint8
 const (
 	STATE_DISABLED State  = iota
 	STATE_OFF
-	STATE_PUMP             
+	STATE_PUMP
 	STATE_SWEEP
 	STATE_SOLAR
 	STATE_SOLAR_MIXING
@@ -72,7 +72,68 @@ func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) (*Swit
 		manualOp: time.Now().Add(time.Hour * -24),
 	}
 	solarLed.Output()
+	p.bindHK()
 	return &p
+}
+
+func (p *Switches) bindHK() {
+	p.pump.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
+                if on == true {
+			p.SetState(STATE_PUMP, true)
+                } else {
+                        p.StopAll(true)
+                }
+        })
+	
+	p.sweep.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
+		state := p.state
+		switch p.state {
+		case STATE_SOLAR:
+			if on {
+				state = STATE_SOLAR_MIXING
+			}
+			break
+		case STATE_SOLAR_MIXING:
+			if !on {
+				state = STATE_SOLAR
+			}
+			break
+		default:
+			if on {
+				state = STATE_SWEEP
+			} else {
+				state = STATE_PUMP
+			}
+		}
+		p.SetState(state, true)
+        })
+
+	p.solar.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
+		state := p.state
+		switch p.state {
+		case STATE_SWEEP:
+		case STATE_SOLAR_MIXING:
+			if on {
+				state = STATE_SOLAR_MIXING
+			} else {
+				state = STATE_SWEEP
+			}
+			break
+		case STATE_SOLAR:
+			if !on {
+				state = STATE_PUMP
+			}
+			break
+		default:
+			if on {
+				state = STATE_SOLAR
+			} else {
+				state = STATE_OFF
+			}
+		}
+		p.SetState(state, true)
+        })
+	
 }
 
 func (p *Switches) GetStartTime() time.Time {
@@ -83,79 +144,80 @@ func (p *Switches) GetStopTime() time.Time {
 	return p.pump.GetStopTime()
 }
 
+func (p *Switches) Enable(manual bool) {
+	if p.state == STATE_DISABLED {
+		p.state = STATE_OFF
+		p.StopAll(manual)
+	}
+}
+
 func (p *Switches) Disable() {
-	p.StopAll()
+	p.solarLed.Low()
+	turnOn(p.solar, false)
+	turnOn(p.pump, false)
+	turnOn(p.sweep, false)
+	p.manualOp = time.Now() // Not really important
 	p.state = STATE_DISABLED
 }
 
-func (p *Switches) StopAll() {
-	p.sweep.TurnOff()
-	p.pump.TurnOff()
-	p.solar.TurnOff()
-	p.solarLed.Low()
-	if p.state != STATE_DISABLED {
-		p.state = STATE_OFF
+func turnOn(relay *Relay, on bool) {
+	if on {
+		relay.TurnOn()
+	} else {
+		relay.TurnOff()
 	}
 }
 
-func (p *Switches) StartPump() {
+func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state State) {
+	if solarOn { p.solarLed.High() } else { p.solarLed.Low() }
+	turnOn(p.solar, solarOn)
+	turnOn(p.pump, pumpOn)
+	turnOn(p.sweep, sweepOn)
+	if isManual {
+		if p.GetStartTime().After(p.GetStopTime()) {
+			p.manualOp = p.GetStartTime()
+		} else {
+			p.manualOp = p.GetStopTime()
+		}
+	}
+	p.state = state
+}
+
+func (p *Switches) StopAll(manual bool) {
+	state := STATE_OFF
+	if p.state == STATE_DISABLED { state = STATE_DISABLED }
+	p.setSwitches(false, false, false, manual, state)
+}
+
+func (p *Switches) SetState(s State, manual bool) {
 	if p.state == STATE_DISABLED {
+		Info("Disabled, can't change state from %s to %s",
+			p.state, s);
 		return
 	}
-	p.pump.TurnOn()
-	p.sweep.TurnOff()
-	p.solar.TurnOff()
-	p.solarLed.Low()
-	p.state = STATE_PUMP
-}
-
-func (p *Switches) StartSweep() {
-	if p.state == STATE_DISABLED {
-		return
+	if p.ManualState() && !manual {
+		Debug("Manual override, can't change state from %s to %s",
+			p.state, s);
+		return // Don't override a manual operation
 	}
-	p.pump.TurnOn()
-	p.sweep.TurnOn()
-	p.solar.TurnOff()
-	p.solarLed.Low()
-	p.state = STATE_SWEEP
-}
-
-func (p *Switches) StartSolar() {
-	if p.state == STATE_DISABLED {
-		return
+	Info("State change from %s to %s", p.state, s)
+	switch s {
+	case STATE_DISABLED:
+		p.Disable(); return
+	case STATE_OFF:
+		p.StopAll(manual); return
+	case STATE_PUMP:
+		p.setSwitches(true, false, false, manual, s); return
+	case STATE_SWEEP:
+		p.setSwitches(true, true, false, manual, s); return
+	case STATE_SOLAR:
+		p.setSwitches(true, false, true, manual, s); return
+	case STATE_SOLAR_MIXING:
+		p.setSwitches(true, true, true, manual, s); return
 	}
-	p.StartPump()
-	p.solar.TurnOn()
-	p.solarLed.High()
-	p.state = STATE_SOLAR
 }
 
-func (p *Switches) StartSolarMixing() {
-	if p.state == STATE_DISABLED {
-		return
-	}
-	p.StartSweep()
-	p.solarLed.High()
-	p.solar.TurnOn()
-	p.state = STATE_SOLAR_MIXING
-}
-
-func (p *Switches) StartPumpManual() {
-	p.StartPump()
-	p.manualOp = p.GetStartTime()
-}
-
-func (p *Switches) StartSweepManual() {
-	p.StartSweep()
-	p.manualOp = p.GetStartTime()
-}
-
-func (p *Switches) StopAllManual() {
-	p.StopAll()
-	p.manualOp = p.GetStopTime()
-}
-
-func (p *Switches) GetState() State {
+func (p *Switches) State() State {
 	return p.state
 }
 
