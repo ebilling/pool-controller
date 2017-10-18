@@ -10,7 +10,6 @@ func main() {
 		Fatal("Usage: pool-controller CONFIG")
 	}
 	ppc := NewPoolPumpController(os.Args[1])
-	ppc.Update()
 	ppc.Start()
 	hcConfig := hc.Config{
 		Pin: ppc.pin,

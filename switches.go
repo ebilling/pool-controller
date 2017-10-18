@@ -18,7 +18,7 @@ const (
 )
 
 const SolarLED uint8 = 6
-	
+
 func (s State) String() string {
 	switch s {
 	case STATE_DISABLED:
@@ -144,19 +144,15 @@ func (p *Switches) GetStopTime() time.Time {
 	return p.pump.GetStopTime()
 }
 
-func (p *Switches) Enable(manual bool) {
+func (p *Switches) Enable() {
 	if p.state == STATE_DISABLED {
 		p.state = STATE_OFF
-		p.StopAll(manual)
+		p.StopAll(true)
 	}
 }
 
 func (p *Switches) Disable() {
-	p.solarLed.Low()
-	turnOn(p.solar, false)
-	turnOn(p.pump, false)
-	turnOn(p.sweep, false)
-	p.manualOp = time.Now() // Not really important
+	p.StopAll(true)
 	p.state = STATE_DISABLED
 }
 

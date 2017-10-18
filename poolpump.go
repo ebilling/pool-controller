@@ -14,7 +14,7 @@ const (
 	configZip       = "weather.zip"
 	waterGpio       = 24
 	roofGpio        = 25
-	buttonGpio      = 8
+	buttonGpio      = 18
 )
 
 type SolarVariables struct {
@@ -23,6 +23,8 @@ type SolarVariables struct {
 	tolerance         float64
 }
 
+// The PoolPumpController manages the relays that control the pumps based on
+// data from temperature probes and the weather. 
 type PoolPumpController struct {
 	config        *Config
 	weather       *Weather
@@ -45,6 +47,9 @@ func therm(config *Config, name string, gpio uint32) (*GpioThermometer) {
 	return NewGpioThermometer(name, mftr, gpio, cap)
 }
 
+// Creates a thermometer that remembers the temperature of the water when the
+// pumps were running.  This is more reprsentative of the actual water temperature,
+// as the water temperature probe is near the pump, not actually in the pool.
 func RunningWaterThermometer(t Thermometer, s *Switches) (*SelectiveThermometer) {
 	return NewSelectiveThermometer("Cached Pool Temp", mftr, t, func () (bool) {
 		return s.State() > STATE_OFF
@@ -73,6 +78,8 @@ func NewPoolPumpController(path string) *PoolPumpController {
 	return &ppc
 }
 
+// Updates the solar configuration parameters from the config file (if changed)
+// and updates the values of the Thermometers.
 func (ppc *PoolPumpController) Update() {
 	ppc.config.Update()
 	if ppc.config.Contains(configTarget) {
@@ -89,32 +96,30 @@ func (ppc *PoolPumpController) Update() {
 	ppc.runningTemp.Update()
 }
 
-func (ppc *PoolPumpController) RunLoop() {
-	interval := 10 * time.Second
-	for tries := 0; true; tries++ {
-		if tries % 10 == 0 {
-			Info(ppc.Status())
-		}
-		select {
-		case <- time.After(interval):
-			ppc.Update()
-			ppc.RunPumpsIfNeeded()
-		case <- ppc.done:
-			break
-		}
-	}
+// Writes updates to RRD files and generates cached graphs
+func (ppc *PoolPumpController) UpdateRrd() {
+
 }
 
+// A return value of 'True' indicates that the pool is too hot and the roof is cold
+// (probably at night), running the pumps with solar on would help bring the water
+// down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
 	return  ppc.waterTemp.Temperature() > ppc.solar.target + ppc.solar.tolerance &&
 		ppc.waterTemp.Temperature() > ppc.roofTemp.Temperature() + ppc.solar.deltaT
 }
 
+// A return value of 'True' indicates that the pool is too cool and the roof is hot, running
+// the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
 	return  ppc.waterTemp.Temperature() < ppc.solar.target - ppc.solar.tolerance &&
 		ppc.waterTemp.Temperature() < ppc.roofTemp.Temperature() - ppc.solar.deltaT
 }
 
+// If the water is not within the tolerance limit of the target, and the roof temperature would
+// help get the temperature to be closer to the target, the pumps will be turned on.  If the
+// outdoor temperature is low or the pool is very cold, the sweep will also be run to help mix
+// the water as it approaches the target.
 func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	state := ppc.switches.State()
 	if state == STATE_DISABLED || ppc.switches.ManualState() {
@@ -137,6 +142,29 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	}
 }
 
+// Runs calls PoolPumpController.Update() and PoolPumpController.RunPumpsIfNeeded()
+// repeatedly until PoolPumpController.Stop() is called
+func (ppc *PoolPumpController) runLoop() {
+	interval := 10 * time.Second
+	for tries := 0; true; tries++ {
+		if tries % 10 == 0 {
+			Info(ppc.Status())
+		}
+		select {
+		case <- ppc.done:
+			ppc.button.Stop()
+			 // Turn off the pumps, and don't let them turn back on
+			ppc.switches.Disable()
+			break
+		case <- time.After(interval):
+			ppc.Update()
+			ppc.RunPumpsIfNeeded()
+			ppc.UpdateRrd()
+		}
+	}
+}
+
+// Finishes initializing the PoolPumpController, and kicks off the control thread.
 func (ppc *PoolPumpController) Start() {	
 	ppc.button = NewGpioButton(buttonGpio, func() {
 		switch ppc.switches.State() {
@@ -155,8 +183,9 @@ func (ppc *PoolPumpController) Start() {
 			ppc.switches.SetState(STATE_OFF, true)
 		}
 	})
+	ppc.Update()
 	ppc.button.Start()
-	go ppc.RunLoop()
+	go ppc.runLoop()
 }
 
 func (ppc *PoolPumpController) Stop() {

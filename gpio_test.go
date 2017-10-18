@@ -219,10 +219,10 @@ func pumpTest(t *testing.T, pumps *Switches, state State,
 		t.Errorf("Stop time should not have changed")
 	}
 	if pumps.State() != state {
-		t.Errorf("Expected %s, found %s", state.String(), pumps.State().String())
+		t.Errorf("Expected State %s, found %s", state.String(), pumps.State().String())
 	}
 	if pumps.ManualState() != manual {
-		t.Errorf("Should have been manual")
+		t.Errorf("Expected Manual %t found %t", manual, pumps.ManualState())
 	}
 }
 
@@ -324,7 +324,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 			stopTime = pumps.GetStopTime()
 			pumps.Disable()
 			pumpTest(t, pumps, STATE_DISABLED, rpio.Low, rpio.Low, rpio.Low,
-				false, true, false, startTime, stopTime)
+				false, true, true, startTime, stopTime)
 		})
 		
 		t.Run("StartPump", func (t *testing.T) {
@@ -332,7 +332,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 			stopTime = pumps.GetStopTime()
 			pumps.SetState(STATE_SOLAR_MIXING, false)
 			pumpTest(t, pumps, STATE_DISABLED, rpio.Low, rpio.Low, rpio.Low,
-				false, false, false, startTime, stopTime)
+				false, false, true, startTime, stopTime)
 		})
 
 		t.Run("Disabled", func (t *testing.T) {
@@ -340,9 +340,23 @@ func TestGpioSwitchesBasic(t *testing.T) {
 			stopTime = pumps.GetStopTime()
 			pumps.SetState(STATE_PUMP, true)
 			pumpTest(t, pumps, STATE_DISABLED, rpio.Low, rpio.Low, rpio.Low,
-				false, false, false, startTime, stopTime)
+				false, false, true, startTime, stopTime)
 		})
 	})
-
-
+	t.Run("Enable", func (t *testing.T) {
+		t.Run("Disabled", func (t *testing.T) {
+			startTime = pumps.GetStartTime()
+			stopTime = pumps.GetStopTime()
+			pumps.Disable()
+			pumpTest(t, pumps, STATE_DISABLED, rpio.Low, rpio.Low, rpio.Low,
+				false, true, true, startTime, stopTime)
+		})
+		t.Run("Enabled", func (t *testing.T) {
+			startTime = pumps.GetStartTime()
+			stopTime = pumps.GetStopTime()
+			pumps.Enable()
+			pumpTest(t, pumps, STATE_OFF, rpio.Low, rpio.Low, rpio.Low,
+				false, true, true, startTime, stopTime)
+		})	
+	})
 }
