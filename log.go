@@ -84,7 +84,7 @@ func Log(format string, a ...interface{}) (error) {
 
 func Trace(format string, a ...interface{}) (error) {
 	tb := rtdebug.Stack()
-	return Info(fmt.Sprintf(format, a...) +
+	return Debug(fmt.Sprintf(format, a...) +
 		fmt.Sprintf(": TraceBack{%+v}",string(tb[:])))
 }
 

@@ -19,6 +19,7 @@ type Relay struct {
 	startTime  time.Time
 	stopTime   time.Time
 	accessory  *accessory.Switch
+	enabled    bool
 }
 
 func AccessoryInfo(name string, manufacturer string) (accessory.Info) {
@@ -42,6 +43,7 @@ func newRelay(pin PiPin, name string, manufacturer string) (*Relay) {
 		startTime: time.Now(),
 		stopTime:  time.Now(),
 		accessory: accessory.NewSwitch(AccessoryInfo(name, manufacturer)),
+		enabled:   true,
 	}
 	relay.pin.Output()
 	return &relay

@@ -3,36 +3,95 @@ package main
 import (
 	"math"
 	"sort"
+	"time"
 )
 
-func Average(list []float64) (float64) {
+type CacheValue struct {
+	seq      int
+	value    float64
+}
+
+type History struct {
+	data           []float64
+	ttl            int
+	sz             int
+	avg            CacheValue
+	med            CacheValue
+	vrc            CacheValue
+}
+
+func NewHistory(sz int) (*History) {
+	return &History{
+		data: make([]float64, sz),
+		ttl:  0,
+		sz:   sz,
+		avg:  CacheValue{ seq: -1 },
+		med:  CacheValue{ seq: -1 },
+		vrc:  CacheValue{ seq: -1 },
+	}
+}
+
+func (h *History) Push(f float64) {	
+	h.data[h.ttl%h.sz] = f
+	h.ttl++
+}
+
+func (h *History) PushDuration(d time.Duration) {
+	h.Push(float64(d))
+}
+
+func (h *History) Len() (int) {
+	if h.ttl < h.sz {
+		return h.ttl
+	}
+	return h.sz
+}
+
+func (h *History) Average() (float64) {
+	if h.ttl == h.avg.seq {
+		return h.avg.value
+	}
 	total := 0.0
-	for _, element := range list {
+	for _, element := range h.data {
 		total += element
 	}
-	return total/float64(len(list))
+	h.avg.value = total/float64(h.Len())
+	h.avg.seq = h.ttl
+	return h.avg.value
 }
 
-func Median(list []float64) (float64) {
-	if len(list) < 2 {
-		return Average(list)
+func (h *History) Median() (float64) {
+	if h.ttl == h.med.seq {
+		return h.med.value
 	}
-	sort.Float64s(list)
-	return list[len(list)/2]
+	if h.Len() < 2 {
+		h.med.value = h.Average()
+	} else {
+		data := []float64(h.data[:h.Len()])
+		sort.Float64s(data)
+		h.med.value = data[h.Len()/2]
+	}
+	h.med.seq = h.ttl
+	return h.med.value
 }
 
-func Variance(list []float64) (float64) {
-	if len(list) < 1 {
-		return 0.0
+func (h *History) Variance() (float64) {
+	if h.ttl == h.vrc.seq {
+		return h.vrc.value
 	}
-	avg := Average(list)
 	variance := 0.0
-	for _, n := range list {
-		variance = variance + math.Pow(avg - n, 2.0)		
+	if h.Len() < 1 {
+		return variance
 	}
-	return variance/float64(len(list))
+	avg := h.Average()
+	for _, n := range h.data[:h.Len()] {
+		variance = variance + math.Pow(avg - n, 2.0)
+	}
+	h.vrc.value = variance/float64(h.Len())
+	h.vrc.seq = h.ttl
+	return h.vrc.value
 }
 
-func Stddev(list []float64) (float64) {
-	return math.Sqrt(Variance(list))
+func (h *History) Stddev() (float64) {
+	return math.Sqrt(h.Variance())
 }

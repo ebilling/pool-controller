@@ -62,26 +62,30 @@ type GpioThermometer struct {
 	name        string
 	mutex       sync.Mutex
 	pin         PiPin
-	gpio        uint8
 	microfarads float64
-	temperature float64
 	updated     time.Time
+	history     History
 	accessory   *accessory.Thermometer
 }
 
 func NewGpioThermometer(name string, manufacturer string,
 	gpio uint8, capacitance_uF float64) (*GpioThermometer) {
+	return newGpioThermometer(name, manufacturer,
+		NewGpio(gpio), capacitance_uF)
+}
+
+func newGpioThermometer(name string, manufacturer string,
+	pin PiPin, capacitance_uF float64) (*GpioThermometer) {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
 		0.0, -20.0, 100.0, 1.0)
 	th := GpioThermometer{
-		name:        name,
-		mutex:       sync.Mutex{},
-		pin:         NewGpio(gpio),
-		gpio:        gpio,
-		microfarads: capacitance_uF,
-		temperature: float64(0.0), // TODO: Remove and use accessory storage only
-		updated:     time.Now().Add(-24 * time.Hour),
-		accessory:   acc,
+		name:            name,
+		mutex:           sync.Mutex{},
+		pin:             pin,
+		microfarads:     capacitance_uF,
+		history:        *NewHistory(50),
+		updated:         time.Now().Add(-24 * time.Hour),
+		accessory:       acc,
 	}
 	return &th
 }
@@ -101,7 +105,7 @@ func (t *GpioThermometer) getDischargeTime() (time.Duration) {
 	//Discharge the capacitor (low temps could make this really long)
 	t.pin.Output()
 	t.pin.Low()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
 	// Start polling
 	start := time.Now()
@@ -136,35 +140,60 @@ func (t *GpioThermometer) getTemp(ohms float64) (float64) {
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) (bool) {
 	const minTime = 3 * time.Millisecond
-	const maxTime = 500 * time.Millisecond
-	//TODO: add stddev detection here
-	return dischargeTime > minTime && dischargeTime < maxTime
+	const maxTime = 500 * time.Millisecond	
+
+	// Completely bogus, ignore
+	if dischargeTime < minTime || dischargeTime > maxTime {
+		return false
+	}
+	return true
 }
 
 func (t *GpioThermometer) Temperature() (float64) {
 	if time.Now().After(t.updated.Add(time.Minute)) {
 		t.Update()
 	}
-	return t.temperature
+	return t.accessory.TempSensor.CurrentTemperature.GetValue()
 }
 
 func (t *GpioThermometer) Update() (error) {
 	var dischargeTime time.Duration
-	// Ignore bad results, try again
-	for i := 0; i < 5; i++ {
+	h := NewHistory(3)
+	tries := 0
+	for i := 0; h.Len() < 3; i++ {
+		tries++
 		dischargeTime = t.getDischargeTime()
 		if t.inRange(dischargeTime) {
-			break
+			t.history.PushDuration(dischargeTime)
+			h.PushDuration(dischargeTime)
 		}
 	}
-	temp := t.getTemp(t.getOhms(dischargeTime))
-	if temp != 0.0 {
-		t.temperature = temp
-		t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
-		t.updated = time.Now()
-		return nil
+
+	// DEBUG 
+	Debug("%s Update() took %d tries to find %d results", t.Name(), tries, h.Len())
+
+	stdd := t.history.Stddev()
+	avg  := t.history.Average()
+	med  := t.history.Median()
+
+	// Throw away bad results
+	if math.Abs(avg - h.Median()) > stdd * 1.5 {
+		Info("%s failed to update: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
+			t.Name(),
+			h.Median()/float64(time.Millisecond),
+			med/float64(time.Millisecond),
+			avg/float64(time.Millisecond),
+			stdd/float64(time.Millisecond))
+		return fmt.Errorf("Could not update temperature successfully")
 	}
-	return fmt.Errorf("Could not update temperature successfully")
+	temp := t.getTemp(t.getOhms(dischargeTime))
+	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
+	t.updated = time.Now()
+	return nil
+}
+
+func (t *GpioThermometer) cleanData() {
+	
 }
 
 // Converts a temperature in Celsius to Farenheit

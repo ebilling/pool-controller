@@ -2,19 +2,23 @@ package main
 
 import (
 	"github.com/brutella/hc"
-	"os"
+	"flag"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		Fatal("Usage: pool-controller CONFIG")
+	forceRrd := flag.Bool("f", false, "force creation of new RRD files if present")
+	flag.Parse()
+	
+	if len(flag.Args()) < 1 {
+		Fatal("Usage: pool-controller [-f] CONFIG")
 	}
+
 	if err := GpioInit(); err != nil {
 		Fatal("Could not initialize GPIO: %s", err.Error())
 	}
-	config := NewConfig(os.Args[1])
+	config := NewConfig(flag.Args()[0])
 	ppc := NewPoolPumpController(config)
-	ppc.Start()
+	ppc.Start(*forceRrd)
 
 	hcConfig := hc.Config{
 		Pin: 	     config.GetString("homekit.pin"),
