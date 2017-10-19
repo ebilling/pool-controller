@@ -42,8 +42,8 @@ func newRelay(pin PiPin, name string, manufacturer string) (*Relay) {
 	relay := Relay{
 		name:      name,
 		pin:       pin,
-		startTime: time.Now().Add(time.Hour * -24),
-		stopTime:  time.Now().Add(time.Hour * -24),
+		startTime: time.Now(),
+		stopTime:  time.Now(),
 		accessory: accessory.NewSwitch(AccessoryInfo(name, manufacturer)),
 	}
 	relay.pin.Output()

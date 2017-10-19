@@ -8,6 +8,7 @@ import (
 
 type Rrd struct {
 	path        string
+	creator    *rrd.Creator
 	updater    *rrd.Updater
 	grapher    *rrd.Grapher
 }
@@ -18,12 +19,20 @@ func NewRrd(filename string) (*Rrd) {
 		updater: rrd.NewUpdater(filename),
 		grapher: rrd.NewGrapher(),
 	}
+	r.creator = rrd.NewCreator(r.path, time.Now(), 10)
 	return &r
 }
 
+func (r *Rrd) AddStandardRRAs() {
+	r.creator.RRA("AVERAGE", "0.5", "1", "20000")
+	r.creator.RRA("AVERAGE", "0.5", "6", "20000")
+	r.creator.RRA("AVERAGE", "0.5", "30", "400000")
+	r.creator.RRA("MAX", "0.5", "30", "400000")
+}
+
 // Used to create an RRD, only call once in the life of an RRD
-func (r *Rrd) Creator(name string) (*rrd.Creator) {
-	return rrd.NewCreator(r.path, time.Now(), 10)
+func (r *Rrd) Creator() (*rrd.Creator) {
+	return r.creator
 }
 
 // Updates the data in the RRD
@@ -43,7 +52,7 @@ func (r *Rrd) SaveGraph(start, end time.Time) (error) {
 }
 
 // Popular pallet for graphing
-func colorStr(count int32) string {
+func colorStr(count int) string {
 	TABLEAU_20 := [][]int{
 		{ 31, 119, 180}, {174, 199, 232}, {255, 127,  14}, {255, 187, 120},
 		{ 44, 160,  44}, {152, 223, 138}, {214,  39,  40}, {255, 152, 150},

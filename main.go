@@ -9,12 +9,15 @@ func main() {
 	if len(os.Args) < 2 {
 		Fatal("Usage: pool-controller CONFIG")
 	}
-	ppc := NewPoolPumpController(os.Args[1])
+	config := NewConfig(os.Args[1])
+	ppc := NewPoolPumpController(config)
 	ppc.Start()
+
 	hcConfig := hc.Config{
-		Pin: ppc.pin,
-		StoragePath: "/var/cache/homekit",
+		Pin: 	     config.GetString("homekit.pin"),
+		StoragePath: config.GetString("homekit.data"),
 	}
+
 	transport, err := hc.NewIPTransport(
 		hcConfig,
 		ppc.switches.pump.Accessory(),
@@ -34,6 +37,7 @@ func main() {
 		transport.Stop()
 	})
 
+	Info("Homekit Pin: %s", hcConfig.Pin)
 	transport.Start()
 	Info("Exiting")
 }
