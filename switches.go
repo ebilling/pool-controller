@@ -1,15 +1,14 @@
 package main
 
 import (
-	"github.com/stianeikeland/go-rpio"
 	"fmt"
 	"time"
 )
 
-type State uint8
+type State int8
 
 const (
-	STATE_DISABLED State  = iota
+	STATE_DISABLED State  = iota - 1
 	STATE_OFF
 	STATE_PUMP
 	STATE_SWEEP
@@ -59,7 +58,7 @@ func NewSwitches(manufacturer string) (*Switches) {
 		NewRelay(Relay1, "Pool Pump", manufacturer),
 		NewRelay(Relay2, "Pool Sweep", manufacturer),
 		NewRelay(Relay3, "Solar", manufacturer),
-		rpio.Pin(SolarLED))
+		NewGpio(SolarLED))
 }
 
 func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) (*Switches) {

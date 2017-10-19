@@ -1,45 +1,50 @@
 package main
 
 import (
-	"github.com/stianeikeland/go-rpio"
 	"fmt"
 	"testing"
 	"time"
 )
 
+type Direction bool
+const (
+	Input Direction = false
+	Output Direction = true
+)
+
 type TestPin struct {
-	state        rpio.State
-	direction    rpio.Direction
+	state        GpioState
+	direction    Direction
 	sleepTime    time.Duration
 	inputTime    time.Time
 }
 
 func (p *TestPin) Input() {
-	p.direction = rpio.Input
+	p.direction = Input
 	p.inputTime = time.Now()
 	Debug("Setting Fake pin to Input mode %v", p)
 }
 
 func (p *TestPin) Output() {
-	p.direction = rpio.Output
+	p.direction = Output
 	Debug("Setting Fake pin to Output mode %v", p)
 }
 
 func (p *TestPin) High() {
-	p.state = rpio.High
+	p.state = High
 	Debug("Setting Fake pin state to High %v", p)
 }
 
 func (p *TestPin) Low() {
-	p.state = rpio.Low
+	p.state = Low
 	Debug("Setting Fake pin state to Low %v", p)
 }
 
-func (p *TestPin) Read() rpio.State {
+func (p *TestPin) Read() GpioState {
 	now := time.Now()
 	sleeptime := p.inputTime.Add(p.sleepTime)
 	if p.sleepTime > 0 && now.After(sleeptime) {
-		p.state = rpio.High
+		p.state = High
 	}
 	return p.state
 }
@@ -52,11 +57,11 @@ func (p *TestPin) PullOff() {}
 
 func (p *TestPin) String() string {
 	state := "Low"
-        if p.state == rpio.High {
+        if p.state == High {
 		state = "High"
 	}
 	direction := "Input"
-	if p.direction == rpio.Output {
+	if p.direction == Output {
 		direction = "Output"
 	}
 	return fmt.Sprintf("TestPin: {State: %s, Direction: %s, Duration: %d, InputTime: %s}",
@@ -66,16 +71,16 @@ func (p *TestPin) String() string {
 func TestGpioThermometer(t *testing.T) {
 	sleeptime := 100 * time.Millisecond
 	pin := TestPin{
-		state:        rpio.Low,
-		direction:    rpio.Input,
+		state:        Low,
+		direction:    Input,
 		sleepTime:    sleeptime,
 		inputTime:    time.Now(),
 	}
 	therm := NewGpioThermometer("Test Thermometer", mftr, 22, 10.0)
 	therm.pin = &pin
 
-	Debug("States (H=%d, L=%d) Direction (I=%d, O=%d)", rpio.High, rpio.Low,
-		rpio.Input, rpio.Output)
+	Debug("States (H=%d, L=%d) Direction (I=%d, O=%d)", High, Low,
+		Input, Output)
 	Debug("Therm: %v", therm)
 	
 	t.Run("getDischargeTime", func (t *testing.T) {
@@ -124,27 +129,27 @@ func TestGpioThermometer(t *testing.T) {
 	})
 }
 
-func DirectionStr(d rpio.Direction) string {
-	if d == rpio.Input {
+func DirectionStr(d Direction) string {
+	if d == Input {
 		return "Input"
 	}
-	if d == rpio.Output {
+	if d == Output {
 		return "Output"
 	}
 	return "ERROR"
 }
 
-func StateStr(s rpio.State) string {
-	if s == rpio.High {
+func StateStr(s GpioState) string {
+	if s == High {
 		return "High"
 	}
-	if s == rpio.Low {
+	if s == Low {
 		return "Low"
 	}
 	return "ERROR"
 }
 
-func checkPinState(t *testing.T, pin PiPin, dir rpio.Direction, state rpio.State) {
+func checkPinState(t *testing.T, pin PiPin, dir Direction, state GpioState) {
 	tpin := pin.(*TestPin)
 	if tpin.direction != dir {
 		t.Errorf("Pin direction %s, expected %s",
@@ -163,12 +168,12 @@ func TestGpioRelay(t *testing.T) {
 	stop := relay.stopTime
 	
 	t.Run("NewRelay", func(t *testing.T) {
-		checkPinState(t, relay.pin, rpio.Output, rpio.Low)
+		checkPinState(t, relay.pin, Output, Low)
 	})
 	
 	t.Run("TurnOn", func(t *testing.T) {
 		relay.TurnOn()
-		checkPinState(t, relay.pin, rpio.Output, rpio.High)
+		checkPinState(t, relay.pin, Output, High)
 		if !relay.GetStartTime().After(start) {
 			t.Errorf("Start time not updated")
 		}
@@ -183,7 +188,7 @@ func TestGpioRelay(t *testing.T) {
 	start = relay.startTime
 	t.Run("TurnOff", func(t *testing.T) {
 		relay.TurnOff()
-		checkPinState(t, pin, rpio.Output, rpio.Low)
+		checkPinState(t, pin, Output, Low)
 		if !relay.GetStartTime().Equal(start) {
 			t.Errorf("Start time should not have been updated")
 		}
@@ -197,12 +202,12 @@ func TestGpioRelay(t *testing.T) {
 }
 
 func pumpTest(t *testing.T, pumps *Switches, state State,
-	pumpState, sweepState, solarState rpio.State,
+	pumpState, sweepState, solarState GpioState,
 	started, stopped, manual bool, startTime, stopTime time.Time) {
-	checkPinState(t, pumps.pump.pin, rpio.Output, pumpState)
-	checkPinState(t, pumps.sweep.pin, rpio.Output, sweepState)
-	checkPinState(t, pumps.solar.pin, rpio.Output, solarState)
-	checkPinState(t, pumps.solarLed, rpio.Output, solarState)
+	checkPinState(t, pumps.pump.pin, Output, pumpState)
+	checkPinState(t, pumps.sweep.pin, Output, sweepState)
+	checkPinState(t, pumps.solar.pin, Output, solarState)
+	checkPinState(t, pumps.solarLed, Output, solarState)
 	if !pumps.pump.GetStartTime().Equal(pumps.GetStartTime()) {
 		t.Errorf("Start time should be same as pump")
 	}
@@ -240,7 +245,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 	startTime := pumps.GetStartTime()
 	stopTime := pumps.GetStopTime()
 	t.Run("Initialized", func (t *testing.T) {
-		pumpTest(t, pumps, STATE_OFF, rpio.Low, rpio.Low, rpio.Low,
+		pumpTest(t, pumps, STATE_OFF, Low, Low, Low,
 			false, false, false, startTime, stopTime)
 	})
 
@@ -248,7 +253,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		startTime = pumps.GetStartTime()
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(STATE_PUMP, false)
-		pumpTest(t, pumps, STATE_PUMP, rpio.High, rpio.Low, rpio.Low,
+		pumpTest(t, pumps, STATE_PUMP, High, Low, Low,
 			true, false, false, startTime, stopTime)
 	})
 
@@ -256,7 +261,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		startTime = pumps.GetStartTime()
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(STATE_SWEEP, false)
-		pumpTest(t, pumps, STATE_SWEEP, rpio.High, rpio.High, rpio.Low,
+		pumpTest(t, pumps, STATE_SWEEP, High, High, Low,
 			true, false, false, startTime, stopTime)
 	})
 
@@ -264,7 +269,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		startTime = pumps.GetStartTime()
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(STATE_PUMP, false)
-		pumpTest(t, pumps, STATE_PUMP, rpio.High, rpio.Low, rpio.Low,
+		pumpTest(t, pumps, STATE_PUMP, High, Low, Low,
 			true, false, false, startTime, stopTime)
 	})
 
@@ -272,7 +277,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		startTime = pumps.GetStartTime()
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(STATE_SOLAR, false)
-		pumpTest(t, pumps, STATE_SOLAR, rpio.High, rpio.Low, rpio.High,
+		pumpTest(t, pumps, STATE_SOLAR, High, Low, High,
 			true, false, false, startTime, stopTime)
 	})
 
@@ -280,7 +285,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		startTime = pumps.GetStartTime()
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(STATE_SOLAR_MIXING, false)
-		pumpTest(t, pumps, STATE_SOLAR_MIXING, rpio.High, rpio.High, rpio.High,
+		pumpTest(t, pumps, STATE_SOLAR_MIXING, High, High, High,
 			true, false, false, startTime, stopTime)
 	})	
 	
@@ -288,10 +293,10 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		startTime = pumps.GetStartTime()
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(STATE_PUMP, true)
-		pumpTest(t, pumps, STATE_PUMP, rpio.High, rpio.Low, rpio.Low,
+		pumpTest(t, pumps, STATE_PUMP, High, Low, Low,
 			true, false, true, startTime, stopTime)
 		pumps.SetState(STATE_SOLAR, false)
-		pumpTest(t, pumps, STATE_PUMP, rpio.High, rpio.Low, rpio.Low,
+		pumpTest(t, pumps, STATE_PUMP, High, Low, Low,
 			true, false, true, startTime, stopTime)
 		
 	})
@@ -300,10 +305,10 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		startTime = pumps.GetStartTime()
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(STATE_SWEEP, true)
-		pumpTest(t, pumps, STATE_SWEEP, rpio.High, rpio.High, rpio.Low,
+		pumpTest(t, pumps, STATE_SWEEP, High, High, Low,
 			true, false, true, startTime, stopTime)
 		pumps.SetState(STATE_SOLAR, false)
-		pumpTest(t, pumps, STATE_SWEEP, rpio.High, rpio.High, rpio.Low,
+		pumpTest(t, pumps, STATE_SWEEP, High, High, Low,
 			true, false, true, startTime, stopTime)
 	})
 
@@ -311,10 +316,10 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		startTime = pumps.GetStartTime()
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(STATE_OFF, true)
-		pumpTest(t, pumps, STATE_OFF, rpio.Low, rpio.Low, rpio.Low,
+		pumpTest(t, pumps, STATE_OFF, Low, Low, Low,
 			false, true, true, startTime, stopTime)
 		pumps.SetState(STATE_SOLAR_MIXING, false)
-		pumpTest(t, pumps, STATE_OFF, rpio.Low, rpio.Low, rpio.Low,
+		pumpTest(t, pumps, STATE_OFF, Low, Low, Low,
 			false, true, true, startTime, stopTime)
 	})
 
@@ -323,7 +328,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 			startTime = pumps.GetStartTime()
 			stopTime = pumps.GetStopTime()
 			pumps.Disable()
-			pumpTest(t, pumps, STATE_DISABLED, rpio.Low, rpio.Low, rpio.Low,
+			pumpTest(t, pumps, STATE_DISABLED, Low, Low, Low,
 				false, true, true, startTime, stopTime)
 		})
 		
@@ -331,7 +336,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 			startTime = pumps.GetStartTime()
 			stopTime = pumps.GetStopTime()
 			pumps.SetState(STATE_SOLAR_MIXING, false)
-			pumpTest(t, pumps, STATE_DISABLED, rpio.Low, rpio.Low, rpio.Low,
+			pumpTest(t, pumps, STATE_DISABLED, Low, Low, Low,
 				false, false, true, startTime, stopTime)
 		})
 
@@ -339,7 +344,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 			startTime = pumps.GetStartTime()
 			stopTime = pumps.GetStopTime()
 			pumps.SetState(STATE_PUMP, true)
-			pumpTest(t, pumps, STATE_DISABLED, rpio.Low, rpio.Low, rpio.Low,
+			pumpTest(t, pumps, STATE_DISABLED, Low, Low, Low,
 				false, false, true, startTime, stopTime)
 		})
 	})
@@ -348,14 +353,14 @@ func TestGpioSwitchesBasic(t *testing.T) {
 			startTime = pumps.GetStartTime()
 			stopTime = pumps.GetStopTime()
 			pumps.Disable()
-			pumpTest(t, pumps, STATE_DISABLED, rpio.Low, rpio.Low, rpio.Low,
+			pumpTest(t, pumps, STATE_DISABLED, Low, Low, Low,
 				false, true, true, startTime, stopTime)
 		})
 		t.Run("Enabled", func (t *testing.T) {
 			startTime = pumps.GetStartTime()
 			stopTime = pumps.GetStopTime()
 			pumps.Enable()
-			pumpTest(t, pumps, STATE_OFF, rpio.Low, rpio.Low, rpio.Low,
+			pumpTest(t, pumps, STATE_OFF, Low, Low, Low,
 				false, true, true, startTime, stopTime)
 		})	
 	})

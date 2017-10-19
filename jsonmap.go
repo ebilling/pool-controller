@@ -24,7 +24,7 @@ func (m *JSONmap) readBytes(data []byte) (error) {
 }
 
 func (m *JSONmap) readString(data string) (error) {
-	Info("Converting string to JSONmap: %s", data)
+	Debug("Converting string to JSONmap: %s", data)
 	return json.Unmarshal([]byte(data), &m._data)
 }
 

@@ -2,19 +2,16 @@ package main
 
 import (
 	"github.com/brutella/hc/accessory"
-	"github.com/stianeikeland/go-rpio"
 	"fmt"
 	"time"
 )
 
 const (
 	Relay1 uint8 = 17
-	Relay2       = 27
-	Relay3       = 22
-	Relay4       = 23
+	Relay2 uint8 = 27
+	Relay3 uint8 = 22
+	Relay4 uint8 = 23
 )
-
-var RELAYS = [...]uint8{Relay1, Relay2, Relay3, Relay4}
 
 type Relay struct {
 	name       string
@@ -35,7 +32,7 @@ func timeStr(t time.Time) string{
 }
 
 func NewRelay(pin uint8, name string, manufacturer string) (*Relay) {
-	return newRelay(rpio.Pin(pin), name, manufacturer)
+	return newRelay(NewGpio(pin), name, manufacturer)
 }
 
 func newRelay(pin PiPin, name string, manufacturer string) (*Relay) {
@@ -47,7 +44,6 @@ func newRelay(pin PiPin, name string, manufacturer string) (*Relay) {
 		accessory: accessory.NewSwitch(AccessoryInfo(name, manufacturer)),
 	}
 	relay.pin.Output()
-	relay.pin.Low()
 	return &relay
 }
 
@@ -79,8 +75,15 @@ func (r *Relay) TurnOff() {
 	r.accessory.Switch.On.SetValue(false)
 }
 
+func (r *Relay) isOn() bool {
+	if r.pin.Read() == High {
+		return true
+	}
+	return false
+}
+
 func (r *Relay) Status() string {
-	if r.pin.Read() == rpio.High {
+	if r.pin.Read() == High {
 		return "On"
 	}
 	return "Off"

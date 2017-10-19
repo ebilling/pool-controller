@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/stianeikeland/go-rpio"
 	"time"
 )
 
@@ -14,7 +13,7 @@ type Button struct {
 }
 
 func NewGpioButton(pin uint8, callback func()) (*Button) {
-	return newButton(rpio.Pin(pin), callback)
+	return newButton(NewGpio(pin), callback)
 }
 
 func newButton(pin PiPin, callback func ()) (*Button) {
@@ -47,7 +46,7 @@ func (b *Button) RunLoop() {
 			state := b.pin.Read()
 			if state != oldState {
 				oldState = state // State change		
-				if state == rpio.High {
+				if state == High {
 					b.callback()
 				}
 			}

@@ -9,6 +9,9 @@ func main() {
 	if len(os.Args) < 2 {
 		Fatal("Usage: pool-controller CONFIG")
 	}
+	if err := GpioInit(); err != nil {
+		Fatal("Could not initialize GPIO: %s", err.Error())
+	}
 	config := NewConfig(os.Args[1])
 	ppc := NewPoolPumpController(config)
 	ppc.Start()

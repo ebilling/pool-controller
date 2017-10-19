@@ -2,7 +2,6 @@ package main
 
 import (
         "github.com/brutella/hc/accessory"
-	"github.com/stianeikeland/go-rpio"
 	"fmt"
 	"math"
 	"sync"
@@ -28,13 +27,15 @@ func NewSelectiveThermometer(name string, manufacturer string, thermometer Therm
 	filter func () bool) (*SelectiveThermometer) {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
 		0.0, -20.0, 100.0, 1.0)
+	thermometer.Update()
+	acc.TempSensor.CurrentTemperature.SetValue(thermometer.Temperature())
 	return &SelectiveThermometer{
 		name:         name,
 		thermometer:  thermometer,
 		filter:       filter,
-		temperature:  0.0,
+		temperature:  thermometer.Temperature(),
 		accessory:    acc,
-	}
+	}	
 }
 
 func (t *SelectiveThermometer) Name() string {
@@ -48,6 +49,7 @@ func (t *SelectiveThermometer) Temperature() float64 {
 func (t *SelectiveThermometer) Update() error {
 	if (t.filter()) {
 		t.temperature = t.thermometer.Temperature()
+		t.accessory.TempSensor.CurrentTemperature.SetValue(t.temperature)
 	}
 	return nil
 }
@@ -60,7 +62,7 @@ type GpioThermometer struct {
 	name        string
 	mutex       sync.Mutex
 	pin         PiPin
-	gpio        uint32
+	gpio        uint8
 	microfarads float64
 	temperature float64
 	updated     time.Time
@@ -68,13 +70,13 @@ type GpioThermometer struct {
 }
 
 func NewGpioThermometer(name string, manufacturer string,
-	gpio uint32, capacitance_uF float64) (*GpioThermometer) {
+	gpio uint8, capacitance_uF float64) (*GpioThermometer) {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
 		0.0, -20.0, 100.0, 1.0)
 	th := GpioThermometer{
 		name:        name,
 		mutex:       sync.Mutex{},
-		pin:         rpio.Pin(gpio),
+		pin:         NewGpio(gpio),
 		gpio:        gpio,
 		microfarads: capacitance_uF,
 		temperature: float64(0.0), // TODO: Remove and use accessory storage only
@@ -107,7 +109,7 @@ func (t *GpioThermometer) getDischargeTime() (time.Duration) {
 	timeout := start.Add(500 * time.Millisecond)
 	for time.Now().Before(timeout) {
 		r := t.pin.Read()
-		if r == rpio.High {
+		if r == High {
 			return time.Since(start)
 		}
 		time.Sleep(time.Microsecond*100)

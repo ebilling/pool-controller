@@ -60,6 +60,6 @@ func colorStr(count int) string {
 		{227, 119, 194}, {247, 182, 210}, {127, 127, 127}, {199, 199, 199},
 		{188, 189,  34}, {219, 219, 141}, { 23, 190, 207}, {158, 218, 229}}
 
-	return fmt.Sprintf("#%02x%02x%02x", TABLEAU_20[count%20][0],
+	return fmt.Sprintf("%02x%02x%02x", TABLEAU_20[count%20][0],
 		TABLEAU_20[count%20][1], TABLEAU_20[count%20][2])
 }
