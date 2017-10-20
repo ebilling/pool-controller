@@ -80,4 +80,3 @@ func (g *Gpio) PullDown() {
 func (g *Gpio) PullOff() {
 	g.pin.In(gpio.Float, gpio.NoEdge)
 }
-

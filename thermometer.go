@@ -83,7 +83,7 @@ func newGpioThermometer(name string, manufacturer string,
 		mutex:           sync.Mutex{},
 		pin:             pin,
 		microfarads:     capacitance_uF,
-		history:        *NewHistory(50),
+		history:        *NewHistory(100),
 		updated:         time.Now().Add(-24 * time.Hour),
 		accessory:       acc,
 	}

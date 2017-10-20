@@ -185,6 +185,7 @@ func (p *Switches) StopAll(manual bool) {
 }
 
 func (p *Switches) SetState(s State, manual bool) {
+	if p.state == s { return // Nothing to do here }
 	if p.state == STATE_DISABLED {
 		Info("Disabled, can't change state from %s to %s",
 			p.state, s);

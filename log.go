@@ -22,6 +22,14 @@ func _init() {
 	}
 }
 
+func EnableDebug() {
+	__debug__ = true
+}
+
+func DisableDebug() {
+	__debug__ = false
+}
+
 func Alert(format string, a ...interface{}) (error) {
 	_init()
 	return __logger__.Alert(fmt.Sprintf(format, a...))
@@ -60,14 +68,6 @@ func Warn(format string, a ...interface{}) (error) {
 func Info(format string, a ...interface{}) (error) {
 	_init()
 	return __logger__.Info(fmt.Sprintf(format, a...))
-}
-
-func EnableDebug() {
-	__debug__ = true
-}
-
-func DisableDebug() {
-	__debug__ = false
 }
 
 func Debug(format string, a ...interface{}) (error) {

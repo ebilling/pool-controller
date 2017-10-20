@@ -30,7 +30,7 @@ type PoolPumpController struct {
 	config        *Config
 	weather       *Weather
 	switches      *Switches
-	waterTemp     Thermometer
+	pumpTemp      Thermometer
 	runningTemp   Thermometer
 	roofTemp      Thermometer
 	solar         SolarVariables
@@ -63,18 +63,18 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 		config:     config,
 		weather:    NewWeather(config.GetString(configAppId), 15 * time.Minute),
 		switches:   NewSwitches(mftr),
-		waterTemp:  therm(config, "Pumphouse", waterGpio),
+		pumpTemp:  therm(config, "Pumphouse", waterGpio),
 		roofTemp:   therm(config, "Poolhouse Roof", roofGpio),
 		solar:      SolarVariables{
-			target: 25.0,
-			deltaT: 5.0,
+			target:    25.0,
+			deltaT:    5.0,
 			tolerance: 0.5,
 		},
 		tempRrd:    NewRrd(config.GetString("homekit.data")+"/temperature.rrd"),
 		pumpRrd:    NewRrd(config.GetString("homekit.data")+"/pumpstatus.rrd"),
 		done:       make(chan bool),
 	}
-	ppc.runningTemp = RunningWaterThermometer(ppc.waterTemp, ppc.switches)
+	ppc.runningTemp = RunningWaterThermometer(ppc.pumpTemp, ppc.switches)
 	return &ppc
 }
 
@@ -91,7 +91,7 @@ func (ppc *PoolPumpController) Update() {
 	if ppc.config.Contains(configTolerance) {
 		ppc.solar.tolerance = ppc.config.GetFloat(configTolerance)
 	}
-	ppc.waterTemp.Update()
+	ppc.pumpTemp.Update()
 	ppc.roofTemp.Update()
 	ppc.runningTemp.Update()
 }
@@ -100,15 +100,15 @@ func (ppc *PoolPumpController) Update() {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
-	return  ppc.waterTemp.Temperature() > ppc.solar.target + ppc.solar.tolerance &&
-		ppc.waterTemp.Temperature() > ppc.roofTemp.Temperature() + ppc.solar.deltaT
+	return  ppc.pumpTemp.Temperature() > ppc.solar.target + ppc.solar.tolerance &&
+		ppc.pumpTemp.Temperature() > ppc.roofTemp.Temperature() + ppc.solar.deltaT
 }
 
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
-	return  ppc.waterTemp.Temperature() < ppc.solar.target - ppc.solar.tolerance &&
-		ppc.waterTemp.Temperature() < ppc.roofTemp.Temperature() - ppc.solar.deltaT
+	return  ppc.pumpTemp.Temperature() < ppc.solar.target - ppc.solar.tolerance &&
+		ppc.pumpTemp.Temperature() < ppc.roofTemp.Temperature() - ppc.solar.deltaT
 }
 
 // If the water is not within the tolerance limit of the target, and the roof temperature would
@@ -123,9 +123,9 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	temp := ppc.weather.GetCurrentTempC(ppc.config.Get(configZip).(string))
 	if ppc.shouldCool() || ppc.shouldWarm() {
 		// Wide deltaT between target and temp or when it's cold, run sweep 
-		if ppc.waterTemp.Temperature() < ppc.solar.target - ppc.solar.deltaT ||
+		if ppc.pumpTemp.Temperature() < ppc.solar.target - ppc.solar.deltaT ||
 			temp < ppc.solar.target || // Cool Weather
-			ppc.waterTemp.Temperature() > ppc.solar.target + ppc.solar.tolerance {
+			ppc.pumpTemp.Temperature() > ppc.solar.target + ppc.solar.tolerance {
 			ppc.switches.SetState(STATE_SOLAR_MIXING, false)
 		} else {
 			// Just push water through the panels
@@ -134,10 +134,9 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		return
 	}
 	if time.Now().Sub(ppc.switches.GetStopTime()) > 24 * time.Hour {
+		ppc.switches.SetState(STATE_SWEEP, false) // Clean pool
 		if time.Now().Sub(ppc.switches.GetStartTime()) > 2 * time.Hour {
 			ppc.switches.StopAll(false) // End daily
-		} else {
-			ppc.switches.SetState(STATE_SWEEP, false) // Clean pool
 		}
 		return
 	}
@@ -197,7 +196,7 @@ func (ppc *PoolPumpController) Start(force bool) {
 }
 
 func (r *Rrd) addTemp(name, title string, colorid, which int) {
-	r.creator.DS(name, "GAUGE", "10", "-273", "5000")
+	r.creator.DS(name, "GAUGE", "30", "-273", "5000")
 	vname := fmt.Sprintf("t%d", which)
 	cname := fmt.Sprintf("f%d", which)
 	r.grapher.Def(vname, r.path, name, "MAX")
@@ -215,15 +214,15 @@ func (ppc *PoolPumpController) createRrds(force bool) {
 	tg.SetVLabel("Degrees Farenheit")
 	tg.SetRightAxis(1, 0.0)
 	tg.SetRightAxisLabel("dekawatts/sqm")
-	tg.SetSize(700, 300) // Config?
+	tg.SetSize(700, 400) // Config?
 	tg.SetImageFormat("PNG")
 
-	ppc.tempRrd.addTemp("pump",    "Pump",         8,  0)
-	ppc.tempRrd.addTemp("weather", "Weather",      1,  1)
-	ppc.tempRrd.addTemp("roof",    "Roof",         2,  2)
-	ppc.tempRrd.addTemp("solar",   "SolRad w/sqm", 4,  3)
-	ppc.tempRrd.addTemp("pool",    "Pool",         0,  4)
-	ppc.tempRrd.addTemp("target",  "Target",       6,  5)
+	ppc.tempRrd.addTemp("pump",    "Pump",         8,  1)
+	ppc.tempRrd.addTemp("weather", "Weather",      1,  2)
+	ppc.tempRrd.addTemp("roof",    "Roof",         2,  3)
+	ppc.tempRrd.addTemp("solar",   "SolRad w/sqm", 4,  4)
+	ppc.tempRrd.addTemp("pool",    "Pool",         0,  5)
+	ppc.tempRrd.addTemp("target",  "Target",       6,  6)
 	ppc.tempRrd.AddStandardRRAs()
 	ppc.tempRrd.Creator().Create(force) // fails if already exists
 
@@ -232,13 +231,13 @@ func (ppc *PoolPumpController) createRrds(force bool) {
 	pg.SetVLabel("Status Code")
 	pg.SetRightAxis(1, 0.0)
 	pg.SetRightAxisLabel("Status Code")
-	pg.SetSize(700, 300) // Config?
+	pg.SetSize(700, 250) // Config?
 	pg.SetImageFormat("PNG")
 
 	pc := ppc.pumpRrd.Creator()
-	pc.DS("status", "GAUGE", "10", "-1", "10")
-	pc.DS("solar",  "GAUGE", "10", "-1", "10")
-	pc.DS("manual", "GAUGE", "10", "-1", "10")
+	pc.DS("status", "GAUGE", "30", "-1", "10")
+	pc.DS("solar",  "GAUGE", "30", "-1", "10")
+	pc.DS("manual", "GAUGE", "30", "-1", "10")
 	ppc.pumpRrd.AddStandardRRAs()
 	pc.Create(force) // fails if already exists
 
@@ -255,14 +254,14 @@ func (ppc *PoolPumpController) UpdateRrd() {
 	hours := time.Duration(ppc.config.GetFloat("graph.scale")) * time.Hour
 
 	update := fmt.Sprintf("N:%f:%f:%f:%f:%f:%f",
-		ppc.waterTemp.Temperature(), ppc.WeatherC(), ppc.roofTemp.Temperature(),
+		ppc.pumpTemp.Temperature(), ppc.WeatherC(), ppc.roofTemp.Temperature(),
 		ppc.weather.GetSolarRadiation(ppc.config.GetString(configZip)),
 		ppc.runningTemp.Temperature(), ppc.solar.target)
-
+	EnableDebug()
 	Debug("Updating TempRrd: %s", update)
 	err :=  ppc.tempRrd.Updater().Update(update)
 	if err != nil {
-		Error("Could not create TempRrd: %s", err.Error())
+		Error("Update failed for TempRrd {%s}: %s", update, err.Error())
 	}
 
 	_, err = ppc.tempRrd.Grapher().SaveGraph("/tmp/temps.tmp",
@@ -283,11 +282,14 @@ func (ppc *PoolPumpController) UpdateRrd() {
 
 	_, err = ppc.pumpRrd.Grapher().SaveGraph("/tmp/pumps.tmp",
 		time.Now().Add(hours * -1), time.Now())
-	if err != nil { Error("Could not create PumpGraph: %s", err.Error()) }
+	if err != nil {
+		Error("Update failed for TempRrd {%s}: %s", update, err.Error())
+	}
 
 	// Expose the files over atomically
 	os.Rename("/tmp/temps.tmp", "/tmp/temps.png")
 	os.Rename("/tmp/pumps.tmp", "/tmp/pumps.png")
+	DisableDebug()
 }
 
 func (ppc *PoolPumpController) Stop() {
@@ -304,6 +306,6 @@ func (ppc *PoolPumpController) Status() string {
 		"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f) CurrentTemp(%0.1f)",
 		ppc.switches.State(), ppc.switches.solar.Status(),
 		ppc.switches.pump.Status(), ppc.switches.sweep.Status(),
-		ppc.runningTemp.Temperature(), ppc.waterTemp.Temperature(),
+		ppc.runningTemp.Temperature(), ppc.pumpTemp.Temperature(),
 		ppc.roofTemp.Temperature(), ppc.WeatherC())
 }

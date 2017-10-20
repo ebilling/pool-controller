@@ -27,12 +27,12 @@ func main() {
 
 	transport, err := hc.NewIPTransport(
 		hcConfig,
+		ppc.runningTemp.Accessory(),
+		ppc.pumpTemp.Accessory(),
+		ppc.roofTemp.Accessory(),
 		ppc.switches.pump.Accessory(),
 		ppc.switches.sweep.Accessory(),
-		ppc.switches.solar.Accessory(),
-		ppc.waterTemp.Accessory(),
-		ppc.runningTemp.Accessory(),
-		ppc.roofTemp.Accessory())
+		ppc.switches.solar.Accessory())
 
 
 	if err != nil {
