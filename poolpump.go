@@ -148,7 +148,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 // Runs calls PoolPumpController.Update() and PoolPumpController.RunPumpsIfNeeded()
 // repeatedly until PoolPumpController.Stop() is called
 func (ppc *PoolPumpController) runLoop() {
-	interval := 10 * time.Second
+	interval :=  5 * time.Second
 	for tries := 0; true; tries++ {
 		if tries % 6 == 0 {
 			Info(ppc.Status())

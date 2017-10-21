@@ -7,7 +7,6 @@ import (
 type Button struct {
 	pin        PiPin
 	callback   func ()
-	sleeptime  time.Duration
 	bouncetime time.Duration	
 	done       chan bool
 }
@@ -20,11 +19,10 @@ func newButton(pin PiPin, callback func ()) (*Button) {
 	b := Button{
 		pin:          pin,
 		callback:     callback,
-		sleeptime:    20 * time.Millisecond,
-		bouncetime:   250 * time.Millisecond,
+		bouncetime:   800 * time.Millisecond,
 		done:         make(chan bool),
 	}
-	pin.Input()
+	pin.InputEdge(PullUp, FallingEdge)
 	return &b
 }
 
@@ -34,19 +32,19 @@ func (b *Button) Start() {
 
 func (b *Button) RunLoop() {
 	start:= time.Now()
-	oldState:= b.pin.Read()
 	for true {
 		select {
 		case done := <- b.done:
-			if done {break}
+			if done { return }     // End job
+		default:         // Required to not block
+			break
 		}
-		time.Sleep(b.sleeptime)
-		if start.Add(b.bouncetime).Before(time.Now()) {
-			start = time.Now() // filter noise of up/down
-			state := b.pin.Read()
-			if state != oldState {
-				oldState = state // State change		
-				if state == High {
+		if b.pin.WaitForEdge(time.Second) {
+			if start.Add(b.bouncetime).Before(time.Now()) {
+				start = time.Now() // filter noise of up/down
+				state := b.pin.Read()
+				if state == Low {
+					Debug("Button Pushed: Running Callback")
 					b.callback()
 				}
 			}

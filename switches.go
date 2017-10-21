@@ -70,7 +70,7 @@ func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) (*Swit
 		solarLed: solarLed,
 		manualOp: time.Now().Add(time.Hour * -24),
 	}
-	solarLed.Output()
+	solarLed.Output(Low)
 	p.bindHK()
 	return &p
 }
@@ -164,7 +164,7 @@ func turnOn(relay *Relay, on bool) {
 }
 
 func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state State) {
-	if solarOn { p.solarLed.High() } else { p.solarLed.Low() }
+	if solarOn { p.solarLed.Output(High) } else { p.solarLed.Output(Low) }
 	turnOn(p.solar, solarOn)
 	turnOn(p.pump, pumpOn)
 	turnOn(p.sweep, sweepOn)
