@@ -168,7 +168,7 @@ func (t *GpioThermometer) Update() (error) {
 
 	Debug("%s Update() took %d tries to find %d results", t.Name(), tries, h.Len())
 
-	stdd := t.history.Stddev() * 2
+	stdd := t.history.Stddev() * 1.5
 	avg  := t.history.Average()
 	med  := t.history.Median()
 

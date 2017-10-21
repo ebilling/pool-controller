@@ -91,6 +91,11 @@ func (ppc *PoolPumpController) Update() {
 	if ppc.config.Contains(configTolerance) {
 		ppc.solar.tolerance = ppc.config.GetFloat(configTolerance)
 	}
+	if ppc.config.Contains("Debug") && ppc.config.GetString("Debug") == "True" {
+		EnableDebug()
+	} else {
+		DisableDebug()
+	}
 	ppc.pumpTemp.Update()
 	ppc.roofTemp.Update()
 	ppc.runningTemp.Update()
@@ -196,7 +201,7 @@ func (ppc *PoolPumpController) Start(force bool) {
 }
 
 func (r *Rrd) addTemp(name, title string, colorid, which int) {
-	r.creator.DS(name, "GAUGE", "60", "-273", "1000")
+	r.creator.DS(name, "GAUGE", "30", "-273", "1000")
 	vname := fmt.Sprintf("t%d", which)
 	cname := fmt.Sprintf("f%d", which)
 	r.grapher.Def(vname, r.path, name, "MAX")
@@ -214,7 +219,7 @@ func (ppc *PoolPumpController) createRrds(force bool) {
 	tg.SetVLabel("Degrees Farenheit")
 	tg.SetRightAxis(1, 0.0)
 	tg.SetRightAxisLabel("dekawatts/sqm")
-	tg.SetSize(700, 400) // Config?
+	tg.SetSize(640, 300) // Config?
 	tg.SetImageFormat("PNG")
 
 	ppc.tempRrd.addTemp("pump",    "Pump",         8,  1)
@@ -231,13 +236,13 @@ func (ppc *PoolPumpController) createRrds(force bool) {
 	pg.SetVLabel("Status Code")
 	pg.SetRightAxis(1, 0.0)
 	pg.SetRightAxisLabel("Status Code")
-	pg.SetSize(700, 250) // Config?
+	pg.SetSize(640, 200) // Config?
 	pg.SetImageFormat("PNG")
 
 	pc := ppc.pumpRrd.Creator()
-	pc.DS("status", "GAUGE", "60", "-1", "10")
-	pc.DS("solar",  "GAUGE", "60", "-1", "10")
-	pc.DS("manual", "GAUGE", "60", "-1", "10")
+	pc.DS("status", "GAUGE", "30", "-1", "10")
+	pc.DS("solar",  "GAUGE", "30", "-1", "10")
+	pc.DS("manual", "GAUGE", "30", "-1", "10")
 	ppc.pumpRrd.AddStandardRRAs()
 	pc.Create(force) // fails if already exists
 

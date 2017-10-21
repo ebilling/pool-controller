@@ -19,7 +19,7 @@ func NewRrd(filename string) (*Rrd) {
 		updater: rrd.NewUpdater(filename),
 		grapher: rrd.NewGrapher(),
 	}
-	r.creator = rrd.NewCreator(r.path, time.Now(), 15)
+	r.creator = rrd.NewCreator(r.path, time.Now(), 10)
 	return &r
 }
 

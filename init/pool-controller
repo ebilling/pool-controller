@@ -13,7 +13,7 @@ set -e
 
 # /etc/init.d/poold: start and stop the poold daemon
 name='pool-controller'
-conf='/etc/poold.conf'
+conf='/etc/pool.conf'
 bin="/usr/local/bin/$name"
 rundir="/var/cache/homekit"
 pidfile="/tmp/$name.pid"

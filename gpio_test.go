@@ -134,9 +134,9 @@ func TestGpioThermometer(t *testing.T) {
 			old := therm.updated
 			therm.Update()
 			if (therm.updated == old) == expected[i] {
-				t.Errorf("temp(%0.1f) old(%0.1f) expected(%t) " +
+				t.Errorf("i(%d) temp(%0.1f) old(%s) expected(%t) " +
 					"Current(%0.1f) med(%0.1f) avg(%0.1f) stdd(%0.1f)",
-					therm.Temperature(), old, expected[i],
+					i, therm.Temperature(), timeStr(old), expected[i],
 					float64(pin.sleepTime)/float64(time.Millisecond),
 					therm.history.Median()/float64(time.Millisecond),
 					therm.history.Average()/float64(time.Millisecond),
