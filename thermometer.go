@@ -96,6 +96,26 @@ func (t *GpioThermometer) Accessory() (*accessory.Accessory) {
 	return t.accessory.Accessory
 }
 
+func (t *GpioThermometer) getEdgeDischargeTime() (time.Duration) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	//Discharge the capacitor (low temps could make this really long)
+	t.pin.Output(Low)
+	time.Sleep(300 * time.Millisecond)
+
+	// Start polling
+	start:= time.Now()
+	t.pin.InputEdge(PullUp, RisingEdge)
+	if !t.pin.WaitForEdge(time.Second/2) {
+		Error("Thermometer read timed out")
+		return time.Duration(0)
+	}
+	stop:= time.Now()
+	t.pin.Output(Low)
+	return stop.Sub(start)
+}
+
 func (t *GpioThermometer) getDischargeTime() (time.Duration) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -136,7 +156,7 @@ func (t *GpioThermometer) getTemp(ohms float64) (float64) {
 }
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) (bool) {
-	const minTime = 3 * time.Millisecond
+	const minTime = 1 * time.Millisecond
 	const maxTime = 500 * time.Millisecond
 
 	// Completely bogus, ignore
@@ -159,7 +179,7 @@ func (t *GpioThermometer) Update() (error) {
 	tries := 0
 	for i := 0; h.Len() < 3; i++ {
 		tries++
-		dischargeTime = t.getDischargeTime()
+		dischargeTime = t.getEdgeDischargeTime()
 		if t.inRange(dischargeTime) {
 			t.history.PushDuration(dischargeTime)
 			h.PushDuration(dischargeTime)

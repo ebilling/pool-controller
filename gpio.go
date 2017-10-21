@@ -111,7 +111,7 @@ func (g *Gpio) Input() {
 }
 
 func (g *Gpio) InputEdge(p Pull, e Edge) {
-	Debug("Setting gpio(%d) to Input(%s, %s)", g.gpio, p, NoEdge)
+	Debug("Setting gpio(%d) to Input(%s, %s)", g.gpio, p, e)
 	g.pin.In(p.Pull(), e.Edge())
 }
 

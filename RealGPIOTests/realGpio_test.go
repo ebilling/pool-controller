@@ -9,7 +9,7 @@ import (
 const (
 	LED = 5     // Pin 29
 	CAP = 6     // Pin 31
-	NEXT = 13   // Pin 33
+	RELAY = 13  // Pin 33
 	SWITCH = 19 // Pin 35: Also PCM capable
 )
 
@@ -19,8 +19,8 @@ func GpioStr(g *Gpio) string {
 		return "LED"
 	case CAP:
 		return "CAP"
-	case NEXT:
-		return "NEXT"
+	case RELAY:
+		return "RELAY"
 	case SWITCH:
 		return "SWITCH"
 	default:
@@ -31,11 +31,11 @@ func GpioStr(g *Gpio) string {
 
 var Led *Gpio // Setup: GPIO -> <1k Resistor -> LED -> GND
 var Cap *Gpio // Setup: +3.3v -> 1k-20k Resistor -> GPIO -> 10uF capacitor -> GND
+var TestRelay *Relay // Setup GPIO -> 4.7k Resistor -> Relay Board
 var Switch *Gpio // Setup: GPIO -> Button Switch -> GND
 
 func ExpectedState(t *testing.T, gpio *Gpio, exp GpioState) {
-	time.Sleep(time.Second/2)
-	if val := gpio.Read(); val != exp {		
+	if val := gpio.Read(); val != exp {
 		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio), exp, val)
 	}
 }
@@ -73,7 +73,6 @@ func doStop(button *Button, b *bool, t time.Time) {
 
 func TestPushButton(t *testing.T) {
 	wasRun := 0
-	fmt.Printf("TestPushButton\n")
 	button := NewGpioButton(SWITCH, func() {
 		wasRun++
 		Info("Button Pushed %d!!!", wasRun)
@@ -105,8 +104,39 @@ func TestThermometer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Thermometer update failed: %s", err.Error())
 	}
-	if therm.Temperature() < 45.0 || therm.Temperature() > 40.0 {
+	if therm.Temperature() > 48.0 || therm.Temperature() < 46.0 {
 		t.Errorf("Thermometer value not within acceptable limits: %0.1f",
 			therm.Temperature())
 	}
+}
+
+func runRelayTestOn(t *testing.T, relay *Relay) {
+	relay.TurnOn()
+	Info("Testing Relay On: %s is %s", relay.Name(), relay.Status())
+	if !relay.isOn() {
+		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
+	}
+}
+
+func runRelayTestOff(t *testing.T, relay *Relay) {
+	relay.TurnOff()
+	Info("Testing Relay Off: %s is %s", relay.Name(), relay.Status())
+	if relay.isOn() {
+		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
+	}
+}
+
+func runRelayTest(t *testing.T, r *Relay, sleep time.Duration) {
+	t.Run(fmt.Sprintf("%s.Test", r.Name()), func(t *testing.T) {
+		runRelayTestOn(t, r)
+		time.Sleep(sleep)
+		runRelayTestOff(t,r)
+	})
+}
+
+func TestRelays(t *testing.T) {
+	EnableDebug()
+	GpioInit()
+	TestRelay = NewRelay(RELAY, "Relay", "Testing")
+	runRelayTest(t, TestRelay, time.Second)
 }
