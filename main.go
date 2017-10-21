@@ -12,10 +12,12 @@ func main() {
 	if len(flag.Args()) < 1 {
 		Fatal("Usage: pool-controller [-f] CONFIG")
 	}
-
+	
 	if err := GpioInit(); err != nil {
 		Fatal("Could not initialize GPIO: %s", err.Error())
 	}
+	PowerLed := NewGpio(5)
+	PowerLed.Output(High)
 	config := NewConfig(flag.Args()[0])
 	ppc := NewPoolPumpController(config)
 	ppc.Start(*forceRrd)
@@ -47,4 +49,5 @@ func main() {
 	Info("Homekit Pin: %s", hcConfig.Pin)
 	transport.Start()
 	Info("Exiting")
+	PowerLed.Output(Low)
 }
