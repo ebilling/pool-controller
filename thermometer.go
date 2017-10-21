@@ -20,7 +20,6 @@ type SelectiveThermometer struct {
 	filter      func () (bool)
 	thermometer Thermometer
 	accessory   *accessory.Thermometer
-	temperature float64
 }
 
 func NewSelectiveThermometer(name string, manufacturer string, thermometer Thermometer,
@@ -33,7 +32,6 @@ func NewSelectiveThermometer(name string, manufacturer string, thermometer Therm
 		name:         name,
 		thermometer:  thermometer,
 		filter:       filter,
-		temperature:  thermometer.Temperature(),
 		accessory:    acc,
 	}	
 }
@@ -43,13 +41,13 @@ func (t *SelectiveThermometer) Name() string {
 }
 
 func (t *SelectiveThermometer) Temperature() float64 {
-	return t.temperature
+	return t.accessory.TempSensor.CurrentTemperature.GetValue()
 }
 
 func (t *SelectiveThermometer) Update() error {
 	if (t.filter()) {
-		t.temperature = t.thermometer.Temperature()
-		t.accessory.TempSensor.CurrentTemperature.SetValue(t.temperature)
+		t.accessory.TempSensor.CurrentTemperature.SetValue(
+			t.thermometer.Temperature())
 	}
 	return nil
 }
@@ -168,16 +166,15 @@ func (t *GpioThermometer) Update() (error) {
 		}
 	}
 
-	// DEBUG 
 	Debug("%s Update() took %d tries to find %d results", t.Name(), tries, h.Len())
 
-	stdd := t.history.Stddev()
+	stdd := t.history.Stddev() * 1.5
 	avg  := t.history.Average()
 	med  := t.history.Median()
 
 	// Throw away bad results
-	if math.Abs(avg - h.Median()) > stdd * 1.5 {
-		Info("%s failed to update: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
+	if math.Abs(avg - h.Median()) > stdd {
+		Info("%s Thermometer update failed: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
 			t.Name(),
 			h.Median()/float64(time.Millisecond),
 			med/float64(time.Millisecond),
@@ -185,7 +182,7 @@ func (t *GpioThermometer) Update() (error) {
 			stdd/float64(time.Millisecond))
 		return fmt.Errorf("Could not update temperature successfully")
 	}
-	temp := t.getTemp(t.getOhms(dischargeTime))
+	temp := t.getTemp(t.getOhms(time.Duration(int64(h.Median()))))
 	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
 	t.updated = time.Now()
 	return nil

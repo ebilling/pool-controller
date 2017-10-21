@@ -1,0 +1,6 @@
+#!/bin/sh
+
+apt-get update
+apt-get upgrade
+apt-get install apache2 rrdtool librrd-dev libavahi-compat-libdnssd-dev golang git emacs24
+

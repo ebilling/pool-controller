@@ -24,10 +24,8 @@ func NewRrd(filename string) (*Rrd) {
 }
 
 func (r *Rrd) AddStandardRRAs() {
-	r.creator.RRA("AVERAGE", "0.5", "1", "20000")
-	r.creator.RRA("AVERAGE", "0.5", "6", "20000")
-	r.creator.RRA("AVERAGE", "0.5", "30", "400000")
-	r.creator.RRA("MAX", "0.5", "30", "400000")
+	r.creator.RRA("AVERAGE", "0.5", "3",  "400000")
+	r.creator.RRA("MAX",     "0.5", "60", "400000")
 }
 
 // Used to create an RRD, only call once in the life of an RRD

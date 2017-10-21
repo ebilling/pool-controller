@@ -1,0 +1,25 @@
+#!/bin/sh
+
+
+setup()
+{
+    echo "installing binary $2 as $1"
+    rm -f /etc/init.d/$1 /etc/rc*.d/???$1
+    cp -f $1 /etc/init.d/.
+    chmod 0755 /etc/init.d/$1
+    chown root:root /etc/init.d/$1
+    ln -f -s $2 /usr/local/bin/$1
+    ln -f -s /etc/init.d/$1 /etc/rc0.d/K01$1
+    ln -f -s /etc/init.d/$1 /etc/rc1.d/K01$1
+    ln -f -s /etc/init.d/$1 /etc/rc2.d/S$3$1
+    ln -f -s /etc/init.d/$1 /etc/rc3.d/S$3$1
+    ln -f -s /etc/init.d/$1 /etc/rc4.d/S$3$1
+    ln -f -s /etc/init.d/$1 /etc/rc5.d/S$3$1
+    ln -f -s /etc/init.d/$1 /etc/rc6.d/K01$1
+}
+
+useradd -U -M -s /bin/false homekit
+
+setup "pool-controller" "/home/pi/go/bin/pool-controller" "99"
+
+systemctl daemon-reload
