@@ -37,7 +37,7 @@ func TestRelays(t *testing.T) {
 //	sweep := NewRelay(Relay2, "Sweep", "Testing")
 //	solar := NewRelay(Relay3, "Solar", "Testing")
 
-	empty := NewRelay(Relay3, "Empty", "Testing")
+	empty := NewRelay(13, "Empty", "Testing")
 
 	runTest(t, empty, 15 * time.Second)
 }

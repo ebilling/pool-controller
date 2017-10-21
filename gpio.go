@@ -95,7 +95,6 @@ func NewGpio(gpio uint8) (*Gpio) {
 		pin:       gpioreg.ByName(strconv.Itoa(int(gpio))),
 	}
 	gpioreg.Register(g.pin, false)
-	g.Output(Low)
 	return &g
 }
 

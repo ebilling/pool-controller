@@ -45,7 +45,7 @@ func newRelay(pin PiPin, name string, manufacturer string) (*Relay) {
 		accessory: accessory.NewSwitch(AccessoryInfo(name, manufacturer)),
 		enabled:   true,
 	}
-	relay.pin.Output(High)
+	relay.TurnOff()
 	return &relay
 }
 
