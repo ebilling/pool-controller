@@ -196,7 +196,7 @@ func (ppc *PoolPumpController) Start(force bool) {
 }
 
 func (r *Rrd) addTemp(name, title string, colorid, which int) {
-	r.creator.DS(name, "GAUGE", "30", "-273", "5000")
+	r.creator.DS(name, "GAUGE", "10", "-273", "5000")
 	vname := fmt.Sprintf("t%d", which)
 	cname := fmt.Sprintf("f%d", which)
 	r.grapher.Def(vname, r.path, name, "MAX")
@@ -235,9 +235,9 @@ func (ppc *PoolPumpController) createRrds(force bool) {
 	pg.SetImageFormat("PNG")
 
 	pc := ppc.pumpRrd.Creator()
-	pc.DS("status", "GAUGE", "30", "-1", "10")
-	pc.DS("solar",  "GAUGE", "30", "-1", "10")
-	pc.DS("manual", "GAUGE", "30", "-1", "10")
+	pc.DS("status", "GAUGE", "10", "-1", "10")
+	pc.DS("solar",  "GAUGE", "10", "-1", "10")
+	pc.DS("manual", "GAUGE", "10", "-1", "10")
 	ppc.pumpRrd.AddStandardRRAs()
 	pc.Create(force) // fails if already exists
 
@@ -257,7 +257,6 @@ func (ppc *PoolPumpController) UpdateRrd() {
 		ppc.pumpTemp.Temperature(), ppc.WeatherC(), ppc.roofTemp.Temperature(),
 		ppc.weather.GetSolarRadiation(ppc.config.GetString(configZip)),
 		ppc.runningTemp.Temperature(), ppc.solar.target)
-	EnableDebug()
 	Debug("Updating TempRrd: %s", update)
 	err :=  ppc.tempRrd.Updater().Update(update)
 	if err != nil {
@@ -275,7 +274,6 @@ func (ppc *PoolPumpController) UpdateRrd() {
 	manual := 0.0
 	if ppc.switches.ManualState() {	manual = 1.2 }
 	update = fmt.Sprintf("N:%d:%0.1f:%0.1f", ppc.switches.State(), solar, manual)
-
 	Debug("Updating PumpRrd: %s", update)
 	err = ppc.pumpRrd.Updater().Update(update)
 	if err != nil { Error("Could not create PumpRrd: %s", err.Error()) }
@@ -289,7 +287,6 @@ func (ppc *PoolPumpController) UpdateRrd() {
 	// Expose the files over atomically
 	os.Rename("/tmp/temps.tmp", "/tmp/temps.png")
 	os.Rename("/tmp/pumps.tmp", "/tmp/pumps.png")
-	DisableDebug()
 }
 
 func (ppc *PoolPumpController) Stop() {
