@@ -168,13 +168,13 @@ func (t *GpioThermometer) Update() (error) {
 
 	Debug("%s Update() took %d tries to find %d results", t.Name(), tries, h.Len())
 
-	stdd := t.history.Stddev()
+	stdd := t.history.Stddev() * 2
 	avg  := t.history.Average()
 	med  := t.history.Median()
 
 	// Throw away bad results
-	if math.Abs(avg - h.Median()) > stdd * 1.5 {
-		Info("%s failed to update: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
+	if math.Abs(avg - h.Median()) > stdd {
+		Info("%s Thermometer update failed: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
 			t.Name(),
 			h.Median()/float64(time.Millisecond),
 			med/float64(time.Millisecond),

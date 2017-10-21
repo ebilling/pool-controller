@@ -196,7 +196,7 @@ func (ppc *PoolPumpController) Start(force bool) {
 }
 
 func (r *Rrd) addTemp(name, title string, colorid, which int) {
-	r.creator.DS(name, "GAUGE", "10", "-273", "5000")
+	r.creator.DS(name, "GAUGE", "60", "-273", "1000")
 	vname := fmt.Sprintf("t%d", which)
 	cname := fmt.Sprintf("f%d", which)
 	r.grapher.Def(vname, r.path, name, "MAX")
@@ -235,9 +235,9 @@ func (ppc *PoolPumpController) createRrds(force bool) {
 	pg.SetImageFormat("PNG")
 
 	pc := ppc.pumpRrd.Creator()
-	pc.DS("status", "GAUGE", "10", "-1", "10")
-	pc.DS("solar",  "GAUGE", "10", "-1", "10")
-	pc.DS("manual", "GAUGE", "10", "-1", "10")
+	pc.DS("status", "GAUGE", "60", "-1", "10")
+	pc.DS("solar",  "GAUGE", "60", "-1", "10")
+	pc.DS("manual", "GAUGE", "60", "-1", "10")
 	ppc.pumpRrd.AddStandardRRAs()
 	pc.Create(force) // fails if already exists
 
