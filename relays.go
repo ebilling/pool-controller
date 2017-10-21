@@ -45,7 +45,7 @@ func newRelay(pin PiPin, name string, manufacturer string) (*Relay) {
 		accessory: accessory.NewSwitch(AccessoryInfo(name, manufacturer)),
 		enabled:   true,
 	}
-	relay.pin.Output()
+	relay.pin.Output(Low)
 	return &relay
 }
 
@@ -65,14 +65,14 @@ func (r *Relay) String() string {
 
 func (r *Relay) TurnOn() {
 	Trace("TurnOn %s", r.name)
-	r.pin.High()
+	r.pin.Output(High)
 	r.startTime = time.Now()
 	r.accessory.Switch.On.SetValue(true)
 }
 
 func (r *Relay) TurnOff() {
 	Trace("TurnOff %s", r.name)
-	r.pin.Low()
+	r.pin.Output(Low)
 	r.stopTime = time.Now()
 	r.accessory.Switch.On.SetValue(false)
 }

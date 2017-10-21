@@ -8,12 +8,14 @@ import (
 
 type Direction bool
 const (
-	Input Direction = false
-	Output Direction = true
+ 	Input Direction = false
+ 	Output Direction = true
 )
 
 type TestPin struct {
 	state        GpioState
+	pull         Pull
+	edge         Edge
 	direction    Direction
 	sleepTime    time.Duration
 	inputTime    time.Time
@@ -22,22 +24,20 @@ type TestPin struct {
 func (p *TestPin) Input() {
 	p.direction = Input
 	p.inputTime = time.Now()
-	Debug("Setting Fake pin to Input mode %v", p)
+	p.pull = Float
+	p.edge = NoEdge
 }
 
-func (p *TestPin) Output() {
+func (p *TestPin) InputEdge(pull Pull, e Edge) {
+	p.direction = Input
+	p.inputTime = time.Now()
+	p.pull = pull
+	p.edge = e
+}
+
+func (p *TestPin) Output(s GpioState) {
 	p.direction = Output
-	Debug("Setting Fake pin to Output mode %v", p)
-}
-
-func (p *TestPin) High() {
-	p.state = High
-	Debug("Setting Fake pin state to High %v", p)
-}
-
-func (p *TestPin) Low() {
-	p.state = Low
-	Debug("Setting Fake pin state to Low %v", p)
+	p.state = s
 }
 
 func (p *TestPin) Read() GpioState {
@@ -49,23 +49,18 @@ func (p *TestPin) Read() GpioState {
 	return p.state
 }
 
-func (p *TestPin) PullUp() {}
-
-func (p *TestPin) PullDown() {}
-
-func (p *TestPin) PullOff() {}
+func (p *TestPin) WaitForEdge(ignored time.Duration) bool {
+	time.Sleep(p.sleepTime)
+	return true
+}
 
 func (p *TestPin) String() string {
-	state := "Low"
-        if p.state == High {
-		state = "High"
-	}
 	direction := "Input"
 	if p.direction == Output {
 		direction = "Output"
 	}
-	return fmt.Sprintf("TestPin: {State: %s, Direction: %s, Duration: %d, InputTime: %s}",
-		state, direction, p.sleepTime, timeStr(p.inputTime))
+	return fmt.Sprintf("TestPin: {State: %s, Direction: %s, Edge: %s, Pull: %s, Duration: %d, InputTime: %s}",
+		p.state, direction, p.edge, p.pull, p.sleepTime, timeStr(p.inputTime))
 }
 
 func TestGpioThermometer(t *testing.T) {	

@@ -5,6 +5,7 @@ import (
 	"periph.io/x/periph/conn/gpio/gpioreg"
 	"periph.io/x/periph/host"
 	"strconv"
+	"time"
 )
 
 type GpioState bool
@@ -14,11 +15,73 @@ const (
 	High GpioState = true
 )
 
-func (s GpioState) String() string {
+func (s GpioState) State() gpio.Level {
 	if s == Low {
-		return "Low"
+		return gpio.Low
 	}
-	return "High"
+	return gpio.High
+}
+
+func (s GpioState) String() string {
+	return s.State().String()
+}
+
+type Edge int
+const (
+    NoEdge      Edge = 0
+    RisingEdge  Edge = 1
+    FallingEdge Edge = 2
+    BothEdges   Edge = 3
+)
+
+func (e Edge) Edge() gpio.Edge {
+	switch e {
+	case NoEdge:
+		return gpio.NoEdge
+	case RisingEdge:
+		return gpio.RisingEdge
+	case FallingEdge:
+		return gpio.FallingEdge
+	case BothEdges:
+		return gpio.BothEdges
+	}
+	return gpio.NoEdge
+}
+
+func (e Edge) String() string {
+	return e.Edge().String()
+}
+
+type Pull int
+const (
+    Float        Pull = 0 // Let the input float
+    PullDown     Pull = 1 // Apply pull-down
+    PullUp       Pull = 2 // Apply pull-up
+    PullNoChange Pull = 3 // Do not change the previous pull resistor setting
+)
+
+func (p Pull) Pull() gpio.Pull {
+	switch p {
+	case Float:
+		return gpio.Float
+	case PullDown:
+		return gpio.PullDown
+	case PullUp:
+		return gpio.PullUp
+	case PullNoChange:
+		return gpio.PullNoChange
+	}
+	return gpio.PullNoChange
+}
+
+func (p Pull) String() string { return p.Pull().String() }
+
+type PiPin interface {
+	Input()
+	InputEdge(Pull, Edge)
+	Output(GpioState)
+	Read() GpioState
+	WaitForEdge(time.Duration) bool
 }
 
 type Gpio struct {
@@ -32,6 +95,7 @@ func NewGpio(gpio uint8) (*Gpio) {
 		pin:       gpioreg.ByName(strconv.Itoa(int(gpio))),
 	}
 	gpioreg.Register(g.pin, false)
+	g.Output(Low)
 	return &g
 }
 
@@ -43,23 +107,18 @@ func GpioInit() error {
 }
 
 func (g *Gpio) Input() {
-	Debug("Setting gpio(%d) to Input", g.gpio)
+	Debug("Setting gpio(%d) to Input(%s, %s)", g.gpio, Float, NoEdge)
 	g.pin.In(gpio.Float, gpio.NoEdge)
 }
 
-func (g *Gpio) Output() {
-	Debug("Output setting gpio(%d) to Low", g.gpio)
-	g.pin.Out(gpio.Low)
+func (g *Gpio) InputEdge(p Pull, e Edge) {
+	Debug("Setting gpio(%d) to Input(%s, %s)", g.gpio, p, NoEdge)
+	g.pin.In(p.Pull(), e.Edge())
 }
 
-func (g *Gpio) High() {
-	Debug("Turning gpio(%d) to High", g.gpio)
-	g.pin.Out(gpio.High)
-}
-
-func (g *Gpio) Low() {
-	Debug("Turning gpio(%d) to Low", g.gpio)
-	g.pin.Out(gpio.Low)
+func (g *Gpio) Output(s GpioState) {
+	Debug("Output setting gpio(%d) to %s", g.gpio, s)
+	g.pin.Out(s.State())
 }
 
 func (g *Gpio) Read() GpioState {
@@ -69,14 +128,6 @@ func (g *Gpio) Read() GpioState {
 	return Low
 }
 
-func (g *Gpio) PullUp() {
-	g.pin.In(gpio.PullUp, gpio.NoEdge)
-}
-
-func (g *Gpio) PullDown() {
-	g.pin.In(gpio.PullDown, gpio.NoEdge)
-}
-
-func (g *Gpio) PullOff() {
-	g.pin.In(gpio.Float, gpio.NoEdge)
+func (g *Gpio) WaitForEdge(timeout time.Duration) bool {
+	return g.pin.WaitForEdge(timeout)
 }
