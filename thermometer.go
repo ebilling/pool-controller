@@ -139,7 +139,7 @@ func (t *GpioThermometer) getTemp(ohms float64) (float64) {
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) (bool) {
 	const minTime = 3 * time.Millisecond
-	const maxTime = 500 * time.Millisecond	
+	const maxTime = 500 * time.Millisecond
 
 	// Completely bogus, ignore
 	if dischargeTime < minTime || dischargeTime > maxTime {
