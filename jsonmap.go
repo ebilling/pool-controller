@@ -83,7 +83,7 @@ func (m *JSONmap) Write(path string, permissions uint32) error {
 func (m *JSONmap) Get(fullname string) (interface{}) {
 	val, err := m.get(fullname)
 	if err != nil {
-		Error("Problem fetching %s, %s", fullname, err.Error())
+		Debug("Problem fetching %s, %s", fullname, err.Error())
 	}
 	return val
 }
@@ -96,7 +96,7 @@ func (m *JSONmap) Contains(fullname string) bool {
 func (m *JSONmap) GetFloat(fullname string) (float64) {
 	x, err := m.get(fullname)
 	if err != nil {
-		Error("Problem fetching %s, %s", fullname, err.Error())
+		Debug("Problem fetching %s, %s", fullname, err.Error())
 		return 0.0
 	}
 	kind := reflect.TypeOf(x).Kind()
