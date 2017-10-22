@@ -33,7 +33,7 @@ func NewSelectiveThermometer(name string, manufacturer string, thermometer Therm
 		thermometer:  thermometer,
 		filter:       filter,
 		accessory:    acc,
-	}	
+	}
 }
 
 func (t *SelectiveThermometer) Name() string {
@@ -96,7 +96,7 @@ func (t *GpioThermometer) Accessory() (*accessory.Accessory) {
 	return t.accessory.Accessory
 }
 
-func (t *GpioThermometer) getEdgeDischargeTime() (time.Duration) {
+func (t *GpioThermometer) getDischargeTime() (time.Duration) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -114,29 +114,6 @@ func (t *GpioThermometer) getEdgeDischargeTime() (time.Duration) {
 	stop:= time.Now()
 	t.pin.Output(Low)
 	return stop.Sub(start)
-}
-
-func (t *GpioThermometer) getDischargeTime() (time.Duration) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-	
-	//Discharge the capacitor (low temps could make this really long)
-	t.pin.Output(Low)
-	time.Sleep(300 * time.Millisecond)
-
-	// Start polling
-	start := time.Now()
-	t.pin.Input()
-	timeout := start.Add(500 * time.Millisecond)
-	for time.Now().Before(timeout) {
-		r := t.pin.Read()
-		if r == High {
-			return time.Since(start)
-		}
-		time.Sleep(time.Microsecond*100)
-	}
-	Error("Thermometer read timed out")
-	return time.Duration(0)
 }
 
 func (t *GpioThermometer) getOhms(dischargeTime time.Duration) (float64) {
@@ -173,13 +150,15 @@ func (t *GpioThermometer) Temperature() (float64) {
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()
 }
 
+const Millisecond_f float64 = float64(time.Millisecond)
+
 func (t *GpioThermometer) Update() (error) {
 	var dischargeTime time.Duration
 	h := NewHistory(3)
 	tries := 0
 	for i := 0; h.Len() < 3; i++ {
 		tries++
-		dischargeTime = t.getEdgeDischargeTime()
+		dischargeTime = t.getDischargeTime()
 		if t.inRange(dischargeTime) {
 			t.history.PushDuration(dischargeTime)
 			h.PushDuration(dischargeTime)
@@ -188,18 +167,20 @@ func (t *GpioThermometer) Update() (error) {
 
 	Debug("%s Update() took %d tries to find %d results", t.Name(), tries, h.Len())
 
-	stdd := t.history.Stddev() * 1.5
+	stdd := t.history.Stddev()
 	avg  := t.history.Average()
 	med  := t.history.Median()
+	dev  := stdd * 1.5
+	if dev < Millisecond_f  { dev = Millisecond_f } // give some wiggle room
 
 	// Throw away bad results
-	if math.Abs(avg - h.Median()) > stdd {
+	if math.Abs(avg - h.Median()) > dev {
 		Info("%s Thermometer update failed: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
 			t.Name(),
-			h.Median()/float64(time.Millisecond),
-			med/float64(time.Millisecond),
-			avg/float64(time.Millisecond),
-			stdd/float64(time.Millisecond))
+			h.Median()/Millisecond_f,
+			med/Millisecond_f,
+			avg/Millisecond_f,
+			stdd/Millisecond_f)
 		return fmt.Errorf("Could not update temperature successfully")
 	}
 	temp := t.getTemp(t.getOhms(time.Duration(int64(h.Median()))))
@@ -209,7 +190,7 @@ func (t *GpioThermometer) Update() (error) {
 }
 
 func (t *GpioThermometer) cleanData() {
-	
+
 }
 
 // Converts a temperature in Celsius to Farenheit
