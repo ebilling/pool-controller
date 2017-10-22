@@ -171,7 +171,7 @@ func (t *GpioThermometer) Update() (error) {
 	avg  := t.history.Average()
 	med  := t.history.Median()
 	dev  := stdd * 1.5
-	if dev < Millisecond_f  { dev = Millisecond_f } // give some wiggle room
+	if dev < 2 * Millisecond_f  { dev = 2 * Millisecond_f } // give some wiggle room
 
 	// Throw away bad results
 	if math.Abs(avg - h.Median()) > dev {

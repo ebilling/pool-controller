@@ -21,19 +21,19 @@ const SolarLED uint8 = 6
 func (s State) String() string {
 	switch s {
 	case STATE_DISABLED:
-		return "STATE_DISABLED"
+		return "Disabled"
 	case STATE_OFF:
-		return "STATE_OFF"
+		return "Off"
 	case STATE_PUMP:
-		return "STATE_PUMP"
+		return "Pump Running"
 	case STATE_SWEEP:
-		return "STATE_SWEEP"
+		return "Cleaning"
 	case STATE_SOLAR:
-		return "STATE_SOLAR"
+		return "Solar Running"
 	case STATE_SOLAR_MIXING:
-		return "STATE_SOLAR_MIXING"
+		return "Solar Mixing"
 	default:
-		return "STATE_UNKNOWN"
+		return "Unknown"
 	}
 }
 
@@ -43,7 +43,7 @@ type Switches struct {
 	sweep       *Relay
 	solar       *Relay
 	solarLed    PiPin
-	manualOp    time.Time	
+	manualOp    time.Time
 }
 
 func (p *Switches) String() string {
@@ -83,7 +83,7 @@ func (p *Switches) bindHK() {
                         p.StopAll(true)
                 }
         })
-	
+
 	p.sweep.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		state := p.state
 		switch p.state {
@@ -132,7 +132,7 @@ func (p *Switches) bindHK() {
 		}
 		p.SetState(state, true)
         })
-	
+
 }
 
 func (p *Switches) GetStartTime() time.Time {

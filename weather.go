@@ -94,15 +94,15 @@ func (w *Weather) GetWeatherByZip(zipcode string) (*JSONmap) {
 }
 
 func (w *WeatherData) Update() (error) {
-	Debug("Updating Weather Forecast for %s", w.zipcode)
+	Info("Updating Weather Forecast for %s", w.zipcode)
 	response := w.service.Read(w.zipcode)
 	if response == "" {
 		return fmt.Errorf("Error getting data from weather service")
 	}
 	err := w.data.readString(response)
 	if err != nil {
-		return fmt.Errorf("Issue reading data from weather service: %s",
-			err.Error())
+		return fmt.Errorf("Issue reading data from weather service: %s Response(%s)",
+			err.Error(), response)
 	}
 	w.updated = time.Now()
 	Debug("WeatherData Updated: %v", w)

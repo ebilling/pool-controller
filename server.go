@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 )
 
 type Handler struct {
-	tempRrd       *Rrd
-	pumpRrd       *Rrd
-	config        *Config
+	ppc    *PoolPumpController
 }
 
 // A TLS server for the pool-controller
@@ -23,9 +22,7 @@ func NewServer(port int, ppc *PoolPumpController) (*Server) {
 	s := Server {
 		port:        port,
 		handler:     &Handler{
-			tempRrd:      ppc.tempRrd,
-			pumpRrd:      ppc.pumpRrd,
-			config:       ppc.config,
+			ppc:      ppc,
 		},
 	}
 	s.server =  http.Server{
@@ -97,25 +94,40 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	h.writeResponse(w, []byte("Please implement me"), "text/plain")
 }
 
+func getscale(r *http.Request) string {
+	scale := ""
+	cookie, _ := r.Cookie("scale")
+	if cookie != nil { scale = cookie.Value	}
+	return getFormValue(r, "scale", scale)
+}
+
 func duration(r *http.Request) time.Duration {
 	var num int
 	var let string
-	fmt.Sscanf(r.FormValue("scale"), "%d%s", &num, &let)
-	d := time.Duration(num)
+	scale := getscale(r)
 	day := time.Hour * 24
-
-	switch let{
-	case "m":
-		return d * time.Minute
-	case "h":
-		return d * time.Hour
-	case "d":
-		return d * day
-	case "w":
-		return d * 7 * day
-	default:
+	if len(scale) > 1 {
+		fmt.Sscanf(scale, "%d%s", &num, &let)
+		d := time.Duration(num)
+		switch let{
+		case "m":
+			return d * time.Minute
+		case "h":
+			return d * time.Hour
+		case "d":
+			return d * day
+		case "w":
+			return d * 7 * day
+		default:
+		}
 	}
 	return day
+}
+
+func getFormValue(r *http.Request, name, defaultValue string) string {
+	value := r.FormValue(name)
+	if value == "" { return defaultValue }
+	return value
 }
 
 func (h *Handler) graphHandler(w http.ResponseWriter, r *http.Request, which int) {
@@ -123,10 +135,14 @@ func (h *Handler) graphHandler(w http.ResponseWriter, r *http.Request, which int
 	var graph []byte
 	end := time.Now()
 	start := end.Add(-1 * duration(r))
+	width, _ := strconv.ParseUint(getFormValue(r, "width", "640"), 10, 32)
+	height, _ := strconv.ParseUint(getFormValue(r, "height", "300"), 10, 32)
 	if which == PumpImage {
-		_, graph, err = h.pumpRrd.Grapher().Graph(start, end)
+		h.ppc.pumpRrd.Grapher().SetSize(uint(width), uint(height))
+		_, graph, err = h.ppc.pumpRrd.Grapher().Graph(start, end)
 	} else if which == TempImage {
-		_, graph, err = h.tempRrd.Grapher().Graph(start, end)
+		h.ppc.tempRrd.Grapher().SetSize(uint(width), uint(height))
+		_, graph, err = h.ppc.tempRrd.Grapher().Graph(start, end)
 	} else {
 		http.Error(w, "Unknown Graph", 404)
 		return
@@ -138,26 +154,62 @@ func (h *Handler) graphHandler(w http.ResponseWriter, r *http.Request, which int
 	h.writeResponse(w, graph, "image/png")
 }
 
+// TODO add width and height variables
+func image(which string, width, height int, scale string) string {
+	return fmt.Sprintf("<img src=\"/%s?scale=%s&width=%d&height=%d\" width=%d height=%d alt=\"Temperatures and Solar Radiation\" />",
+		which, scale, width, height, width, height)
+}
+
+func indent(howmany int) string {
+	out := ""
+	for i := 0; i < howmany; i++ {
+		out += "\t"
+	}
+	return out
+}
+
 func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
-	html := `<html>
-  <head><title>Pool Pump Controller</title></head>
-  <body>
-    <center>
-      <table>
-        <tr><td></td><td><img src="/temps?&t=" onload='setTimeout(function() {src = src.substring(0, (src.lastIndexOf("t=")+2))+(new Date()).getTime()}, 60000)' onerror='setTimeout(function() {src = src.substring(0, (src.lastIndexOf("t=")+2))+(new Date()).getTime()}, 60000)' alt='Temperatures and Solar Radiation' /></td></tr>
-        <tr><td></td><td><br></td></tr>
-        <tr><td><table>
-                <tr><td>4</td><td>Solar Mixing</td></tr>
-                <tr><td>3</td><td>Solar</td></tr>
-                <tr><td>2</td><td>Sweep</td></tr>
-                <tr><td>1</td><td>Pump</td></tr>
-                <tr><td>0</td><td>Off</td></tr>
-                <tr><td>-1</td><td>Disabled</td></tr>
-            </table></td>
-            <td><IMG SRC="/pumps?&t=" onload='setTimeout(function() {src = src.substring(0, (src.lastIndexOf("t=")+2))+(new Date()).getTime()}, 60000)' onerror='setTimeout(function() {src = src.substring(0, (src.lastIndexOf("t=")+2))+(new Date()).getTime()}, 60000)' alt='Pump Status' /></td></tr>
-        </table>
-    </center>
-  </body>
-</html>`
+	scale := getscale(r)
+	cookie := &http.Cookie{
+		Name: "scale",
+		Value: scale,
+		MaxAge: int(365 * 24 * time.Hour/time.Second),
+	}
+	http.SetCookie(w, cookie)
+	h.setRefresh(w, r, 60)
+	modeStr := "Auto"
+	if h.ppc.switches.ManualState() {
+		modeStr = "Manual"
+	}
+
+	html := "<html><head><title>Pool Pump Controller</title></head><body><center>" +
+		"<table>\n"
+	html += indent(1) + "<tr><td colspan=2 align=center><font face=helvetica color=#444444 " +
+		"size=-1><form action=/ method=POST>Time Window:<input name=scale value=" +
+		scale + " size=5> ex. 12h (w, d, h, m)</form></font></td></tr>\n"
+        html += indent(1) + "<tr><td>" + image("temps", 640, 300, scale) + "</td>"
+	html += "<td align=left nowrap><font face=helvetica color=#444444 size=-1>"
+	html += fmt.Sprintf("Pool: %0.1f F<br>", toFarenheit(h.ppc.runningTemp.Temperature()))
+	html += fmt.Sprintf("Roof: %0.1f F<br>", toFarenheit(h.ppc.roofTemp.Temperature()))
+	html += fmt.Sprintf("Weather: %0.1f F<br>",
+		toFarenheit(h.ppc.weather.GetCurrentTempC(h.ppc.zipcode)))
+	html += fmt.Sprintf("Solar: %0.1f W/sqm", h.ppc.weather.GetSolarRadiation(h.ppc.zipcode))
+	html += "</font></td></tr>\n"
+	html += indent(1) + "<tr><td colspan=2><br></td></tr>"
+        html += indent(1) + "<tr>"
+	html += "<td>" + image("pumps", 640, 200, scale) + "</td>"
+	html += "<td align=left nowrap><font face=helvetica color=#444444 size=-1>"
+	html += fmt.Sprintf("Pump: %s<br>", h.ppc.switches.State())
+	html += fmt.Sprintf("Solar: %s<br>", h.ppc.switches.solar.Status())
+	html += fmt.Sprintf("Mode: %s", modeStr)
+	html += "</font></td></tr>\n"
+	html += indent(1) + "<tr><td align=center><font size=-1 color=#aaaaaa>" +
+		"4=SolarMixing, 3=SolarHeating, 2=Cleaning, 1=PumpRunning, 0=Off, " +
+		"-1=Disabled</font></td><td></td></tr>\n"
+	html += "<tr><td colspan=2><br></td></tr>\n"
+	html += indent(1) + "<tr><td colspan=2 align=center>" +
+		fmt.Sprintf("Updated: %s", time.Now().String()) +
+		"</td></tr>\n"
+        html += "</table></font></center></body></html>"
 	h.writeResponse(w, []byte(html), "text/html")
 }
