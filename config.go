@@ -1,11 +1,13 @@
 package main
 
 import (
+	"sync"
 	"time"
 	"os"
 )
 
 type Config struct {
+	lock  sync.Mutex
 	path  string
 	data  JSONmap
 	mtime time.Time
@@ -13,14 +15,17 @@ type Config struct {
 
 func NewConfig(path string) *Config {
 	c := Config{
+		lock: sync.Mutex{},
 		path: path,
-		data: NewJSONmap(),		
+		data: NewJSONmap(),
 	}
 	c.Update()
 	return &c
 }
 
 func (c *Config) Update() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	fi, err := os.Stat(c.path)
 	if err != nil {
 		Error("Error stat'ing config file %s: %s", c.path, err.Error())
@@ -34,6 +39,13 @@ func (c *Config) Update() {
 		}
 		c.mtime = fi.ModTime()
 	}
+}
+
+func (c *Config) Write() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	check(c.data.Write(c.path, 0644), "Could not write config to %s", c.path)
+	c.mtime = time.Now()
 }
 
 func (c *Config) Contains(fullname string) bool {
