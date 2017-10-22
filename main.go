@@ -8,11 +8,11 @@ import (
 func main() {
 	forceRrd := flag.Bool("f", false, "force creation of new RRD files if present")
 	flag.Parse()
-	
+
 	if len(flag.Args()) < 1 {
 		Fatal("Usage: pool-controller [-f] CONFIG")
 	}
-	
+
 	if err := GpioInit(); err != nil {
 		Fatal("Could not initialize GPIO: %s", err.Error())
 	}
@@ -21,6 +21,9 @@ func main() {
 	config := NewConfig(flag.Args()[0])
 	ppc := NewPoolPumpController(config)
 	ppc.Start(*forceRrd)
+
+	server := NewServer(9443, ppc)
+	server.Start()
 
 	hcConfig := hc.Config{
 		Pin: 	     config.GetString("homekit.pin"),
@@ -44,8 +47,8 @@ func main() {
 	hc.OnTermination(func() {
 		ppc.Stop()
 		transport.Stop()
+		server.Stop()
 	})
-
 	Info("Homekit Pin: %s", hcConfig.Pin)
 	transport.Start()
 	Info("Exiting")

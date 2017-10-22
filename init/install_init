@@ -23,3 +23,5 @@ useradd -U -M -s /bin/false homekit
 setup "pool-controller" "/home/pi/go/bin/pool-controller" "99"
 
 systemctl daemon-reload
+
+openssl req -newkey rsa:4096 -nodes -keyout /etc/ssl/private/pool-controller.key -x509 -days 3650 -out /etc/ssl/certs/pool-controller.crt

@@ -25,7 +25,7 @@ type SolarVariables struct {
 }
 
 // The PoolPumpController manages the relays that control the pumps based on
-// data from temperature probes and the weather. 
+// data from temperature probes and the weather.
 type PoolPumpController struct {
 	config        *Config
 	weather       *Weather
@@ -127,7 +127,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	}
 	temp := ppc.weather.GetCurrentTempC(ppc.config.Get(configZip).(string))
 	if ppc.shouldCool() || ppc.shouldWarm() {
-		// Wide deltaT between target and temp or when it's cold, run sweep 
+		// Wide deltaT between target and temp or when it's cold, run sweep
 		if ppc.pumpTemp.Temperature() < ppc.solar.target - ppc.solar.deltaT ||
 			temp < ppc.solar.target || // Cool Weather
 			ppc.pumpTemp.Temperature() > ppc.solar.target + ppc.solar.tolerance {
@@ -196,7 +196,7 @@ func (ppc *PoolPumpController) Start(force bool) {
 
 	// Start go routines
 	ppc.Update()
-	ppc.button.Start()	
+	ppc.button.Start()
 	go ppc.runLoop()
 }
 
@@ -300,7 +300,7 @@ func (ppc *PoolPumpController) Stop() {
 
 func (ppc *PoolPumpController) WeatherC() float64 {
 	return ppc.weather.GetCurrentTempC(ppc.config.GetString(configZip))
-}	
+}
 
 func (ppc *PoolPumpController) Status() string {
 	return fmt.Sprintf(
