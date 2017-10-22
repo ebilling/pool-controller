@@ -46,6 +46,7 @@ func startServer(s *Server) {
 
 func (s *Server) Start() {
 	go startServer(s)
+	Info("Starting HTTPS on 0.0.0.0:%d", s.port)
 }
 
 func (s *Server) Stop() {
@@ -60,7 +61,7 @@ const (
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	Info("Received: %s", r.URL)
+	Debug("Received: %s", r.URL)
 	switch r.URL.Path {
 	case "/":
 		h.rootHandler(w, r)
@@ -77,6 +78,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Unknown request type", 404)
 	}
+}
+
+func (h *Handler) setRefresh(w http.ResponseWriter, r *http.Request, seconds int) {
+	refresh := fmt.Sprintf("%d; url=%s", seconds, r.RequestURI)
+	Debug("Setting Refresh to: %s", refresh)
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Refresh", refresh)
 }
 
 func (h *Handler) writeResponse(w http.ResponseWriter, content []byte, ctype string) {
@@ -126,16 +134,17 @@ func (h *Handler) graphHandler(w http.ResponseWriter, r *http.Request, which int
 	if err != nil {
 		Error("Could not produce graph: %s", err.Error())
 	}
+	h.setRefresh(w, r, 20) // Refresh image every 20 seconds
 	h.writeResponse(w, graph, "image/png")
 }
 
 func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	html := `<html>
-  <head><title>Pool Pump Controller</title><meta http-equiv="refresh" content="10"></head>
+  <head><title>Pool Pump Controller</title></head>
   <body>
     <center>
       <table>
-        <tr><td></td><td><IMG src="temps"></td></tr>
+        <tr><td></td><td><img src="/temps?&t=" onload='setTimeout(function() {src = src.substring(0, (src.lastIndexOf("t=")+2))+(new Date()).getTime()}, 60000)' onerror='setTimeout(function() {src = src.substring(0, (src.lastIndexOf("t=")+2))+(new Date()).getTime()}, 60000)' alt='Temperatures and Solar Radiation' /></td></tr>
         <tr><td></td><td><br></td></tr>
         <tr><td><table>
                 <tr><td>4</td><td>Solar Mixing</td></tr>
@@ -145,7 +154,7 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
                 <tr><td>0</td><td>Off</td></tr>
                 <tr><td>-1</td><td>Disabled</td></tr>
             </table></td>
-            <td><IMG SRC="pumps"></td></tr>
+            <td><IMG SRC="/pumps?&t=" onload='setTimeout(function() {src = src.substring(0, (src.lastIndexOf("t=")+2))+(new Date()).getTime()}, 60000)' onerror='setTimeout(function() {src = src.substring(0, (src.lastIndexOf("t=")+2))+(new Date()).getTime()}, 60000)' alt='Pump Status' /></td></tr>
         </table>
     </center>
   </body>
