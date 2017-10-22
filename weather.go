@@ -22,6 +22,7 @@ type WeatherData struct {
 type Weather struct {
 	service Service
 	ttl     time.Duration
+	backoff time.Time
 	cache   map[string]*WeatherData
 }
 
@@ -30,6 +31,7 @@ func NewWeather(appId string, ttl time.Duration) (*Weather){
 	w := Weather{
 		service: &service,
 		ttl:     ttl,
+		backoff: time.Now(),
 		cache:   make(map[string]*WeatherData),
 	}
 	return &w
@@ -79,10 +81,14 @@ func (w *Weather) GetWeatherByZip(zipcode string) (*JSONmap) {
 		w.cache[zipcode] = data
 	}
 	Debug("GetWeatherByZip - Getting new data")
-	err := data.Update()
-	if err != nil {
-		Error("Failed to get data for %s: %s", zipcode, err.Error())
-		return nil
+	// Don't keep sending requests when they are not going through
+	if w.backoff.Add(30 * time.Minute).Before(time.Now()) {
+		err := data.Update()
+		if err != nil {
+			Error("Failed to get data for %s: %s", zipcode, err.Error())
+			w.backoff = time.Now()
+			return nil
+		}
 	}
 	return &data.data
 }
