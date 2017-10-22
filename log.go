@@ -30,6 +30,16 @@ func DisableDebug() {
 	__debug__ = false
 }
 
+func check(err error, format string, a ...interface{}) error {
+	s := fmt.Sprintf(format, a...)
+	return Error("%s: Error(%s)", s, err.Error())
+}
+
+func checkfatal(err error, format string, a ...interface{}) {
+	s := fmt.Sprintf(format, a...)
+	Fatal("%s: Error(%s)", s, err.Error())
+}
+
 func Alert(format string, a ...interface{}) (error) {
 	_init()
 	return __logger__.Alert(fmt.Sprintf(format, a...))
@@ -87,4 +97,3 @@ func Trace(format string, a ...interface{}) (error) {
 	return Debug(fmt.Sprintf(format, a...) +
 		fmt.Sprintf(": TraceBack{%+v}",string(tb[:])))
 }
-
