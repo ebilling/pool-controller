@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"reflect"
 	"strconv"
 	"strings"
@@ -44,7 +45,7 @@ func (m *JSONmap) readFile(path string) (error) {
 }
 
 func (jm *JSONmap) get(fullname string) (interface{}, error) {
-	var m interface{}	
+	var m interface{}
 	Debug("Fetching %s from JSONmap", fullname)
 	if jm == nil || jm._data == nil {
 		return nil, errors.New("data for JSONmap is (nil)")
@@ -68,6 +69,15 @@ func (jm *JSONmap) get(fullname string) (interface{}, error) {
 		}
 	}
 	return m, nil
+}
+
+func (m *JSONmap) Write(path string, permissions uint32) error {
+	data, err := json.MarshalIndent(m._data, "", "  ")
+	if err != nil {
+		check(err, "Could not write JSONdata to %s", path)
+		return err
+	}
+	return ioutil.WriteFile(path, data, os.FileMode(permissions))
 }
 
 func (m *JSONmap) Get(fullname string) (interface{}) {
