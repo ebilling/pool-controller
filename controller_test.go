@@ -47,7 +47,17 @@ func TestJSONmap(t *testing.T) {
 	})
 
 	t.Run("Set", func(t *testing.T) {
-		err := m.Set()
+		tst_val := "24.7"
+		err := m.Set(swp_str, tst_val)
+		if err != nil {
+			t.Errorf("Expected nil, error: %s", err.Error())
+		}
+		val := m.Get(swp_str)
+		if val == swp_val {
+			t.Errorf("Old value not changed to %s found (%s)", tst_val, val)
+		} else if val != tst_val {
+			t.Errorf("Expected (%s) found (%s)", tst_val, val)
+		}
 	})
 }
 
@@ -59,21 +69,30 @@ func checkErr(t *testing.T, err error) {
 
 func TestLog(t *testing.T) {
 	t.Run("Alert", func(t *testing.T) {
-		checkErr(t, Alert("testing %s", "testval"))})
+		checkErr(t, Alert("testing %s", "alert"))
+	})
 	t.Run("Crit", func(t *testing.T) {
-		checkErr(t, Crit("testing %s", "testval"))})
+		checkErr(t, Crit("testing %s", "crit"))
+	})
 	t.Run("Emerg", func(t *testing.T) {
-		checkErr(t, Emerg("testing %s", "testval"))})
+		checkErr(t, Emerg("testing %s", "emerg"))
+	})
 	t.Run("Error", func(t *testing.T) {
-		checkErr(t, Error("testing %s", "testval"))})
+		checkErr(t, Error("testing %s", "error"))
+	})
 	t.Run("Notice", func(t *testing.T) {
-		checkErr(t, Notice("testing %s", "testval"))})
+		checkErr(t, Notice("testing %s", "notice"))
+	})
 	t.Run("Warn", func(t *testing.T) {
-		checkErr(t, Warn("testing %s", "testval"))})
+		checkErr(t, Warn("testing %s", "warn"))
+	})
 	t.Run("Info", func(t *testing.T) {
-		checkErr(t, Info("testing %s", "testval"))})
+		checkErr(t, Info("testing %s", "info"))
+	})
 	t.Run("Log", func(t *testing.T) {
-		checkErr(t, Log("testing %s", "testval"))})
+		checkErr(t, Log("testing %s", "log"))
+	})
 	t.Run("Trace", func(t *testing.T) {
-		checkErr(t, Trace("testing %s", "testval"))})
+		checkErr(t, Trace("testing %s", "trace"))
+	})
 }

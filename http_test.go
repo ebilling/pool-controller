@@ -116,8 +116,11 @@ func TestWeather(t *testing.T) {
 
 	w := NewWeather("", time.Hour)
 	w.service = &TestService{} // Don't actually call WU
+
+	Debug("TestService Added: %v", w)
 	
 	t.Run("Good Zip", func(t *testing.T) {
+		Debug("data: %v", w.cache)
 		j := w.GetWeatherByZip(goodZip)
 		loc := j.Get(dispLoc)
 		if loc != dispLocVal {

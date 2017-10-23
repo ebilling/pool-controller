@@ -4,32 +4,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
-	"os"
 )
 
 type JSONmap struct {
 	_data map[string]interface{}
 }
 
-func NewJSONmap() (JSONmap) {
-	return JSONmap {
+func NewJSONmap() JSONmap {
+	return JSONmap{
 		_data: make(map[string]interface{}),
 	}
 }
 
-func (m *JSONmap) readBytes(data []byte) (error) {
+func (m *JSONmap) readBytes(data []byte) error {
 	return json.Unmarshal(data, &m._data)
 }
 
-func (m *JSONmap) readString(data string) (error) {
+func (m *JSONmap) readString(data string) error {
 	Debug("Converting string to JSONmap: %s", data)
 	return json.Unmarshal([]byte(data), &m._data)
 }
 
-func (m *JSONmap) readFile(path string) (error) {
+func (m *JSONmap) readFile(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		Error("Config Open Error: %s", err.Error())
@@ -71,29 +71,39 @@ func (jm *JSONmap) get(fullname string) (interface{}, error) {
 	return m, nil
 }
 
-func (jm *JSONmap) set(fullname, value string) error {
-	var m interface{}
-	Debug("Setting %s in JSONmap to %s", fullname, value)
+func (jm *JSONmap) set(fullname, newvalue string) error {
+	var next, last, value interface{}
+	var isMap, present bool
+
+	Debug("Setting %s in JSONmap to %s\n", fullname, newvalue)
 	if jm == nil || jm._data == nil {
 		return fmt.Errorf("data for JSONmap is (nil)")
 	}
-	m = jm._data
 	nameSlice := strings.Split(fullname, ".")
-	for _, name := range nameSlice {
-		Debug("Looking for [%s]", name)
-		_, isMap := m.(map[string]interface{})
+	next = jm._data
+    end := len(nameSlice) - 1
+	Debug("\n\n%s\n\n%v\n\n", nameSlice, next)
+	for i, name := range nameSlice {
+		Debug("Looking for [%s] in %s\n", name, next)
+		next, isMap = next.(map[string]interface{})
 		if !isMap {
 			return fmt.Errorf("set: No data for element: %s of %s", name, fullname)
 		}
-		value, present := m.(map[string]interface{})[name]
-		Debug("Did we find %s: %t", name, present)
+        last = next
+		value, present = next.(map[string]interface{})[name]
+		Debug("Did we find %s: present(%t) value(%v)\n", name, present, value)
 		if !present {
 			return fmt.Errorf("No data present for %s", fullname)
 		}
-		m, isMap = value.(map[string]interface{})
+		next, isMap = value.(map[string]interface{})
 		if !isMap {
-			// Found it *****
-			m.(map[string]interface{})[name] = fullname
+			Debug("Trying to save %s to %v [%s]\n", newvalue, last, name)
+			if i == end {
+				last.(map[string]interface{})[name] = newvalue
+				return nil
+			} else {
+				return fmt.Errorf("%s is a key for a map (%v), not a final value", fullname, next)
+			}
 		}
 	}
 	return nil
@@ -108,7 +118,7 @@ func (m *JSONmap) Write(path string, permissions uint32) error {
 	return ioutil.WriteFile(path, data, os.FileMode(permissions))
 }
 
-func (m *JSONmap) Get(fullname string) (interface{}) {
+func (m *JSONmap) Get(fullname string) interface{} {
 	val, err := m.get(fullname)
 	if err != nil {
 		Debug("Problem fetching %s, %s", fullname, err.Error())
@@ -129,7 +139,7 @@ func (m *JSONmap) Contains(fullname string) bool {
 	return ret == nil
 }
 
-func (m *JSONmap) GetFloat(fullname string) (float64) {
+func (m *JSONmap) GetFloat(fullname string) float64 {
 	x, err := m.get(fullname)
 	if err != nil {
 		Debug("Problem fetching %s, %s", fullname, err.Error())

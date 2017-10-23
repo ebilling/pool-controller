@@ -78,10 +78,10 @@ func TestGpioThermometer(t *testing.T) {
 	Debug("Therm: %v", therm)
 
 	t.Run("getDischargeTime", func (t *testing.T) {
-		d := therm.getDischargeTime()
-		if d / 1000000 != 100 {
-			t.Errorf("Expected %dms got %dms",
-			sleeptime/1000000, d/1000000)
+		d := therm.getDischargeTime() / time.Millisecond
+		s := sleeptime / time.Millisecond
+		if d < s - 5 || d > s + 5 {
+			t.Errorf("Expected ~%dms got %dms", s, d)
 		}
 	})
 

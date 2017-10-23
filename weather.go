@@ -31,7 +31,7 @@ func NewWeather(appId string, ttl time.Duration) (*Weather){
 	w := Weather{
 		service: &service,
 		ttl:     ttl,
-		backoff: time.Now(),
+		backoff: time.Now().Add(-1 * time.Hour),
 		cache:   make(map[string]*WeatherData),
 	}
 	return &w
@@ -74,6 +74,7 @@ func (w *Weather) GetWeatherByZip(zipcode string) (*JSONmap) {
 	data, present := w.cache[zipcode]
 	Debug("GetWeatherByZip cached(%t)", present)
 	if present && time.Now().After(data.updated.Add(w.ttl)) {
+		Debug("Returning cached data: %v", data.data)
 		return &data.data
 	}
 	if !present {
