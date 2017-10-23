@@ -73,7 +73,7 @@ func newWeatherData(zip string, service Service) (*WeatherData){
 func (w *Weather) GetWeatherByZip(zipcode string) (*JSONmap) {
 	data, present := w.cache[zipcode]
 	Debug("GetWeatherByZip cached(%t)", present)
-	if present && time.Now().After(data.updated.Add(w.ttl)) {
+	if present && time.Now().Before(data.updated.Add(w.ttl)) {
 		Debug("Returning cached data: %v", data.data)
 		return &data.data
 	}
