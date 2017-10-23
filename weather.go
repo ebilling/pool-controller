@@ -85,11 +85,13 @@ func (w *Weather) GetWeatherByZip(zipcode string) (*JSONmap) {
 	// Don't keep sending requests when they are not going through
 	if w.backoff.Add(30 * time.Minute).Before(time.Now()) {
 		err := data.Update()
+		w.backoff = time.Now()
 		if err != nil {
 			Error("Failed to get data for %s: %s", zipcode, err.Error())
-			w.backoff = time.Now()
 			return nil
 		}
+	} else {
+		Error("Backoff being enforced for WeatherUnderground")
 	}
 	return &data.data
 }
