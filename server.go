@@ -1,6 +1,7 @@
 package main
 
 import (
+	"golang.org/x/crypto/bcrypt"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -90,10 +91,6 @@ func (h *Handler) writeResponse(w http.ResponseWriter, content []byte, ctype str
 	w.Write(content)
 }
 
-func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
-	h.writeResponse(w, []byte("Please implement me"), "text/plain")
-}
-
 func getscale(r *http.Request) string {
 	scale := ""
 	cookie, _ := r.Cookie("scale")
@@ -154,9 +151,9 @@ func (h *Handler) graphHandler(w http.ResponseWriter, r *http.Request, which int
 	h.writeResponse(w, graph, "image/png")
 }
 
-// TODO add width and height variables
 func image(which string, width, height int, scale string) string {
-	return fmt.Sprintf("<img src=\"/%s?scale=%s&width=%d&height=%d\" width=%d height=%d alt=\"Temperatures and Solar Radiation\" />",
+	return fmt.Sprintf("<img src=\"/%s?scale=%s&width=%d&height=%d\" width=%d height=%d " +
+		"alt=\"Temperatures and Solar Radiation\" />",
 		which, scale, width, height, width, height)
 }
 
@@ -211,5 +208,70 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("Updated: %s", time.Now().String()) +
 		"</td></tr>\n"
         html += "</table></font></center></body></html>"
+	h.writeResponse(w, []byte(html), "text/html")
+}
+
+func (h *Handler) Authenticate(r *http.Request) bool {
+	user, password, ok := r.BasicAuth()
+	if !ok || user != "admin" { return false }
+	authhash := h.ppc.config.GetString("auth.hash")
+	if authhash == "" {
+		defPass := h.ppc.config.GetString("homekit.pin")
+		defHash, _ := bcrypt.GenerateFromPassword([]byte(defPass), bcrypt.DefaultCost)
+		authhash = string(defHash)
+	}
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	err := bcrypt.CompareHashAndPassword(hashed, []byte(authhash))
+	if err == nil { return true }
+	return false
+}
+
+func configRow(name, inputName, configName string) string {
+	return fmt.Sprintf("<tr><td align=right>%s:</td><input name=%s size=20></td>" +
+		"<td>%s</td></tr>\n", name, inputName, configName)
+}
+
+func setConfigValue(c *Config, configName, formValue string) bool {
+	if formValue == "" { return false }
+	c.Set(configName, formValue)
+	return true
+}
+
+func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
+	if !h.Authenticate(r) {
+		http.Error(w, "Unauthorized", 401)
+		return
+	}
+
+	c := h.ppc.config
+	foundone := false
+	if setConfigValue(c, "auth.hash",      "passcode")  { foundone = true }
+	if setConfigValue(c, "weather.zip",    "zipcode")   { foundone = true }
+	if setConfigValue(c, "weather.appid",  "appid")     { foundone = true }
+	if setConfigValue(c, "temp.tolerance", "tolerance") { foundone = true }
+	if setConfigValue(c, "temp.minDeltaT", "mindelta")  { foundone = true }
+	if setConfigValue(c, "temp.target",    "target")    { foundone = true }
+
+	if foundone { c.Save() }
+
+	html := "<html><head><title>Pool Controller Configuration</title></head><body>"
+	html += "<table cellpadding=3>"
+	html += "<form <font face=helvetica color=#444444 size=-1>" +
+		"<form action=/config method=POST>"
+	html += "<tr><td align=left>Administrator:</td><td colspan=2></td></tr>"
+	html += configRow("Admin Password", "passcode", "")
+	html += "<tr><td colspan=3><br></td></tr>"
+
+	html += "<tr><td align=left>Weather:</td><td colspan=2></td></tr>"
+	html += configRow("Zipcode", "zipcode", c.GetString("weather.zip"))
+	html += configRow("WeatherUnderground ID", "appid", c.GetString("weather.appid"))
+	html += "<tr><td colspan=3><br></td></tr>"
+
+	html += "<tr><td align=left>Solar Settings:</td><td colspan=2></td></tr>"
+	html += configRow("Tolerance", "tolerance", c.GetString("temp.tolerance"))
+	html += configRow("MinDelta", "mindelta", c.GetString("temp.minDeltaT"))
+	html += configRow("Target", "target", c.GetString("temp.target"))
+	html += "</form></table></body></html>"
+
 	h.writeResponse(w, []byte(html), "text/html")
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"strconv"
@@ -48,7 +48,7 @@ func (jm *JSONmap) get(fullname string) (interface{}, error) {
 	var m interface{}
 	Debug("Fetching %s from JSONmap", fullname)
 	if jm == nil || jm._data == nil {
-		return nil, errors.New("data for JSONmap is (nil)")
+		return nil, fmt.Errorf("data for JSONmap is (nil)")
 	}
 	m = jm._data
 	nameSlice := strings.Split(fullname, ".")
@@ -56,12 +56,12 @@ func (jm *JSONmap) get(fullname string) (interface{}, error) {
 		Debug("Looking for [%s]", name)
 		_, isMap := m.(map[string]interface{})
 		if !isMap {
-			return nil, errors.New("No data for element: " + name + " of " + fullname)
+			return nil, fmt.Errorf("No data for element: %s of %s", name, fullname)
 		}
 		value, present := m.(map[string]interface{})[name]
 		Debug("Did we find %s: %t", name, present)
 		if !present {
-			return nil, errors.New("No data present for " + fullname)
+			return nil, fmt.Errorf("No data present for %s", fullname)
 		}
 		m, isMap = value.(map[string]interface{})
 		if !isMap {
@@ -69,6 +69,34 @@ func (jm *JSONmap) get(fullname string) (interface{}, error) {
 		}
 	}
 	return m, nil
+}
+
+func (jm *JSONmap) set(fullname, value string) error {
+	var m interface{}
+	Debug("Setting %s in JSONmap to %s", fullname, value)
+	if jm == nil || jm._data == nil {
+		return fmt.Errorf("data for JSONmap is (nil)")
+	}
+	m = jm._data
+	nameSlice := strings.Split(fullname, ".")
+	for _, name := range nameSlice {
+		Debug("Looking for [%s]", name)
+		_, isMap := m.(map[string]interface{})
+		if !isMap {
+			return fmt.Errorf("set: No data for element: %s of %s", name, fullname)
+		}
+		value, present := m.(map[string]interface{})[name]
+		Debug("Did we find %s: %t", name, present)
+		if !present {
+			return fmt.Errorf("No data present for %s", fullname)
+		}
+		m, isMap = value.(map[string]interface{})
+		if !isMap {
+			// Found it *****
+			m.(map[string]interface{})[name] = fullname
+		}
+	}
+	return nil
 }
 
 func (m *JSONmap) Write(path string, permissions uint32) error {
@@ -86,6 +114,14 @@ func (m *JSONmap) Get(fullname string) (interface{}) {
 		Debug("Problem fetching %s, %s", fullname, err.Error())
 	}
 	return val
+}
+
+func (m *JSONmap) Set(fullname, value string) error {
+	_, err := m.get(fullname)
+	if err != nil {
+		Debug("Problem fetching %s, %s", fullname, err.Error())
+	}
+	return m.set(fullname, value)
 }
 
 func (m *JSONmap) Contains(fullname string) bool {

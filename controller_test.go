@@ -45,6 +45,10 @@ func TestJSONmap(t *testing.T) {
 			t.Errorf("Expected (%f) found (%f)", cap_val, val)
 		}
 	})
+
+	t.Run("Set", func(t *testing.T) {
+		err := m.Set()
+	})
 }
 
 func checkErr(t *testing.T, err error) {

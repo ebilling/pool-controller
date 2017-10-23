@@ -41,7 +41,7 @@ func (c *Config) Update() {
 	}
 }
 
-func (c *Config) Write() {
+func (c *Config) Save() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	check(c.data.Write(c.path, 0644), "Could not write config to %s", c.path)
@@ -54,6 +54,10 @@ func (c *Config) Contains(fullname string) bool {
 
 func (c *Config) Get(fullname string) (interface{}) {
 	return c.data.Get(fullname)
+}
+
+func (c *Config) Set(name, value string) error {
+	return c.data.Set(name, value)
 }
 
 func (c *Config) GetString(fullname string) (string) {
