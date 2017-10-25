@@ -251,8 +251,8 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	html += indent(1) + "<tr><td colspan=2 align=center>" +
 		fmt.Sprintf("Updated: %.19s", time.Now().String()) +
 		"</td></tr>\n"
+	html += "<tr><td colspan=2>" + nav() + "</td><td></td></tr>\n"
 	html += "</table></font>"
-	html += nav()
 	html += "</center></body></html>"
 	h.writeResponse(w, []byte(html), "text/html")
 }
