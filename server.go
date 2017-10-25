@@ -348,22 +348,22 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += "<font size=-1>\n"
 	html += "<table border=0 cellpadding=3>\n"
 	html += "<form action=/config method=POST>\n"
-	html += "<tr><td align=left>Administrator:</td><td colspan=3></td></tr>\n"
+	html += "<tr><th align=left>Administrator:</th><td colspan=3></td></tr>\n"
 	html += h.configRow("Admin Password", "passcode", "", passArgs)
 	html += h.configRow("Confirm Password", "passcode2", "", passArgs)
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
-	html += "<tr><td align=left>Weather:</td><td colspan=3></td></tr>\n"
+	html += "<tr><th align=left>Weather:</th><td colspan=3></td></tr>\n"
 	html += h.configRow("Zipcode", "zipcode", *c.zip, "")
 	html += h.configRow("WeatherUnderground ID", "appid", *c.WUappId, "")
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
-	html += "<tr><td align=left>Temperature Sensor Adjustment:</td><td colspan=3></td></tr>\n"
+	html += "<tr><th align=left>Temperature Sensor Adjustment:</th><td colspan=3></td></tr>\n"
 	html += h.configRow("Pump Capacitance (uF)", "cap_pump", fmt.Sprintf("%0.2f&micro;F", *c.cap_pump), "")
 	html += h.configRow("Roof Capacitance (uF)", "cap_roof", fmt.Sprintf("%0.2f&micro;F", *c.cap_roof), "")
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
-	html += "<tr><td align=left>Solar Settings:</td><td colspan=3></td></tr>\n"
+	html += "<tr><th align=left>Solar Settings:</th><td colspan=3></td></tr>\n"
 	html += h.configRow("Target", "target", fmt.Sprintf("%0.2f&deg;C", *c.target), "")
 	html += h.configRow("Tolerance", "tolerance", fmt.Sprintf("%0.2f&deg;C", *c.tolerance), "")
 	html += h.configRow("MinDelta", "mindelta", fmt.Sprintf("%0.2f&deg;C", *c.deltaT), "")
