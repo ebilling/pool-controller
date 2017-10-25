@@ -1,33 +1,31 @@
-#! /bin/sh
+#! /bin/bash
 
 ### BEGIN INIT INFO
-# Provides:	        pi-go-homekit
+# Provides:	        pool-controller
 # Required-Start:	$remote_fs $syslog
 # Required-Stop:	$remote_fs $syslog
 # Default-Start:	2 3 4 5
 # Default-Stop:
-# Short-Description:	Smart PoolPump Functionality
+# Short-Description:	Smart Pool Pump Functionality
 ### END INIT INFO
 
+#Redirect all output syslog
 set -e
 
-# /etc/init.d/poold: start and stop the poold daemon
 name='pool-controller'
-bin='/usr/local/bin/daemonize.py /usr/local/bin/$name'
-args='-p -data_dir="$data_dir"'
+daemonize="daemonize"
+bin="$name"
 data_dir="/var/cache/homekit"
+args="-p -data_dir=$data_dir"
 pidfile="/tmp/$name.pid"
+log="/tmp/pc.log"
 
+exec 1> >(logger -p daemon.info -t $name) 2>&1
+
+test -x $daemonize || exit 0
 test -x $bin || exit 0
 umask 022
 export PATH="${PATH:+$PATH:}/usr/local/bin"
-
-. /lib/lsb/init-functions
-
-# Are we running from init?
-run_by_init() {
-    ([ "$previous" ] && [ "$runlevel" ]) || [ "$runlevel" = S ]
-}
 
 check_data_dir() {
     # Create the Data empty dir if necessary
@@ -38,47 +36,41 @@ check_data_dir() {
     cd $data_dir
 }
 
-start() {
+start_proc() {
     check_data_dir
     cd $rundir
-    log_daemon_msg "Starting" "$name" || true
-    log_daemon_msg "Starting" "$name" || true
-	if start-stop-daemon --start --pidfile $pid --exec $bin -p -data_dir="$data_dir"&; then
-	    log_end_msg 0 || true
-	else
-	    log_end_msg 1 || true
-	fi
+    if $daemonize $bin $args -pid=$pidfile; then
+	echo "Starting $name: Success"
+    else
+        echo "Starting $name: Failed"
+    fi
 }
 
-stop() {
-    log_daemon_msg "Stopping" "$name" || true
-	if start-stop-daemon --stop --pidfile $pid; then
-	    log_end_msg 0 || true
-	else
-	    log_end_msg 1 || true
-	fi
+stop_proc() {
+    pid=`cat $pidfile`
+    if kill -2 $pid; then
+	echo "Stopping $name: Success"
+    else
+	echo "Stopping $name: Failed"
+    fi
 
 }
 
 case "$1" in
     start)
-	start
+	start_proc
 	;;
     stop)
-	stop
+	stop_proc
 	;;
 
     restart)
-	stop
-	start
+	stop_proc
+	sleep 2
+	start_proc
 	;;
-
-    status)
-	status_of_proc -p `cat $pidfile` $bin && exit 0 || exit $?
-	;;
-
     *)
-	log_action_msg "Usage: /etc/init.d/$name {start|stop|restart|status}" || true
+	echo "Usage: /etc/init.d/$name {start|stop|restart}"
 	exit 1
 esac
 

@@ -5,18 +5,17 @@ import sys
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print "Usage: %s executable ARGS..." % (sys.argv[0])
+        sys.stderr.write("Usage: %s CMD ARGS...\n" % (sys.argv[0]))
 
     args = sys.argv[1:]
-    print "Daemonizing %s" % (args)
 
     try:
         process_id = os.fork()
     except OSError as e:
         self.logger.error("Unable to fork, errno: {0}".format(e.errno))
         sys.exit(1)
+
     if process_id != 0:
         os._exit(0)
- 
-    res = os.execvp(args[0], args[1:])
-    print "Executed %s: %s" % (args, res)
+
+    res = os.execvp(args[0], list(args))

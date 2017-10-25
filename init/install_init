@@ -1,5 +1,7 @@
 #!/bin/sh
 
+key="/etc/ssl/private/pool-controller.key"
+cert="/etc/ssl/certs/pool-controller.crt"
 
 setup()
 {
@@ -19,9 +21,12 @@ setup()
 }
 
 useradd -U -M -s /bin/false homekit
+cp -f daemonize /usr/local/bin/.
 
 setup "pool-controller" "/home/pi/go/bin/pool-controller" "99"
 
 systemctl daemon-reload
 
-openssl req -newkey rsa:4096 -nodes -keyout /etc/ssl/private/pool-controller.key -x509 -days 3650 -out /etc/ssl/certs/pool-controller.crt
+if [ ! -f $cert ]; then
+    openssl req -newkey rsa:4096 -nodes -keyout $key -x509 -days 3650 -out $cert
+fi
