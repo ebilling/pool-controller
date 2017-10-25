@@ -40,16 +40,16 @@ check_data_dir() {
 start() {
     check_data_dir
     log_daemon_msg "Starting" "$name" || true
-	if start-stop-daemon --start --pidfile $pid --exec $bin -p -data_dir="$data_dir"&; then
+	if start-daemon --pidfile $pid --exec "$bin -p -data_dir=$data_dir&"; then
 	    log_end_msg 0 || true
 	else
 	    log_end_msg 1 || true
 	fi
 }
 
-stop_daemon() {
-    log_daemon_msg "Stopping" $name || true
-	if start-stop-daemon --stop --pidfile $pid; then
+stop() {
+    log_daemon_msg "Stopping" "$name" || true
+	if stop-daemon --pidfile $pid; then
 	    log_end_msg 0 || true
 	else
 	    log_end_msg 1 || true
@@ -75,7 +75,7 @@ case "$1" in
 	;;
 
     *)
-	log_action_msg "Usage: /etc/init.d/poold {start|stop|restart|status}" || true
+	log_action_msg "Usage: /etc/init.d/$name {start|stop|restart|status}" || true
 	exit 1
 esac
 
