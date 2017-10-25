@@ -193,11 +193,11 @@ func (ppc *PoolPumpController) WeatherC() float64 {
 
 func (ppc *PoolPumpController) Status() string {
 	return fmt.Sprintf(
-		"Status(%s) Solar(%s) Pump(%s) Sweep(%s) Manual(%t) "+
+		"Status(%s) Solar(%s) Pump(%s) Sweep(%s) Manual(%t) Target(%0.1f)"+
 			"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f) CurrentTemp(%0.1f)",
 		ppc.switches.State(), ppc.switches.solar.Status(),
 		ppc.switches.pump.Status(), ppc.switches.sweep.Status(),
-		ppc.switches.ManualState(),
+		ppc.switches.ManualState(), *ppc.config.target,
 		ppc.runningTemp.Temperature(), ppc.pumpTemp.Temperature(),
 		ppc.roofTemp.Temperature(), ppc.WeatherC())
 }

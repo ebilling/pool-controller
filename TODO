@@ -1,1 +1,0 @@
-Clean up shutdown to avoid using kill -9

@@ -6,17 +6,14 @@ import (
 	"github.com/brutella/hc"
 	"io/ioutil"
 	"os"
-	"runtime"
 )
 
 func main() {
-	if runtime.GOOS == "darwin" {
-		StartTestMode()
-	}
-	help := flag.Bool("h", default_forceRrd, "Display this usage message")
-	config := NewConfig()
-	Debug("Found %d flags in: %s", flag.NFlag(), os.Args)
-	config.OverwriteWithSaved() // Recover saved values, delete conf to clean them
+	help := flag.Bool("h", false, "Display this usage message")
+
+	config := NewConfig()       // Parses flags
+	config.OverwriteWithSaved() // Recover saved values, edit conf to clean them
+
 	if *help {
 		flag.Usage()
 		fmt.Fprintf(os.Stderr, "Any changes put into the web interface will override these"+

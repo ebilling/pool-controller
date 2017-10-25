@@ -259,10 +259,10 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 		"4=SolarMixing, 3=SolarHeating, 2=Cleaning, 1=PumpRunning, 0=Off, " +
 		"-1=Disabled</font></td><td></td></tr>\n"
 	html += "<tr><td colspan=2><br></td></tr>\n"
-	html += indent(1) + "<tr><td colspan=2 align=center>" +
+	html += indent(1) + "<tr><td align=center>" +
 		fmt.Sprintf("Updated: %.19s", time.Now().String()) +
-		"</td></tr>\n"
-	html += "<tr><td colspan=2 align=center>" + nav() + "</td></tr>\n"
+		"</td><td></td></tr>\n"
+	html += "<tr><td align=center>" + nav() + "</td><td></td></tr>\n"
 	html += "</table></font>"
 	html += "</center></body></html>"
 	h.writeResponse(w, []byte(html), "text/html")
