@@ -13,7 +13,8 @@ set -e
 
 # /etc/init.d/poold: start and stop the poold daemon
 name='pool-controller'
-bin="/usr/local/bin/$name"
+bin='/usr/local/bin/daemonize.py /usr/local/bin/$name'
+args='-p -data_dir="$data_dir"'
 data_dir="/var/cache/homekit"
 pidfile="/tmp/$name.pid"
 
@@ -41,7 +42,8 @@ start() {
     check_data_dir
     cd $rundir
     log_daemon_msg "Starting" "$name" || true
-    if nohup $bin -p -data_dir=$data_dir & echo $! > $pidfile; then
+    log_daemon_msg "Starting" "$name" || true
+	if start-stop-daemon --start --pidfile $pid --exec $bin -p -data_dir="$data_dir"&; then
 	    log_end_msg 0 || true
 	else
 	    log_end_msg 1 || true
@@ -50,7 +52,7 @@ start() {
 
 stop() {
     log_daemon_msg "Stopping" "$name" || true
-	if stop-daemon --pidfile $pid; then
+	if start-stop-daemon --stop --pidfile $pid; then
 	    log_end_msg 0 || true
 	else
 	    log_end_msg 1 || true
