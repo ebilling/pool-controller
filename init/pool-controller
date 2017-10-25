@@ -39,8 +39,9 @@ check_data_dir() {
 
 start() {
     check_data_dir
+    cd $rundir
     log_daemon_msg "Starting" "$name" || true
-	if start-daemon --pidfile $pid --exec "$bin -p -data_dir=$data_dir"; then
+    if nohup $bin -p -data_dir=$data_dir & echo $! > $pidfile; then
 	    log_end_msg 0 || true
 	else
 	    log_end_msg 1 || true
