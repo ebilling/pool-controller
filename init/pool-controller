@@ -40,7 +40,7 @@ check_data_dir() {
 start() {
     check_data_dir
     log_daemon_msg "Starting" "$name" || true
-	if start-daemon --pidfile $pid --exec "$bin -p -data_dir=$data_dir&"; then
+	if start-daemon --pidfile $pid --exec "$bin -p -data_dir=$data_dir"; then
 	    log_end_msg 0 || true
 	else
 	    log_end_msg 1 || true
@@ -62,12 +62,12 @@ case "$1" in
 	start
 	;;
     stop)
-	stop_daemon
+	stop
 	;;
 
     restart)
-	stop_daemon
-	start_daemon
+	stop
+	start
 	;;
 
     status)
