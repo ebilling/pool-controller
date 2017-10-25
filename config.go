@@ -17,6 +17,7 @@ var (
 	default_ssl_cert  = "/etc/ssl/certs/pool-controller.crt"
 	default_ssl_key   = "/etc/ssl/private/pool-controller.key"
 	default_data_dir  = "/var/cache/homekit"
+	default_pidfile   = "/tmp/pool-controller.pid"
 	default_pin       = "74023718"
 	default_WUappId   = ""
 	default_zip       = ""
@@ -50,8 +51,9 @@ type Config struct {
 	cap_roof  *float64
 
 	// Internal
-	mtime time.Time
-	ctime time.Time
+	pidfile *string
+	mtime   time.Time
+	ctime   time.Time
 }
 
 func NewConfig() *Config {
@@ -88,6 +90,8 @@ func NewConfig() *Config {
 		"Sets the measured capacitance in microFarads for the inline roof capacitor")
 	c.forceRrd = flag.Bool("f", default_forceRrd,
 		"force creation of new RRD files if present")
+	c.pidfile = flag.String("pid", default_pidfile,
+		"File to write the process id into.")
 	c.persist = flag.Bool("p", false,
 		"If true, any parameter values changed via web interface are saved to a file and read on "+
 			"startup.  If false, any saved values will be ignored on start.  Saved changes "+

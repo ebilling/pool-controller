@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/brutella/hc"
+	"io/ioutil"
 	"os"
 	"runtime"
 )
@@ -23,6 +24,9 @@ func main() {
 			config.data_dir, server_conf)
 		os.Exit(1)
 	}
+
+	// Write PID
+	ioutil.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
 
 	if err := GpioInit(); err != nil {
 		Fatal("Could not initialize GPIO: %s", err.Error())
