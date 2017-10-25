@@ -133,7 +133,8 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 func (ppc *PoolPumpController) runLoop() {
 	interval := 5 * time.Second
 	postStatus := time.Now()
-	for tries := 0; true; tries++ {
+	keepRunning := true
+	for keepRunning {
 		if postStatus.Before(time.Now()) {
 			postStatus = time.Now().Add(5 * time.Minute)
 			Info(ppc.Status())
@@ -143,14 +144,15 @@ func (ppc *PoolPumpController) runLoop() {
 			ppc.button.Stop()
 			// Turn off the pumps, and don't let them turn back on
 			ppc.switches.Disable()
-			Info("Stopped Controller")
-			return
+			keepRunning = false
+			break
 		case <-time.After(interval):
 			ppc.Update()
 			ppc.RunPumpsIfNeeded()
 			ppc.UpdateRrd()
 		}
 	}
+	Info("Exiting Controller")
 }
 
 // Finishes initializing the PoolPumpController, and kicks off the control thread.

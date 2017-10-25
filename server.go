@@ -19,6 +19,7 @@ type Server struct {
 	port    int
 	handler *Handler
 	server  http.Server
+	done    chan bool
 }
 
 func NewServer(port int, ppc *PoolPumpController) *Server {
@@ -27,6 +28,7 @@ func NewServer(port int, ppc *PoolPumpController) *Server {
 		handler: &Handler{
 			ppc: ppc,
 		},
+		done: make(chan bool),
 	}
 	s.server = http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
@@ -40,6 +42,8 @@ func startServer(s *Server, cert, key string) {
 	if err != nil {
 		Error("Error from Server: %s", err.Error())
 	}
+	s.done <- true
+	Info("Exiting HttpServer")
 }
 
 func (s *Server) Start(cert, key string) {
@@ -48,12 +52,19 @@ func (s *Server) Start(cert, key string) {
 }
 
 func (s *Server) Stop() {
+	interval := time.Second
 	ctx, _ := context.WithTimeout(context.Background(), time.Second)
 	err := s.server.Shutdown(ctx)
 	if err != nil {
-		Info("ServerShutdown: %s", err.Error())
-	} else {
-		Error("Server did not respond to shutdown request")
+		Info("HttpServerShutdown: %s", err.Error())
+	}
+	for {
+		select {
+		case <-s.done:
+			return
+		case <-time.After(interval):
+			Info("Waiting for HttpServer to shut down")
+		}
 	}
 }
 

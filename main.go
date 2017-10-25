@@ -55,16 +55,19 @@ func main() {
 	}
 
 	hc.OnTermination(func() {
-		Info("Stopping Controller")
+		Debug("Stopping Controller")
 		ppc.Stop()
-		Info("Stopping Transport")
-		transport.Stop()
-		Info("Stopping Server")
+		Debug("Stopping Server")
 		server.Stop()
-		Info("All services sent shutdown signal!")
+		Debug("Stopping Transport")
+		<-transport.Stop()
+		Debug("All services sent shutdown signal!")
 	})
 	Info("Homekit Pin: %s", hcConfig.Pin)
+
+	// Starting transport blocks until the daemon is killed
 	transport.Start()
-	Info("Exiting")
+
 	PowerLed.Output(Low)
+	Info("Exiting")
 }
