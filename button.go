@@ -6,21 +6,21 @@ import (
 
 type Button struct {
 	pin        PiPin
-	callback   func ()
-	bouncetime time.Duration	
+	callback   func()
+	bouncetime time.Duration
 	done       chan bool
 }
 
-func NewGpioButton(pin uint8, callback func()) (*Button) {
+func NewGpioButton(pin uint8, callback func()) *Button {
 	return newButton(NewGpio(pin), callback)
 }
 
-func newButton(pin PiPin, callback func ()) (*Button) {
+func newButton(pin PiPin, callback func()) *Button {
 	b := Button{
-		pin:          pin,
-		callback:     callback,
-		bouncetime:   250 * time.Millisecond,
-		done:         make(chan bool),
+		pin:        pin,
+		callback:   callback,
+		bouncetime: 250 * time.Millisecond,
+		done:       make(chan bool),
 	}
 	pin.InputEdge(PullUp, FallingEdge)
 	return &b
@@ -31,12 +31,12 @@ func (b *Button) Start() {
 }
 
 func (b *Button) RunLoop() {
-	start:= time.Now()
+	start := time.Now()
 	for true {
 		select {
-		case done := <- b.done:
-			if done { return }     // End job
-		default:         // Required to not block
+		case <-b.done:
+			return // End job
+		default: // Required to not block
 			break
 		}
 		if b.pin.WaitForEdge(time.Second) {

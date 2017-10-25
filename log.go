@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"log/syslog"
+	"os"
+	"os/user"
 	rtdebug "runtime/debug"
 	"strings"
-	"os/user"
-	"os"
 )
 
 var __logger__ *syslog.Writer = nil
@@ -35,7 +35,7 @@ func DisableDebug() {
 }
 
 // Enables Debug logging and sends all log output to Stdout
-func TestMode() {
+func StartTestMode() {
 	EnableDebug()
 	__test__ = true
 }
@@ -48,7 +48,11 @@ func EndTestMode() {
 
 func check(err error, format string, a ...interface{}) error {
 	s := fmt.Sprintf(format, a...)
-	return Error("%s: Error(%s)", s, err.Error())
+	if err != nil {
+		Error("%s: Error(%s)", s, err.Error())
+		return err
+	}
+	return nil
 }
 
 func checkfatal(err error, format string, a ...interface{}) {
@@ -56,19 +60,19 @@ func checkfatal(err error, format string, a ...interface{}) {
 	Fatal("%s: Error(%s)", s, err.Error())
 }
 
-func Alert(format string, a ...interface{}) (error) {
+func Alert(format string, a ...interface{}) error {
 	_init()
 	if __test__ {
-		_, err := fmt.Printf("Alert: " + format + "\n", a...)
+		_, err := fmt.Printf("Alert: "+format+"\n", a...)
 		return err
 	}
 	return __logger__.Alert(fmt.Sprintf(format, a...))
 }
 
-func Crit(format string, a ...interface{}) (error) {
+func Crit(format string, a ...interface{}) error {
 	_init()
 	if __test__ {
-		_, err := fmt.Printf("Crit: " + format + "\n", a...)
+		_, err := fmt.Printf("Crit: "+format+"\n", a...)
 		return err
 	}
 	return __logger__.Crit(fmt.Sprintf(format, a...))
@@ -79,64 +83,64 @@ func Fatal(format string, a ...interface{}) {
 	os.Exit(1)
 }
 
-func Emerg(format string, a ...interface{}) (error) {
+func Emerg(format string, a ...interface{}) error {
 	_init()
 	if __test__ {
-		_, err := fmt.Printf("Emerg: " + format + "\n", a...)
+		_, err := fmt.Printf("Emerg: "+format+"\n", a...)
 		return err
 	}
 	return __logger__.Emerg(fmt.Sprintf(format, a...))
 }
 
-func Error(format string, a ...interface{}) (error) {
+func Error(format string, a ...interface{}) error {
 	_init()
 	if __test__ {
-		_, err := fmt.Printf("Error: " + format + "\n", a...)
+		_, err := fmt.Printf("Error: "+format+"\n", a...)
 		return err
 	}
 	return __logger__.Err(fmt.Sprintf(format, a...))
 }
 
-func Notice(format string, a ...interface{}) (error) {
+func Notice(format string, a ...interface{}) error {
 	_init()
 	if __test__ {
-		_, err := fmt.Printf("Notice: " + format + "\n", a...)
+		_, err := fmt.Printf("Notice: "+format+"\n", a...)
 		return err
 	}
 	return __logger__.Notice(fmt.Sprintf(format, a...))
 }
 
-func Warn(format string, a ...interface{}) (error) {
+func Warn(format string, a ...interface{}) error {
 	_init()
 	if __test__ {
-		_, err := fmt.Printf("Warn: " + format + "\n", a...)
+		_, err := fmt.Printf("Warn: "+format+"\n", a...)
 		return err
 	}
 	return __logger__.Warning(fmt.Sprintf(format, a...))
 }
 
-func Info(format string, a ...interface{}) (error) {
+func Info(format string, a ...interface{}) error {
 	_init()
 	if __test__ {
-		_, err := fmt.Printf("Info: " + format + "\n", a...)
+		_, err := fmt.Printf("Info: "+format+"\n", a...)
 		return err
 	}
 	return __logger__.Info(fmt.Sprintf(format, a...))
 }
 
-func Debug(format string, a ...interface{}) (error) {
+func Debug(format string, a ...interface{}) error {
 	if __debug__ == false {
 		return nil
 	}
 	_init()
 	if __test__ {
-		_, err := fmt.Printf("Debug: " + format + "\n", a...)
+		_, err := fmt.Printf("Debug: "+format+"\n", a...)
 		return err
 	}
 	return __logger__.Debug(fmt.Sprintf(format, a...))
 }
 
-func Log(format string, a ...interface{}) (error) {
+func Log(format string, a ...interface{}) error {
 	return Info(fmt.Sprintf(format, a...))
 }
 
@@ -147,10 +151,14 @@ func traceback() string {
 func caller_traceback() string {
 	s := strings.Split(string(rtdebug.Stack()), "\n")
 	out := "{\n"
-	for i := 7; i < len(s) ; i++ { if  i % 2 == 0 { out += s[i] + "\n" } }
+	for i := 7; i < len(s); i++ {
+		if i%2 == 0 {
+			out += s[i] + "\n"
+		}
+	}
 	return out + "}"
 }
 
-func Trace(format string, a ...interface{}) (error) {
+func Trace(format string, a ...interface{}) error {
 	return Debug(fmt.Sprintf(format, a...) + fmt.Sprintf(": TraceBack -> %s", caller_traceback()))
 }

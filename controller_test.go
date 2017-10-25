@@ -45,20 +45,6 @@ func TestJSONmap(t *testing.T) {
 			t.Errorf("Expected (%f) found (%f)", cap_val, val)
 		}
 	})
-
-	t.Run("Set", func(t *testing.T) {
-		tst_val := "24.7"
-		err := m.Set(swp_str, tst_val)
-		if err != nil {
-			t.Errorf("Expected nil, error: %s", err.Error())
-		}
-		val := m.Get(swp_str)
-		if val == swp_val {
-			t.Errorf("Old value not changed to %s found (%s)", tst_val, val)
-		} else if val != tst_val {
-			t.Errorf("Expected (%s) found (%s)", tst_val, val)
-		}
-	})
 }
 
 func checkErr(t *testing.T, err error) {

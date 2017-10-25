@@ -1,8 +1,8 @@
 package main
 
 import (
-        "github.com/brutella/hc/accessory"
 	"fmt"
+	"github.com/brutella/hc/accessory"
 	"math"
 	"sync"
 	"time"
@@ -17,22 +17,22 @@ type Thermometer interface {
 
 type SelectiveThermometer struct {
 	name        string
-	filter      func () (bool)
+	filter      func() bool
 	thermometer Thermometer
 	accessory   *accessory.Thermometer
 }
 
 func NewSelectiveThermometer(name string, manufacturer string, thermometer Thermometer,
-	filter func () bool) (*SelectiveThermometer) {
+	filter func() bool) *SelectiveThermometer {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
 		0.0, -20.0, 100.0, 1.0)
 	thermometer.Update()
 	acc.TempSensor.CurrentTemperature.SetValue(thermometer.Temperature())
 	return &SelectiveThermometer{
-		name:         name,
-		thermometer:  thermometer,
-		filter:       filter,
-		accessory:    acc,
+		name:        name,
+		thermometer: thermometer,
+		filter:      filter,
+		accessory:   acc,
 	}
 }
 
@@ -45,7 +45,7 @@ func (t *SelectiveThermometer) Temperature() float64 {
 }
 
 func (t *SelectiveThermometer) Update() error {
-	if (t.filter()) {
+	if t.filter() {
 		t.accessory.TempSensor.CurrentTemperature.SetValue(
 			t.thermometer.Temperature())
 	}
@@ -67,23 +67,23 @@ type GpioThermometer struct {
 }
 
 func NewGpioThermometer(name string, manufacturer string,
-	gpio uint8, capacitance_uF float64) (*GpioThermometer) {
+	gpio uint8, capacitance_uF float64) *GpioThermometer {
 	return newGpioThermometer(name, manufacturer,
 		NewGpio(gpio), capacitance_uF)
 }
 
 func newGpioThermometer(name string, manufacturer string,
-	pin PiPin, capacitance_uF float64) (*GpioThermometer) {
+	pin PiPin, capacitance_uF float64) *GpioThermometer {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
 		0.0, -20.0, 100.0, 1.0)
 	th := GpioThermometer{
-		name:            name,
-		mutex:           sync.Mutex{},
-		pin:             pin,
-		microfarads:     capacitance_uF,
-		history:        *NewHistory(100),
-		updated:         time.Now().Add(-24 * time.Hour),
-		accessory:       acc,
+		name:        name,
+		mutex:       sync.Mutex{},
+		pin:         pin,
+		microfarads: capacitance_uF,
+		history:     *NewHistory(100),
+		updated:     time.Now().Add(-24 * time.Hour),
+		accessory:   acc,
 	}
 	return &th
 }
@@ -92,11 +92,11 @@ func (t *GpioThermometer) Name() string {
 	return t.name
 }
 
-func (t *GpioThermometer) Accessory() (*accessory.Accessory) {
+func (t *GpioThermometer) Accessory() *accessory.Accessory {
 	return t.accessory.Accessory
 }
 
-func (t *GpioThermometer) getDischargeTime() (time.Duration) {
+func (t *GpioThermometer) getDischargeTime() time.Duration {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -105,23 +105,23 @@ func (t *GpioThermometer) getDischargeTime() (time.Duration) {
 	time.Sleep(300 * time.Millisecond)
 
 	// Start polling
-	start:= time.Now()
+	start := time.Now()
 	t.pin.InputEdge(PullUp, RisingEdge)
-	if !t.pin.WaitForEdge(time.Second/2) {
+	if !t.pin.WaitForEdge(time.Second / 2) {
 		Error("Thermometer read timed out")
 		return time.Duration(0)
 	}
-	stop:= time.Now()
+	stop := time.Now()
 	t.pin.Output(Low)
 	return stop.Sub(start)
 }
 
-func (t *GpioThermometer) getOhms(dischargeTime time.Duration) (float64) {
+func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
 	uSec := float64(dischargeTime) / 1000.0
 	return 2 * uSec / t.microfarads
 }
 
-func (t *GpioThermometer) getTemp(ohms float64) (float64) {
+func (t *GpioThermometer) getTemp(ohms float64) float64 {
 	const a = 79463.85
 	const b = 0.1453676
 	const c = 2.517178E-15
@@ -129,10 +129,10 @@ func (t *GpioThermometer) getTemp(ohms float64) (float64) {
 	if ohms == 0.0 {
 		return 0.0
 	}
-	return d + (a - d)/(1 + math.Pow(ohms/c, b))
+	return d + (a-d)/(1+math.Pow(ohms/c, b))
 }
 
-func (t *GpioThermometer) inRange(dischargeTime time.Duration) (bool) {
+func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 	const minTime = 1 * time.Millisecond
 	const maxTime = 500 * time.Millisecond
 
@@ -143,7 +143,7 @@ func (t *GpioThermometer) inRange(dischargeTime time.Duration) (bool) {
 	return true
 }
 
-func (t *GpioThermometer) Temperature() (float64) {
+func (t *GpioThermometer) Temperature() float64 {
 	if time.Now().After(t.updated.Add(time.Minute)) {
 		t.Update()
 	}
@@ -152,7 +152,7 @@ func (t *GpioThermometer) Temperature() (float64) {
 
 const Millisecond_f float64 = float64(time.Millisecond)
 
-func (t *GpioThermometer) Update() (error) {
+func (t *GpioThermometer) Update() error {
 	var dischargeTime time.Duration
 	h := NewHistory(3)
 	tries := 0
@@ -168,13 +168,15 @@ func (t *GpioThermometer) Update() (error) {
 	Debug("%s Update() took %d tries to find %d results", t.Name(), tries, h.Len())
 
 	stdd := t.history.Stddev()
-	avg  := t.history.Average()
-	med  := t.history.Median()
-	dev  := stdd * 1.5
-	if dev < 2 * Millisecond_f  { dev = 2 * Millisecond_f } // give some wiggle room
+	avg := t.history.Average()
+	med := t.history.Median()
+	dev := stdd * 1.5
+	if dev < 2*Millisecond_f {
+		dev = 2 * Millisecond_f
+	} // give some wiggle room
 
 	// Throw away bad results
-	if math.Abs(avg - h.Median()) > dev {
+	if math.Abs(avg-h.Median()) > dev {
 		Info("%s Thermometer update failed: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
 			t.Name(),
 			h.Median()/Millisecond_f,
@@ -194,11 +196,11 @@ func (t *GpioThermometer) cleanData() {
 }
 
 // Converts a temperature in Celsius to Farenheit
-func toFarenheit(celsius float64) (float64) {
-	return  (celsius * 9.0 / 5.0) + 32.0
+func toFarenheit(celsius float64) float64 {
+	return (celsius * 9.0 / 5.0) + 32.0
 }
 
 // Converts a temperature in Farenheit to Celsius
-func toCelsius(farenheit float64) (float64) {
-	return farenheit - 32.0 * 5.0 / 9.0
+func toCelsius(farenheit float64) float64 {
+	return farenheit - 32.0*5.0/9.0
 }

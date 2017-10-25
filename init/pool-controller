@@ -13,9 +13,8 @@ set -e
 
 # /etc/init.d/poold: start and stop the poold daemon
 name='pool-controller'
-conf='/etc/pool.conf'
 bin="/usr/local/bin/$name"
-rundir="/var/cache/homekit"
+data_dir="/var/cache/homekit"
 pidfile="/tmp/$name.pid"
 
 test -x $bin || exit 0
@@ -31,27 +30,32 @@ run_by_init() {
 
 check_data_dir() {
     # Create the Data empty dir if necessary
-    if [ ! -d $rundir ]; then
-	mkdir $rundir
-	chmod 0755 $rundir
+    if [ ! -d $data_dir ]; then
+	mkdir -p $data_dir
+	chmod 0755 $data_dir
     fi
+    cd $data_dir
 }
 
 start() {
     check_data_dir
-    cd $rundir
-    nohup $name $conf & echo $! > $pidfile
+    log_daemon_msg "Starting" "$name" || true
+	if start-stop-daemon --start --pidfile $pid --exec $bin -p -data_dir="$data_dir"&; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
 }
 
 stop_daemon() {
-    log_daemon_msg "Stopping server" $bin || true
-    if kill -9 `cat $pidfile`; then
-	log_end_msg 0 || true
-    else
-	log_end_msg 1 || true
-    fi
-}
+    log_daemon_msg "Stopping" $name || true
+	if start-stop-daemon --stop --pidfile $pid; then
+	    log_end_msg 0 || true
+	else
+	    log_end_msg 1 || true
+	fi
 
+}
 
 case "$1" in
     start)

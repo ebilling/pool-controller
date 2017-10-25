@@ -1,10 +1,10 @@
 package main
 
 import (
-	"io/ioutil"
 	"fmt"
-	"time"
+	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 // For Testing
@@ -13,10 +13,10 @@ type Service interface {
 }
 
 type WeatherData struct {
-	zipcode  string
-	updated  time.Time
-	data     JSONmap
-	service  Service
+	zipcode string
+	updated time.Time
+	data    JSONmap
+	service Service
 }
 
 type Weather struct {
@@ -26,7 +26,7 @@ type Weather struct {
 	cache   map[string]*WeatherData
 }
 
-func NewWeather(appId string, ttl time.Duration) (*Weather){
+func NewWeather(appId string, ttl time.Duration) *Weather {
 	service := WUService{appId: appId}
 	w := Weather{
 		service: &service,
@@ -42,13 +42,16 @@ type WUService struct {
 	appId string
 }
 
-func (w *WUService) Read(zip string) (string) {
+func (w *WUService) Read(zip string) string {
+	if __test__ || w.appId == "" {
+		return "" // Don't hit WU for a test, or if unconfigured
+	}
 	// Return cached value
 	url := fmt.Sprintf("http://api.wunderground.com/api/%s/conditions/q/%s.json",
 		w.appId, zip)
 	Debug("Sending request to WeatherUnderground: %s", url)
 	resp, err := http.Get(url)
-        if err != nil {
+	if err != nil {
 		Error("WeatherUnderground returned error: %s",
 			err.Error())
 		return ""
@@ -60,8 +63,8 @@ func (w *WUService) Read(zip string) (string) {
 	return str
 }
 
-func newWeatherData(zip string, service Service) (*WeatherData){
-	data := WeatherData {
+func newWeatherData(zip string, service Service) *WeatherData {
+	data := WeatherData{
 		zipcode: zip,
 		updated: time.Now().Add(-24 * time.Hour),
 		data:    NewJSONmap(),
@@ -70,7 +73,10 @@ func newWeatherData(zip string, service Service) (*WeatherData){
 	return &data
 }
 
-func (w *Weather) GetWeatherByZip(zipcode string) (*JSONmap) {
+func (w *Weather) GetWeatherByZip(zipcode string) *JSONmap {
+	if zipcode == "" {
+		return nil
+	}
 	data, present := w.cache[zipcode]
 	Debug("GetWeatherByZip cached(%t)", present)
 	if present && time.Now().Before(data.updated.Add(w.ttl)) {
@@ -96,7 +102,7 @@ func (w *Weather) GetWeatherByZip(zipcode string) (*JSONmap) {
 	return &data.data
 }
 
-func (w *WeatherData) Update() (error) {
+func (w *WeatherData) Update() error {
 	Info("Updating Weather Forecast for %s", w.zipcode)
 	response := w.service.Read(w.zipcode)
 	if response == "" {
@@ -112,7 +118,7 @@ func (w *WeatherData) Update() (error) {
 	return nil
 }
 
-func (w *Weather) getFloat(zipcode string, name string) (float64) {
+func (w *Weather) getFloat(zipcode string, name string) float64 {
 	co := w.GetWeatherByZip(zipcode)
 	if co == nil {
 		Error("Could not retrieve weather data for %s", zipcode)
@@ -121,10 +127,16 @@ func (w *Weather) getFloat(zipcode string, name string) (float64) {
 	return co.GetFloat(name)
 }
 
-func (w *Weather) GetCurrentTempC(zipcode string) (float64) {
+func (w *Weather) GetCurrentTempC(zipcode string) float64 {
+	if zipcode == "" {
+		return 0.0
+	}
 	return w.getFloat(zipcode, "current_observation.temp_c")
 }
 
-func (w *Weather) GetSolarRadiation(zipcode string) (float64) {
-        return w.getFloat(zipcode, "current_observation.solarradiation")
+func (w *Weather) GetSolarRadiation(zipcode string) float64 {
+	if zipcode == "" {
+		return 0.0
+	}
+	return w.getFloat(zipcode, "current_observation.solarradiation")
 }

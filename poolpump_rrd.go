@@ -8,15 +8,24 @@ func (r *Rrd) addTemp(name, title string, colorid, which int) {
 	cname := fmt.Sprintf("f%d", which)
 	r.grapher.Def(vname, r.path, name, "AVERAGE")
 	if name == "solar" {
-		r.grapher.CDef(cname, vname + ",10,/")
+		r.grapher.CDef(cname, vname+",10,/")
 	} else {
-		r.grapher.CDef(cname, "9,5,/," + vname + ",*,32,+")
+		r.grapher.CDef(cname, "9,5,/,"+vname+",*,32,+")
 	}
 	r.grapher.Line(2.0, cname, colorStr(colorid), title)
 	r.grapher.GPrint(cname, "LAST:%0.1lf")
 }
 
-func (ppc *PoolPumpController) createRrds(force bool) {
+func (ppc *PoolPumpController) createRrds() {
+	ppc.tempRrd.addTemp("pump", "Pump", 8, 1)
+	ppc.tempRrd.addTemp("weather", "Weather", 1, 2)
+	ppc.tempRrd.addTemp("roof", "Roof", 2, 3)
+	ppc.tempRrd.addTemp("solar", "SolRad w/sqm", 4, 4)
+	ppc.tempRrd.addTemp("pool", "Pool", 0, 5)
+	ppc.tempRrd.addTemp("target", "Target", 6, 6)
+	ppc.tempRrd.AddStandardRRAs()
+	ppc.tempRrd.Creator().Create(*ppc.config.forceRrd)
+
 	tg := ppc.tempRrd.grapher
 	tg.SetTitle("Temperatures and Solar Radiation")
 	tg.SetVLabel("Degrees Farenheit")
@@ -25,29 +34,21 @@ func (ppc *PoolPumpController) createRrds(force bool) {
 	tg.SetSize(640, 300) // Config?
 	tg.SetImageFormat("PNG")
 
-	ppc.tempRrd.addTemp("pump",    "Pump",         8,  1)
-	ppc.tempRrd.addTemp("weather", "Weather",      1,  2)
-	ppc.tempRrd.addTemp("roof",    "Roof",         2,  3)
-	ppc.tempRrd.addTemp("solar",   "SolRad w/sqm", 4,  4)
-	ppc.tempRrd.addTemp("pool",    "Pool",         0,  5)
-	ppc.tempRrd.addTemp("target",  "Target",       6,  6)
-	ppc.tempRrd.AddStandardRRAs()
-	ppc.tempRrd.Creator().Create(force) // fails if already exists
+	pc := ppc.pumpRrd.Creator()
+	pc.DS("status", "GAUGE", "30", "-1", "10")
+	pc.DS("solar", "GAUGE", "30", "-1", "10")
+	pc.DS("manual", "GAUGE", "30", "-1", "10")
+	ppc.pumpRrd.AddStandardRRAs()
+	pc.Create(*ppc.config.forceRrd) // fails if already exists
 
 	pg := ppc.pumpRrd.grapher
 	pg.SetTitle("Pump Activity")
 	pg.SetVLabel("Status Code")
+	pg.SetUpperLimit(5.0)
 	pg.SetRightAxis(1, 0.0)
 	pg.SetRightAxisLabel("Status Code")
 	pg.SetSize(640, 200) // Config?
 	pg.SetImageFormat("PNG")
-
-	pc := ppc.pumpRrd.Creator()
-	pc.DS("status", "GAUGE", "30", "-1", "10")
-	pc.DS("solar",  "GAUGE", "30", "-1", "10")
-	pc.DS("manual", "GAUGE", "30", "-1", "10")
-	ppc.pumpRrd.AddStandardRRAs()
-	pc.Create(force) // fails if already exists
 
 	pg.Def("t1", ppc.pumpRrd.path, "status", "AVERAGE")
 	pg.Line(2.0, "t1", colorStr(0), "Pump Status")
@@ -65,19 +66,25 @@ func (ppc *PoolPumpController) UpdateRrd() {
 	update := fmt.Sprintf("N:%f:%f:%f:%f:%f:%f",
 		ppc.pumpTemp.Temperature(), ppc.WeatherC(), ppc.roofTemp.Temperature(),
 		ppc.weather.GetSolarRadiation(ppc.zipcode),
-		ppc.runningTemp.Temperature(), ppc.solar.target)
+		ppc.runningTemp.Temperature(), *ppc.solar.target)
 	Debug("Updating TempRrd: %s", update)
-	err :=  ppc.tempRrd.Updater().Update(update)
+	err := ppc.tempRrd.Updater().Update(update)
 	if err != nil {
 		Error("Update failed for TempRrd {%s}: %s", update, err.Error())
 	}
 
-	solar:= 0.01
-	if ppc.switches.solar.isOn() { solar = 1.03 }
+	solar := 0.01
+	if ppc.switches.solar.isOn() {
+		solar = 1.03
+	}
 	manual := 0.02
-	if ppc.switches.ManualState() {	manual = 1.06 }
+	if ppc.switches.ManualState() {
+		manual = 1.06
+	}
 	update = fmt.Sprintf("N:%d.001:%0.3f:%0.3f", ppc.switches.State(), solar, manual)
 	Debug("Updating PumpRrd: %s", update)
 	err = ppc.pumpRrd.Updater().Update(update)
-	if err != nil { Error("Could not create PumpRrd: %s", err.Error()) }
+	if err != nil {
+		Error("Could not create PumpRrd: %s", err.Error())
+	}
 }
