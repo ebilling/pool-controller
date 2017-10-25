@@ -229,6 +229,7 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 		scale + "\" size=5> ex. 12h (w, d, h, m)</form></font></td></tr>\n"
 	html += indent(1) + "<tr><td>" + image("temps", 640, 300, scale) + "</td>"
 	html += "<td align=left nowrap><font face=helvetica color=#444444 size=-1>"
+	html += fmt.Sprintf("Target: %0.1f F<br>", toFarenheit(*h.ppc.config.target))
 	html += fmt.Sprintf("Pool: %0.1f F<br>", toFarenheit(h.ppc.runningTemp.Temperature()))
 	html += fmt.Sprintf("Roof: %0.1f F<br>", toFarenheit(h.ppc.roofTemp.Temperature()))
 	html += fmt.Sprintf("Weather: %0.1f F<br>",
@@ -345,7 +346,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html := "<html><head><title>Pool Controller Configuration</title></head><body>"
 	html += "<center><font face=helvetica color=#444444>Pool Controller Configuration"
 	html += "<font size=-1>\n"
-	html += "<table border=2 cellpadding=3>\n"
+	html += "<table border=0 cellpadding=3>\n"
 	html += "<form action=/config method=POST>\n"
 	html += "<tr><td align=left>Administrator:</td><td colspan=3></td></tr>\n"
 	html += h.configRow("Admin Password", "passcode", "", passArgs)
