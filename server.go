@@ -262,7 +262,7 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	html += indent(1) + "<tr><td colspan=2 align=center>" +
 		fmt.Sprintf("Updated: %.19s", time.Now().String()) +
 		"</td></tr>\n"
-	html += "<tr><td colspan=2>" + nav() + "</td><td></td></tr>\n"
+	html += "<tr><td colspan=2 align=center>" + nav() + "</td></tr>\n"
 	html += "</table></font>"
 	html += "</center></body></html>"
 	h.writeResponse(w, []byte(html), "text/html")
@@ -283,18 +283,14 @@ func (h *Handler) Authenticate(r *http.Request) bool {
 	return false
 }
 
-func (h *Handler) configRow(name, inputName, configValue, extraArgs string) string {
-	return fmt.Sprintf(
-		"<tr><td align=right>%s:</td><td><font size=-1><input name=\"%s\" size=20 %s></font></td><td>%s</td></tr>\n",
-		name, inputName, extraArgs, configValue)
-}
-
 func processStringUpdate(r *http.Request, formname string, ptr **string) bool {
-	if value := getFormValue(r, formname, **ptr); value != "" {
+	value := getFormValue(r, formname, **ptr)
+	if value != **ptr {
 		Debug("Updating value for %s from %s to %s", formname, **ptr, value)
 		*ptr = &value
 		return true
 	}
+	Debug("No update to %s, value(%s) orig(%s)", formname, value, **ptr)
 	return false
 }
 
@@ -311,6 +307,12 @@ func processFloatUpdate(r *http.Request, formname string, ptr **float64) bool {
 	}
 	Debug("No update to %s, value(%s) orig(%s)", formname, value, curvalue)
 	return false
+}
+
+func (h *Handler) configRow(name, inputName, configValue, extraArgs string) string {
+	return fmt.Sprintf(
+		"<tr><td align=right>%s:</td><td><font size=-1><input name=\"%s\" size=20 %s></font></td><td>%s</td></tr>\n",
+		name, inputName, extraArgs, configValue)
 }
 
 func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
@@ -352,6 +354,14 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		c.Save()
 	}
 
+	// Don't persist this one
+	value := getFormValue(r, "debug", "")
+	if value == "on" {
+		EnableDebug()
+	} else {
+		DisableDebug()
+	}
+
 	passArgs := " type=\"password\" autocomplete=\"new-password\""
 
 	html := "<html><head><title>Pool Controller Configuration</title></head><body>"
@@ -378,6 +388,15 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += h.configRow("Target", "target", fmt.Sprintf("%0.2f&deg;C", *c.target), "")
 	html += h.configRow("Tolerance", "tolerance", fmt.Sprintf("%0.2f&deg;C", *c.tolerance), "")
 	html += h.configRow("MinDelta", "mindelta", fmt.Sprintf("%0.2f&deg;C", *c.deltaT), "")
+	html += "<tr><td colspan=3><br></td></tr>\n"
+
+	html += "<tr><th align=left>Debug Settings:</th><td colspan=3></td></tr>\n"
+	d := "type=checkbox value=on"
+	if __debug__ {
+		d = "type=checkbox value=on checked"
+	}
+	html += h.configRow("Debug Logging Enabled", "debug", "", d)
+
 	html += "</table><input type=submit value=Save></font></font></form>\n"
 	html += nav()
 	html += "</center></body></html>\n"

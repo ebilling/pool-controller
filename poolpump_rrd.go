@@ -13,7 +13,6 @@ func (r *Rrd) addTemp(name, title string, colorid, which int) {
 		r.grapher.CDef(cname, "9,5,/,"+vname+",*,32,+")
 	}
 	r.grapher.Line(2.0, cname, colorStr(colorid), title)
-	r.grapher.GPrint(cname, "LAST:%0.1lf")
 }
 
 func (ppc *PoolPumpController) createRrds() {
@@ -52,13 +51,10 @@ func (ppc *PoolPumpController) createRrds() {
 
 	pg.Def("t1", ppc.pumpRrd.path, "status", "AVERAGE")
 	pg.Line(2.0, "t1", colorStr(0), "Pump Status")
-	pg.GPrint("t1", "LAST:%0.0lf")
 	pg.Def("t2", ppc.pumpRrd.path, "solar", "AVERAGE")
 	pg.Line(2.0, "t2", colorStr(2), "Solar Status")
-	pg.GPrint("t2", "LAST:%0.0lf")
 	pg.Def("t3", ppc.pumpRrd.path, "manual", "AVERAGE")
 	pg.Line(2.0, "t3", colorStr(6), "Manual Operation")
-	pg.GPrint("t3", "LAST:%0.0lf")
 }
 
 // Writes updates to RRD files and generates cached graphs
