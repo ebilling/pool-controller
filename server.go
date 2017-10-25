@@ -355,11 +355,16 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Don't persist this one
-	value := getFormValue(r, "debug", "")
-	if value == "on" {
-		EnableDebug()
-	} else {
-		DisableDebug()
+	posted := getFormValue(r, "posted", "")
+	if posted == "true" { // only change on form submission
+		value := getFormValue(r, "debug", "")
+		if value == "on" {
+			EnableDebug()
+			Debug("Enabling Debug: value(%s) posted(%s)", value, posted)
+		} else {
+			Debug("Disabling Debug: value(%s) posted(%s)", value, posted)
+			DisableDebug()
+		}
 	}
 
 	passArgs := " type=\"password\" autocomplete=\"new-password\""
@@ -396,7 +401,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		d = "type=checkbox value=on checked"
 	}
 	html += h.configRow("Debug Logging Enabled", "debug", "", d)
-
+	html += "<input type=hidden name=posted value=true>\n"
 	html += "</table><input type=submit value=Save></font></font></form>\n"
 	html += nav()
 	html += "</center></body></html>\n"
