@@ -7,14 +7,14 @@ import (
 )
 
 const (
-	LED = 5     // Pin 29
-	CAP = 6     // Pin 31
-	RELAY = 13  // Pin 33
+	LED    = 5  // Pin 29
+	CAP    = 6  // Pin 31
+	RELAY  = 13 // Pin 33
 	SWITCH = 19 // Pin 35: Also PCM capable
 )
 
-func GpioStr(g *Gpio) string {
-	switch g.gpio {
+func GpioStr(g PiPin) string {
+	switch g.Pin() {
 	case LED:
 		return "LED"
 	case CAP:
@@ -29,12 +29,12 @@ func GpioStr(g *Gpio) string {
 	return ""
 }
 
-var Led *Gpio // Setup: GPIO -> <1k Resistor -> LED -> GND
-var Cap *Gpio // Setup: +3.3v -> 1k-20k Resistor -> GPIO -> 10uF capacitor -> GND
+var Led PiPin        // Setup: GPIO -> <1k Resistor -> LED -> GND
+var Cap PiPin        // Setup: +3.3v -> 1k-20k Resistor -> GPIO -> 10uF capacitor -> GND
 var TestRelay *Relay // Setup GPIO -> 4.7k Resistor -> Relay Board
-var Switch *Gpio // Setup: GPIO -> Button Switch -> GND
+var Switch PiPin     // Setup: GPIO -> Button Switch -> GND
 
-func ExpectedState(t *testing.T, gpio *Gpio, exp GpioState) {
+func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
 	if val := gpio.Read(); val != exp {
 		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio), exp, val)
 	}
@@ -42,8 +42,10 @@ func ExpectedState(t *testing.T, gpio *Gpio, exp GpioState) {
 
 func TestInitilization(t *testing.T) {
 	EnableDebug()
-	t.Run("Init Host", func (t *testing.T) {
-		if err := GpioInit(); err != nil {
+	EndTestMode()
+	err := GpioInit()
+	t.Run("Init Host", func(t *testing.T) {
+		if err != nil {
 			t.Errorf("Problem initializing gpio: %s", err.Error())
 		}
 	})
@@ -54,10 +56,10 @@ func TestInitilization(t *testing.T) {
 }
 
 func TestBlinkLed(t *testing.T) {
-	for i := 0 ; i < 5 ; i++ {
+	for i := 0; i < 6; i++ {
 		Led.Output(High)
 		ExpectedState(t, Led, High)
-		time.Sleep(time.Second/4)
+		time.Sleep(time.Second / 3)
 		Led.Output(Low)
 		ExpectedState(t, Led, Low)
 	}
@@ -69,7 +71,6 @@ func doStop(button *Button, b *bool, t time.Time) {
 	*b = true
 	Info("doStop - Stopped after %d ms", time.Now().Sub(t)/time.Millisecond)
 }
-	
 
 func TestPushButton(t *testing.T) {
 	wasRun := 0
@@ -77,12 +78,12 @@ func TestPushButton(t *testing.T) {
 		wasRun++
 		Info("Button Pushed %d!!!", wasRun)
 		Led.Output(High)
-		time.Sleep(time.Second/2)
+		time.Sleep(time.Second / 2)
 		Led.Output(Low)
 	})
 	Info("Starting button test, push it 3 times!")
 	button.Start()
-	for i:=0 ; i < 30 && wasRun < 3 ; i++ {
+	for i := 0; i < 30 && wasRun < 3; i++ {
 		time.Sleep(time.Second)
 	}
 	if wasRun < 3 {
@@ -104,7 +105,7 @@ func TestThermometer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Thermometer update failed: %s", err.Error())
 	}
-	if therm.Temperature() > 48.0 || therm.Temperature() < 46.0 {
+	if therm.Temperature() > 44.0 || therm.Temperature() < 43.0 {
 		t.Errorf("Thermometer value not within acceptable limits: %0.1f",
 			therm.Temperature())
 	}
@@ -130,7 +131,7 @@ func runRelayTest(t *testing.T, r *Relay, sleep time.Duration) {
 	t.Run(fmt.Sprintf("%s.Test", r.Name()), func(t *testing.T) {
 		runRelayTestOn(t, r)
 		time.Sleep(sleep)
-		runRelayTestOff(t,r)
+		runRelayTestOff(t, r)
 	})
 }
 
