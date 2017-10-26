@@ -59,6 +59,7 @@ func TestInitilization(t *testing.T) {
 }
 
 func TestBlinkLed(t *testing.T) {
+	Info("Running %s", t.Name())
 	for i := 0; i < 6; i++ {
 		time.Sleep(time.Second / 5)
 		Led.Output(High)
@@ -77,6 +78,7 @@ func doStop(button *Button, b *bool, t time.Time) {
 }
 
 func TestPushButton(t *testing.T) {
+	Info("Running %s", t.Name())
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -107,9 +109,11 @@ func TestPushButton(t *testing.T) {
 }
 
 func TestThermometer(t *testing.T) {
+	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700, 10.0)
 
 	t.Run("Calibrate Cap4700", func(t *testing.T) {
+		Info("Running %s", t.Name())
 		c, err := therm.Calibrate(4700)
 		if err != nil {
 			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
@@ -118,6 +122,7 @@ func TestThermometer(t *testing.T) {
 		therm.SetAdjustment(c)
 	})
 	t.Run("Temperature Cap4700", func(t *testing.T) {
+		Info("Running %s", t.Name())
 		err := therm.Update()
 		if err != nil {
 			t.Errorf("Thermometer update failed: %s", err.Error())
@@ -130,6 +135,7 @@ func TestThermometer(t *testing.T) {
 
 	therm = NewGpioThermometer("Fixed 10kOhm ResistorTest", "TestManufacturer", CAP10000, 10.0)
 	t.Run("Calibrate Cap10000", func(t *testing.T) {
+		Info("Running %s", t.Name())
 		c, err := therm.Calibrate(10000)
 		if err != nil {
 			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
@@ -138,6 +144,7 @@ func TestThermometer(t *testing.T) {
 		therm.SetAdjustment(c)
 	})
 	t.Run("Temperature Cap4700", func(t *testing.T) {
+		Info("Running %s", t.Name())
 		err := therm.Update()
 		if err != nil {
 			t.Errorf("Thermometer update failed: %s", err.Error())
@@ -167,6 +174,7 @@ func runRelayTestOff(t *testing.T, relay *Relay) {
 
 func runRelayTest(t *testing.T, r *Relay, sleep time.Duration) {
 	t.Run(fmt.Sprintf("%s.Test", r.Name()), func(t *testing.T) {
+		Info("Running %s", t.Name())
 		runRelayTestOn(t, r)
 		time.Sleep(sleep)
 		runRelayTestOff(t, r)
@@ -174,7 +182,7 @@ func runRelayTest(t *testing.T, r *Relay, sleep time.Duration) {
 }
 
 func TestRelays(t *testing.T) {
-	EnableDebug()
+	Info("Running %s", t.Name())
 	GpioInit()
 	TestRelay = NewRelay(RELAY, "Relay", "Testing")
 	runRelayTest(t, TestRelay, time.Second)
