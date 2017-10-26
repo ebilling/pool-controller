@@ -6,6 +6,7 @@ import (
 )
 
 func TestGpioThermometer(t *testing.T) {
+	StartTestMode()
 	sleeptime := 100 * time.Millisecond
 	pin := TestPin{
 		state:     Low,

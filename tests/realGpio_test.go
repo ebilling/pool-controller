@@ -45,7 +45,6 @@ func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
 }
 
 func TestInitilization(t *testing.T) {
-	EnableDebug()
 	EndTestMode()
 	err := GpioInit()
 	t.Run("Init Host", func(t *testing.T) {
@@ -61,10 +60,10 @@ func TestInitilization(t *testing.T) {
 
 func TestBlinkLed(t *testing.T) {
 	for i := 0; i < 6; i++ {
-		time.Sleep(time.Second / 10)
+		time.Sleep(time.Second / 5)
 		Led.Output(High)
 		ExpectedState(t, Led, High)
-		time.Sleep(time.Second / 10)
+		time.Sleep(time.Second / 5)
 		Led.Output(Low)
 		ExpectedState(t, Led, Low)
 	}
