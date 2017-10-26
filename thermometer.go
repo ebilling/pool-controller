@@ -97,7 +97,7 @@ func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermo
 		mutex:       sync.Mutex{},
 		pin:         pin,
 		microfarads: 10.0,
-		adjust:      1.0,
+		adjust:      1.8,
 		history:     *NewHistory(100),
 		updated:     time.Now().Add(-24 * time.Hour),
 		accessory:   acc,
@@ -137,11 +137,6 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	return stop.Sub(start)
 }
 
-func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
-	uSec := t.adjust * us(dischargeTime)
-	return 2 * uSec / t.microfarads
-}
-
 func (t *GpioThermometer) getTemp(ohms float64) float64 {
 	const a = 79463.85
 	const b = 0.1453676
@@ -153,8 +148,13 @@ func (t *GpioThermometer) getTemp(ohms float64) float64 {
 	return d + (a-d)/(1+math.Pow(ohms/c, b))
 }
 
+func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
+	uSec := t.adjust * us(dischargeTime)
+	return uSec / t.microfarads
+}
+
 func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
-	calculated := ohms * t.microfarads * 1000.0
+	calculated := ohms * t.microfarads / 1000.0
 	Info("Expecting %0.3f ms", calculated)
 
 	// Take a sample of values
