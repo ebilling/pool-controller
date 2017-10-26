@@ -175,7 +175,7 @@ func TestPushButton(t *testing.T) {
 		TestRelay.TurnOn()
 		time.Sleep(time.Second / 10)
 		TestRelay.TurnOff()
-		time.Sleep(time.Second / 2)
+		time.Sleep(time.Second)
 	}
 	if wasRun < 3 {
 		t.Errorf("Expected 3 button pushes")
