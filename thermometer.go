@@ -158,7 +158,7 @@ func (t *GpioThermometer) getTemp(ohms float64) float64 {
 }
 
 func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
-	calculated := ohms * t.microfarads / 1000.0
+	calculated := ohms * t.microfarads * 1000.0
 	Info("Expecting %0.3f ms", calculated)
 
 	// Take a sample of values
