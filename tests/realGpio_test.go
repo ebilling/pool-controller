@@ -40,7 +40,7 @@ var Switch PiPin     // Setup: GPIO -> Button Switch -> GND
 
 func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
 	if val := gpio.Read(); val != exp {
-		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio), exp, val)
+		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio.Pin()), exp, val)
 	}
 }
 
