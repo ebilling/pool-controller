@@ -57,9 +57,10 @@ func TestInitilization(t *testing.T) {
 
 func TestBlinkLed(t *testing.T) {
 	for i := 0; i < 6; i++ {
+		time.Sleep(time.Second / 10)
 		Led.Output(High)
 		ExpectedState(t, Led, High)
-		time.Sleep(time.Second / 3)
+		time.Sleep(time.Second / 10)
 		Led.Output(Low)
 		ExpectedState(t, Led, Low)
 	}
@@ -100,13 +101,13 @@ func TestPushButton(t *testing.T) {
 }
 
 func TestThermometer(t *testing.T) {
-	therm := NewGpioThermometer("FixedResistorTest", "TestManufacturer", CAP, 10.0)
+	therm := NewGpioThermometer("FixedResistorTest", "TestManufacturer", CAP, 9.77)
 	err := therm.Update()
 	if err != nil {
 		t.Errorf("Thermometer update failed: %s", err.Error())
 	}
 	if therm.Temperature() > 44.0 || therm.Temperature() < 43.0 {
-		t.Errorf("Thermometer value not within acceptable limits: %0.1f",
+		t.Errorf("Thermometer value off: %0.1f, expected 43.6",
 			therm.Temperature())
 	}
 }

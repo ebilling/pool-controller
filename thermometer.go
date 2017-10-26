@@ -99,14 +99,19 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 func (t *GpioThermometer) getDischargeTime() time.Duration {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-
+	
 	//Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
 	time.Sleep(300 * time.Millisecond)
 
 	// Start polling
 	start := time.Now()
-	t.pin.InputEdge(PullUp, RisingEdge)
+	t.pin.InputEdge(PullDown, RisingEdge)
+	if !t.pin.WaitForEdge(time.Second / 2) {
+		Error("Thermometer read timed out")
+		return time.Duration(0)
+	}
+	t.pin.InputEdge(PullDown, FallingEdge)
 	if !t.pin.WaitForEdge(time.Second / 2) {
 		Error("Thermometer read timed out")
 		return time.Duration(0)
@@ -118,7 +123,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 
 func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
 	uSec := float64(dischargeTime) / 1000.0
-	return 2 * uSec / t.microfarads
+	return uSec / t.microfarads
 }
 
 func (t *GpioThermometer) getTemp(ohms float64) float64 {
@@ -165,8 +170,6 @@ func (t *GpioThermometer) Update() error {
 		}
 	}
 
-	Debug("%s Update() took %d tries to find %d results", t.Name(), tries, h.Len())
-
 	stdd := t.history.Stddev()
 	avg := t.history.Average()
 	med := t.history.Median()
@@ -189,10 +192,6 @@ func (t *GpioThermometer) Update() error {
 	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
 	t.updated = time.Now()
 	return nil
-}
-
-func (t *GpioThermometer) cleanData() {
-
 }
 
 // Converts a temperature in Celsius to Farenheit
