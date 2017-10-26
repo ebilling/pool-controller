@@ -108,15 +108,44 @@ func TestPushButton(t *testing.T) {
 }
 
 func TestThermometer(t *testing.T) {
-	therm := NewGpioThermometer("FixedResistorTest", "TestManufacturer", CAP, 10.0)
-	err := therm.Update()
-	if err != nil {
-		t.Errorf("Thermometer update failed: %s", err.Error())
-	}
-	if therm.Temperature() > 44.0 || therm.Temperature() < 43.0 {
-		t.Errorf("Thermometer value off: %0.1f, expected 43.6",
-			therm.Temperature())
-	}
+	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700, 10.0)
+
+	t.Run("Calibrate Cap4700", func(t *testing.T) {
+		c, err := therm.Calibrate(4700)
+		if err != nil {
+			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
+		}
+		therm.SetAdjustment(c)
+	})
+	t.Run("Temperature Cap4700", func(t *testing.T) {
+		err := therm.Update()
+		if err != nil {
+			t.Errorf("Thermometer update failed: %s", err.Error())
+		}
+		if therm.Temperature() > 44.1 || therm.Temperature() < 43.1 {
+			t.Errorf("Thermometer value off: %0.1f, expected 43.6",
+				therm.Temperature())
+		}
+	})
+
+	therm = NewGpioThermometer("Fixed 10kOhm ResistorTest", "TestManufacturer", CAP10000, 10.0)
+	t.Run("Calibrate Cap10000", func(t *testing.T) {
+		c, err := therm.Calibrate(10000)
+		if err != nil {
+			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
+		}
+		therm.SetAdjustment(c)
+	})
+	t.Run("Temperature Cap4700", func(t *testing.T) {
+		err := therm.Update()
+		if err != nil {
+			t.Errorf("Thermometer update failed: %s", err.Error())
+		}
+		if therm.Temperature() > 25.4 || therm.Temperature() < 24.4 {
+			t.Errorf("Thermometer value off: %0.1f, expected 24.9",
+				therm.Temperature())
+		}
+	})
 }
 
 func runRelayTestOn(t *testing.T, relay *Relay) {
