@@ -117,16 +117,11 @@ func discharge_us(t *GpioThermometer, e Edge, p Pull) time.Duration {
 
 	// Start polling
 	start := time.Now()
-	t.pin.InputEdge(PullDown, FallingEdge)
+	t.pin.InputEdge(p, e)
 	if !t.pin.WaitForEdge(time.Second / 2) {
 		Trace("Thermometer %s, Rising read timed out", t.Name())
 		return 0.0
 	}
-	//	t.pin.InputEdge(PullUp, FallingEdge)
-	//	if !t.pin.WaitForEdge(time.Second / 2) {
-	//		Trace("Thermometer %s, Falling read timed out", t.Name())
-	//		return time.Duration(0)
-	//	}
 	stop := time.Now()
 	t.pin.Output(Low)
 	return stop.Sub(start)
@@ -137,7 +132,7 @@ func TestDischargeStrategies(t *testing.T) {
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
 	pulls := []Pull{PullDown, PullUp, Float}
 	edges := []Edge{RisingEdge, FallingEdge, BothEdges}
-	expected := 4700 * therm.microfarads / 1000.0
+	expected := 4700 * therm.microfarads
 	for _, p := range pulls {
 		for _, e := range edges {
 			h := NewHistory(10)
@@ -213,7 +208,7 @@ func TestPushButton(t *testing.T) {
 	button.Start()
 	for i := 0; i < 3; i++ {
 		TestRelay.TurnOn()
-		time.Sleep(time.Second / 10)
+		time.Sleep(time.Second / 3)
 		TestRelay.TurnOff()
 		time.Sleep(2 * time.Second)
 	}
