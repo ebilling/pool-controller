@@ -148,6 +148,26 @@ func TestDischargeStrategies(t *testing.T) {
 	}
 }
 
+func TestBestDischargeStrategy(t *testing.T) {
+	Info("Running %s", t.Name())
+	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
+	pulls := []Pull{PullDown, PullUp, Float}
+	edges := []Edge{RisingEdge, FallingEdge, BothEdges}
+	expected := 4.700 * therm.microfarads
+	Info("Strategy: Pull, Edge, Expected, Average, Stddev, PctVar")
+	h := NewHistory(10)
+	for i := 0; i < 10; i++ {
+		dt1 := discharge_us(therm, RisingEdge, PullDown)
+		dt2 := discharge_us(therm, FallingEdge, PullDown)
+		dt := dt1 + dt2
+		Info("DischargeTime dt1(%f ms),  dt2(%f ms), dt(%fms), %f k-ohms",
+			ms(dt1), ms(dt2), ms(dt), therm.getOhms(dt))
+		h.Push(ms(dt1 + dt2))
+	}
+	Info("Strategy: %0.3f, %0.3f, %0.4f, %0.2f",
+		expected, h.Average(), h.Stddev(), 100.0*h.Stddev()/h.Average())
+}
+
 func TestThermometer(t *testing.T) {
 	t.Skip("Skipping TestThermometer until it is fixed")
 	Info("Running %s", t.Name())
