@@ -154,8 +154,8 @@ func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
 }
 
 func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
-	calculated := ohms * t.microfarads / 1000.0
-	Info("Expecting %0.3f ms", calculated)
+	calculated_ms := ohms * t.microfarads / 1000.0
+	Info("Expecting %0.3f ms", calculated_ms)
 
 	// Take a sample of values
 	h := NewHistory(20)
@@ -166,10 +166,10 @@ func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
 			h.Push(float64(dt))
 		}
 	}
-	value := calculated / h.Median()
-	Info("Expecting %0.3f ms, found %0.3f ms, ratio %0.3f", calculated, h.Median(), value)
-	if h.Stddev() > h.Median()/100 || h.Len() < 10 {
-		return value, fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2%%) entries(%d)",
+	value := calculated_ms / ms(h.Median())
+	Info("Expecting %0.3f ms, found %0.3f ms, ratio %0.3f", calculated_ms, ms(h.Median()), value)
+	if h.Stddev() > h.Median()/20 || h.Len() < 10 {
+		return value, fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2f%%) entries(%d)",
 			value, 100.0*h.Stddev()/h.Median(), h.Len())
 	}
 	return value, nil
