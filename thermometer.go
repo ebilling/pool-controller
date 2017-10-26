@@ -166,8 +166,9 @@ func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
 			h.Push(float64(dt))
 		}
 	}
-	value := calculated_ms / ms(h.Median())
-	Info("Expecting %0.3f ms, found %0.3f ms, ratio %0.3f", calculated_ms, ms(h.Median()), value)
+	dt := time.Duration(int64(h.Median()))
+	value := calculated_ms / ms(dt)
+	Info("Expecting %0.3f ms, found %0.3f ms, ratio %0.3f", calculated_ms, ms(dt), value)
 	if h.Stddev() > h.Median()/20 || h.Len() < 10 {
 		return value, fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2f%%) entries(%d)",
 			value, 100.0*h.Stddev()/h.Median(), h.Len())
