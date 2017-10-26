@@ -15,8 +15,6 @@ func TestGpioThermometer(t *testing.T) {
 	}
 	therm := newGpioThermometer("Test Thermometer", mftr, &pin, 10.0)
 
-	Debug("States (H=%d, L=%d) Direction (I=%d, O=%d)", High, Low,
-		Input, Output)
 	Debug("Therm: %v", therm)
 
 	t.Run("getDischargeTime", func(t *testing.T) {

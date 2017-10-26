@@ -119,12 +119,12 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	start := time.Now()
 	t.pin.InputEdge(PullDown, RisingEdge)
 	if !t.pin.WaitForEdge(time.Second / 2) {
-		Error("Thermometer read timed out")
+		Error("Thermometer Rising read timed out")
 		return time.Duration(0)
 	}
 	t.pin.InputEdge(PullDown, FallingEdge)
 	if !t.pin.WaitForEdge(time.Second / 2) {
-		Error("Thermometer read timed out")
+		Error("Thermometer Falling read timed out")
 		return time.Duration(0)
 	}
 	stop := time.Now()
@@ -159,16 +159,16 @@ func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
 		}
 	}
 	value := calculated / h.Median()
-	if h.Stddev() > h.Median()/100 {
-		return value, fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2%%)",
-			value, 100.0*h.Stddev()/h.Median())
+	if h.Stddev() > h.Median()/100 || h.Len() < 10 {
+		return value, fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2%%) entries(%d)",
+			value, 100.0*h.Stddev()/h.Median(), h.Len())
 	}
 	return value, nil
 }
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 	const minTime = 1 * time.Millisecond
-	const maxTime = 500 * time.Millisecond
+	const maxTime = time.Second
 
 	// Completely bogus, ignore
 	if dischargeTime < minTime || dischargeTime > maxTime {

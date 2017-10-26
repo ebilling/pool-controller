@@ -115,6 +115,7 @@ func TestThermometer(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
 		}
+		Debug("Setting calibration for %0.3f", c)
 		therm.SetAdjustment(c)
 	})
 	t.Run("Temperature Cap4700", func(t *testing.T) {
@@ -134,6 +135,7 @@ func TestThermometer(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
 		}
+		Debug("Setting calibration for %0.3f", c)
 		therm.SetAdjustment(c)
 	})
 	t.Run("Temperature Cap4700", func(t *testing.T) {
