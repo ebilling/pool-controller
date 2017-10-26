@@ -151,8 +151,6 @@ func TestDischargeStrategies(t *testing.T) {
 func TestBestDischargeStrategy(t *testing.T) {
 	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
-	pulls := []Pull{PullDown, PullUp, Float}
-	edges := []Edge{RisingEdge, FallingEdge, BothEdges}
 	expected := 4.700 * therm.microfarads
 	Info("Strategy: Pull, Edge, Expected, Average, Stddev, PctVar")
 	h := NewHistory(10)
