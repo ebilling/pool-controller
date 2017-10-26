@@ -107,7 +107,7 @@ func TestRelays(t *testing.T) {
 	runRelayTest(t, TestRelay, time.Second)
 }
 
-func discharge_ms(t *GpioThermometer, e Edge, p Pull) float64 {
+func discharge_us(t *GpioThermometer, e Edge, p Pull) time.Duration {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -117,15 +117,19 @@ func discharge_ms(t *GpioThermometer, e Edge, p Pull) float64 {
 
 	// Start polling
 	start := time.Now()
-	t.pin.InputEdge(p, e)
+	t.pin.InputEdge(PullDown, FallingEdge)
 	if !t.pin.WaitForEdge(time.Second / 2) {
 		Trace("Thermometer %s, Rising read timed out", t.Name())
 		return 0.0
 	}
+	//	t.pin.InputEdge(PullUp, FallingEdge)
+	//	if !t.pin.WaitForEdge(time.Second / 2) {
+	//		Trace("Thermometer %s, Falling read timed out", t.Name())
+	//		return time.Duration(0)
+	//	}
 	stop := time.Now()
-	t.pin.InputEdge(p, NoEdge)
 	t.pin.Output(Low)
-	return ms(stop.Sub(start))
+	return stop.Sub(start)
 }
 
 func TestDischargeStrategies(t *testing.T) {
@@ -138,8 +142,8 @@ func TestDischargeStrategies(t *testing.T) {
 		for _, e := range edges {
 			h := NewHistory(10)
 			for i := 0; i < 10; i++ {
-				dt := therm.getDischargeTime()
-				Info("DischargeTime %f us,  %f k-ohms", us(dt), therm.getOhms(dt)/1000.0)
+				dt := discharge_us(therm, e, p)
+				Info("DischargeTime %f us,  %f k-ohms", us(dt), therm.getOhms(dt))
 				h.Push(us(dt))
 			}
 			Info("Strategy(%s, %s): Expected %0.3fus %0.3fus stddev=%0.4f pct=%0.2f",
