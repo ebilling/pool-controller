@@ -85,6 +85,7 @@ type PiPin interface {
 	Output(GpioState)
 	Read() GpioState
 	WaitForEdge(time.Duration) bool
+	Pin() uint8
 }
 
 type Gpio struct {
@@ -142,6 +143,10 @@ func (g *Gpio) WaitForEdge(timeout time.Duration) bool {
 	return g.pin.WaitForEdge(timeout)
 }
 
+func (g *Gpio) Pin() uint8 {
+	return g.gpio
+}
+
 type Direction bool
 
 const (
@@ -156,6 +161,7 @@ type TestPin struct {
 	direction Direction
 	sleepTime time.Duration
 	inputTime time.Time
+	pin       uint8
 }
 
 func (p *TestPin) Input() {
@@ -189,6 +195,10 @@ func (p *TestPin) Read() GpioState {
 func (p *TestPin) WaitForEdge(ignored time.Duration) bool {
 	time.Sleep(p.sleepTime)
 	return true
+}
+
+func (p *TestPin) Pin() uint8 {
+	return p.pin
 }
 
 func (p *TestPin) String() string {
