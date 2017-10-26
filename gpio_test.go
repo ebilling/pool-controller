@@ -6,7 +6,7 @@ import (
 )
 
 func TestGpioThermometer(t *testing.T) {
-	sleeptime := 200 * time.Millisecond
+	sleeptime := 100 * time.Millisecond
 	pin := TestPin{
 		state:     Low,
 		direction: Input,
@@ -21,7 +21,7 @@ func TestGpioThermometer(t *testing.T) {
 
 	t.Run("getDischargeTime", func(t *testing.T) {
 		d := therm.getDischargeTime() / time.Millisecond
-		s := sleeptime / time.Millisecond
+		s := 2 * sleeptime / time.Millisecond // Two checks, so 2x
 		if d < s-5 || d > s+5 {
 			t.Errorf("Expected ~%dms got %dms", s, d)
 		}
