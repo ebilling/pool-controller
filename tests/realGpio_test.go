@@ -54,6 +54,7 @@ func TestInitilization(t *testing.T) {
 
 	// Initialized GPIOs
 	Led = NewGpio(LED)
+	Led.Output(Low)
 	ExpectedState(t, Led, Low)
 }
 
