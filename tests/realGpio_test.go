@@ -107,6 +107,43 @@ func TestRelays(t *testing.T) {
 	runRelayTest(t, TestRelay, time.Second)
 }
 
+func discharge_ms(t *GpioThermometer, e Edge, p Pull) float64 {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	//Discharge the capacitor (low temps could make this really long)
+	t.pin.Output(Low)
+	time.Sleep(300 * time.Millisecond)
+
+	// Start polling
+	start := time.Now()
+	t.pin.InputEdge(p, e)
+	if !t.pin.WaitForEdge(time.Second / 2) {
+		Trace("Thermometer %s, Rising read timed out", t.Name())
+		return 0.0
+	}
+	stop := time.Now()
+	t.pin.Output(Low)
+	return ms(stop.Sub(start))
+}
+
+func TestDischargeStrategies(t *testing.T) {
+	Info("Running %s", t.Name())
+	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700, 10.0)
+    pulls := {PullDown, PullUp, Float}
+	edges := {RisingEdge, FallingEdge, BothEdges}
+    for p := range pulls {
+        for e:=range edges {
+            	h := NewHistory(10)
+            	for i := 0; i < 10; i++ {
+            		dt = therm.getDischargeTime()
+            		h.Push(ms(dt))
+            	}
+            Info("Strategy(%s, %s): %0.3fms stddev=%0.4f", p, e, h.Average(), h.Stddev())
+        }
+    }
+}
+
 func TestThermometer(t *testing.T) {
 	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700, 10.0)
