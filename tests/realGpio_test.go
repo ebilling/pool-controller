@@ -139,7 +139,7 @@ func TestDischargeStrategies(t *testing.T) {
 			h := NewHistory(10)
 			for i := 0; i < 10; i++ {
 				dt := therm.getDischargeTime()
-				Info("DischargeTime %0.2f us,  %0.1f k-ohms", us(dt), therm.getOhms(dt)/1000.0)
+				Info("DischargeTime %f us,  %f k-ohms", us(dt), therm.getOhms(dt)/1000.0)
 				h.Push(us(dt))
 			}
 			Info("Strategy(%s, %s): Expected %0.3fus %0.3fus stddev=%0.4f pct=%0.2f",
