@@ -15,7 +15,7 @@ func TestGpioThermometer(t *testing.T) {
 		sleepTime: sleeptime,
 		inputTime: time.Now(),
 	}
-	therm := newGpioThermometer("Test Thermometer", mftr, &pin, 10.0)
+	therm := newGpioThermometer("Test Thermometer", mftr, &pin)
 
 	Debug("Therm: %v", therm)
 

@@ -72,10 +72,9 @@ type GpioThermometer struct {
 	accessory   *accessory.Thermometer
 }
 
-func NewGpioThermometer(name string, manufacturer string,
-	gpio uint8, capacitance_uF float64) *GpioThermometer {
+func NewGpioThermometer(name string, manufacturer string, gpio uint8) *GpioThermometer {
 	return newGpioThermometer(name, manufacturer,
-		NewGpio(gpio), capacitance_uF)
+		NewGpio(gpio))
 }
 
 // Return the number of milliseconds represented by a given time.Duration
@@ -87,8 +86,7 @@ func us(t time.Duration) float64 {
 	return float64(t) / float64(time.Microsecond)
 }
 
-func newGpioThermometer(name string, manufacturer string,
-	pin PiPin, adjustment float64) *GpioThermometer {
+func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermometer {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
 		0.0, -20.0, 100.0, 1.0)
 	th := GpioThermometer{
@@ -96,7 +94,7 @@ func newGpioThermometer(name string, manufacturer string,
 		mutex:       sync.Mutex{},
 		pin:         pin,
 		microfarads: 10.0,
-		adjust:      adjustment,
+		adjust:      1.0,
 		history:     *NewHistory(100),
 		updated:     time.Now().Add(-24 * time.Hour),
 		accessory:   acc,

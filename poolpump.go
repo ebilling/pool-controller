@@ -50,8 +50,8 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 		zipcode:  *config.zip,
 		weather:  NewWeather(*config.WUappId, 20*time.Minute),
 		switches: NewSwitches(mftr),
-		pumpTemp: NewGpioThermometer("Pumphouse", mftr, waterGpio, *config.cap_pump),
-		roofTemp: NewGpioThermometer("Poolhouse Roof", mftr, roofGpio, *config.cap_roof),
+		pumpTemp: NewGpioThermometer("Pumphouse", mftr, waterGpio),
+		roofTemp: NewGpioThermometer("Poolhouse Roof", mftr, roofGpio),
 		solar: SolarVariables{
 			target:    config.target,
 			deltaT:    config.deltaT,

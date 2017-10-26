@@ -123,13 +123,14 @@ func discharge_ms(t *GpioThermometer, e Edge, p Pull) float64 {
 		return 0.0
 	}
 	stop := time.Now()
+	t.pin.InputEdge(p, NoEdge)
 	t.pin.Output(Low)
 	return ms(stop.Sub(start))
 }
 
 func TestDischargeStrategies(t *testing.T) {
 	Info("Running %s", t.Name())
-	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700, 10.0)
+	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
 	pulls := []Pull{PullDown, PullUp, Float}
 	edges := []Edge{RisingEdge, FallingEdge, BothEdges}
 	expected := 4700 * therm.microfarads / 1000.0
@@ -148,7 +149,7 @@ func TestDischargeStrategies(t *testing.T) {
 
 func TestThermometer(t *testing.T) {
 	Info("Running %s", t.Name())
-	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700, 10.0)
+	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
 
 	t.Run("Calibrate Cap4700", func(t *testing.T) {
 		Info("Running %s", t.Name())
@@ -171,7 +172,7 @@ func TestThermometer(t *testing.T) {
 		}
 	})
 
-	therm = NewGpioThermometer("Fixed 10kOhm ResistorTest", "TestManufacturer", CAP10000, 10.0)
+	therm = NewGpioThermometer("Fixed 10kOhm ResistorTest", "TestManufacturer", CAP10000)
 	t.Run("Calibrate Cap10000", func(t *testing.T) {
 		Info("Running %s", t.Name())
 		c, err := therm.Calibrate(10000)
@@ -203,9 +204,6 @@ func TestPushButton(t *testing.T) {
 	button := NewGpioButton(SWITCH, func() {
 		wasRun++
 		Info("Button Pushed %d!!!", wasRun)
-		Led.Output(High)
-		time.Sleep(time.Second / 2)
-		Led.Output(Low)
 	})
 
 	Info("Starting button test, push it 3 times!")
