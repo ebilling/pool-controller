@@ -77,11 +77,14 @@ func NewGpioThermometer(name string, manufacturer string, gpio uint8) *GpioTherm
 		NewGpio(gpio))
 }
 
+const Millisecond_f float64 = float64(time.Millisecond)
+
 // Return the number of milliseconds represented by a given time.Duration
 func ms(t time.Duration) float64 {
 	return float64(t) / float64(time.Millisecond)
 }
 
+// Return the number of microseconds represented by a given time.Duration
 func us(t time.Duration) float64 {
 	return float64(t) / float64(time.Microsecond)
 }
@@ -140,8 +143,8 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 }
 
 func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
-	mSec := t.adjust * ms(dischargeTime)
-	return mSec / t.microfarads
+	uSec := t.adjust * us(dischargeTime)
+	return uSec / t.microfarads
 }
 
 func (t *GpioThermometer) getTemp(ohms float64) float64 {
@@ -194,8 +197,6 @@ func (t *GpioThermometer) Temperature() float64 {
 	}
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()
 }
-
-const Millisecond_f float64 = float64(time.Millisecond)
 
 func (t *GpioThermometer) Update() error {
 	var dischargeTime time.Duration
