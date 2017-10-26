@@ -201,6 +201,7 @@ func TestPushButton(t *testing.T) {
 	wasRun := 0
 	button := NewGpioButton(SWITCH, func() {
 		wasRun++
+		Led.Output(High)
 		Info("Button Pushed %d!!!", wasRun)
 	})
 
@@ -210,6 +211,7 @@ func TestPushButton(t *testing.T) {
 		TestRelay.TurnOn()
 		time.Sleep(time.Second / 3)
 		TestRelay.TurnOff()
+		Led.Output(Low)
 		time.Sleep(2 * time.Second)
 	}
 	if wasRun < 3 {
