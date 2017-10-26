@@ -167,7 +167,6 @@ func TestBestDischargeStrategy(t *testing.T) {
 }
 
 func TestThermometer(t *testing.T) {
-	t.Skip("Skipping TestThermometer until it is fixed")
 	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
 
