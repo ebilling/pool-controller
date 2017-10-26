@@ -140,8 +140,8 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 }
 
 func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
-	uSec := t.adjust * us(dischargeTime)
-	return uSec / t.microfarads
+	mSec := t.adjust * ms(dischargeTime)
+	return mSec / t.microfarads
 }
 
 func (t *GpioThermometer) getTemp(ohms float64) float64 {
