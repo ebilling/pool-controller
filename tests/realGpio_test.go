@@ -133,6 +133,7 @@ func TestDischargeStrategies(t *testing.T) {
 	pulls := []Pull{PullDown, PullUp, Float}
 	edges := []Edge{RisingEdge, FallingEdge, BothEdges}
 	expected := 4700 * therm.microfarads
+	Info("Strategy: Pull, Edge, Expected, Average, Stddev, PctVar")
 	for _, p := range pulls {
 		for _, e := range edges {
 			h := NewHistory(10)
@@ -141,7 +142,7 @@ func TestDischargeStrategies(t *testing.T) {
 				//Info("DischargeTime %f us,  %f k-ohms", us(dt), therm.getOhms(dt))
 				h.Push(us(dt))
 			}
-			Info("Strategy(%s, %s): Expected %0.3fus %0.3fus stddev=%0.4f pct=%0.2f",
+			Info("Strategy: %s, %s, %0.3f, %0.3f, %0.4f, %0.2f",
 				p, e, expected, h.Average(), h.Stddev(), 100.0*h.Stddev()/h.Average())
 		}
 	}
@@ -207,6 +208,7 @@ func TestPushButton(t *testing.T) {
 
 	Info("Starting button test, push it 3 times!")
 	button.Start()
+	time.Sleep(time.Second / 2) // let it start TODO Channel?
 	for i := 0; i < 3; i++ {
 		TestRelay.TurnOn()
 		time.Sleep(time.Second / 3)
