@@ -45,6 +45,7 @@ func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
 }
 
 func TestInitilization(t *testing.T) {
+	EnableDebug()
 	err := GpioInit()
 	t.Run("Init Host", func(t *testing.T) {
 		if err != nil {
