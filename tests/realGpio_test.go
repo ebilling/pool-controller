@@ -130,18 +130,18 @@ func discharge_ms(t *GpioThermometer, e Edge, p Pull) float64 {
 func TestDischargeStrategies(t *testing.T) {
 	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700, 10.0)
-    pulls := {PullDown, PullUp, Float}
-	edges := {RisingEdge, FallingEdge, BothEdges}
-    for p := range pulls {
-        for e:=range edges {
-            	h := NewHistory(10)
-            	for i := 0; i < 10; i++ {
-            		dt = therm.getDischargeTime()
-            		h.Push(ms(dt))
-            	}
-            Info("Strategy(%s, %s): %0.3fms stddev=%0.4f", p, e, h.Average(), h.Stddev())
-        }
-    }
+	pulls := []Pull{PullDown, PullUp, Float}
+	edges := []Edge{RisingEdge, FallingEdge, BothEdges}
+	for _, p := range pulls {
+		for _, e := range edges {
+			h := NewHistory(10)
+			for i := 0; i < 10; i++ {
+				dt := therm.getDischargeTime()
+				h.Push(ms(dt))
+			}
+			Info("Strategy(%s, %s): %0.3fms stddev=%0.4f", p, e, h.Average(), h.Stddev())
+		}
+	}
 }
 
 func TestThermometer(t *testing.T) {
