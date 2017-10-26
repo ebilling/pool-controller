@@ -38,6 +38,9 @@ var Cap4700 PiPin    // Setup: +3.3v -> 4.7k Resistor -> GPIO -> 10uF capacitor 
 var Cap10000 PiPin   // Setup: +3.3v -> 10k Resistor -> GPIO -> 10uF capacitor -> GND
 var Switch PiPin     // Setup: GPIO -> Button Switch -> GND
 
+var r10000 float64 = 9930.0
+var r4700 float64 = 4600.0
+
 func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
 	if val := gpio.Read(); val != exp {
 		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio), exp, val)
@@ -133,7 +136,7 @@ func TestDischargeStrategies(t *testing.T) {
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
 	pulls := []Pull{PullDown, PullUp, Float}
 	edges := []Edge{RisingEdge, FallingEdge, BothEdges}
-	expected := 4700 * therm.microfarads
+	expected := r4700 * therm.microfarads
 	Info("Strategy: Pull, Edge, Expected, Average, Stddev, PctVar")
 	for _, p := range pulls {
 		for _, e := range edges {
@@ -152,7 +155,7 @@ func TestDischargeStrategies(t *testing.T) {
 func TestBestDischargeStrategy(t *testing.T) {
 	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
-	expected := 4.700 * therm.microfarads
+	expected := r4700 * therm.microfarads / 1000.0
 	Info("Strategy: Pull, Edge, Expected, Average, Stddev, PctVar")
 	h := NewHistory(10)
 	for i := 0; i < 10; i++ {
@@ -173,7 +176,7 @@ func TestThermometer(t *testing.T) {
 
 	t.Run("Calibrate Cap4700", func(t *testing.T) {
 		Info("Running %s", t.Name())
-		c, err := therm.Calibrate(4700)
+		c, err := therm.Calibrate(r4700)
 		if err != nil {
 			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
 		}
@@ -195,14 +198,14 @@ func TestThermometer(t *testing.T) {
 	therm = NewGpioThermometer("Fixed 10kOhm ResistorTest", "TestManufacturer", CAP10000)
 	t.Run("Calibrate Cap10000", func(t *testing.T) {
 		Info("Running %s", t.Name())
-		c, err := therm.Calibrate(10000)
+		c, err := therm.Calibrate(r10000)
 		if err != nil {
 			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
 		}
 		Debug("Setting calibration for %0.3f", c)
 		therm.SetAdjustment(c)
 	})
-	t.Run("Temperature Cap4700", func(t *testing.T) {
+	t.Run("Temperature Cap10000", func(t *testing.T) {
 		Info("Running %s", t.Name())
 		err := therm.Update()
 		if err != nil {
