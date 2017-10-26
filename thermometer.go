@@ -190,7 +190,7 @@ func (t *GpioThermometer) Update() error {
 	var dischargeTime time.Duration
 	h := NewHistory(3)
 	tries := 0
-	for i := 0; h.Len() < 3; i++ {
+	for i := 0; h.Len() < 3 && tries < 10; i++ {
 		tries++
 		dischargeTime = t.getDischargeTime()
 		if t.inRange(dischargeTime) {
