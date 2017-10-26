@@ -9,8 +9,8 @@ import (
 const (
 	LED      = 5  // Pin 29
 	RELAY    = 13 // Pin 33
-	CAP4700  = 6  // Pin 31
-	CAP10000 = 19 // Pin 35: Also PCM capable
+	CAP4700  = 19 // Pin 35: Also PCM capable
+	CAP10000 = 6  // Pin 31
 	SWITCH   = 26 // Pin 37
 )
 
