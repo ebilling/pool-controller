@@ -139,9 +139,10 @@ func TestDischargeStrategies(t *testing.T) {
 			h := NewHistory(10)
 			for i := 0; i < 10; i++ {
 				dt := therm.getDischargeTime()
+				Info("DischargeTime %0.2f us,  %0.1f k-ohms", us(dt), therm.getOhms(dt)/1000.0)
 				h.Push(us(dt))
 			}
-			Info("Strategy(%s, %s): Expected %0.3fms %0.3fms stddev=%0.4f pct=%0.2f",
+			Info("Strategy(%s, %s): Expected %0.3fus %0.3fus stddev=%0.4f pct=%0.2f",
 				p, e, expected, h.Average(), h.Stddev(), 100.0*h.Stddev()/h.Average())
 		}
 	}
@@ -197,9 +198,6 @@ func TestThermometer(t *testing.T) {
 
 func TestPushButton(t *testing.T) {
 	Info("Running %s", t.Name())
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
 	wasRun := 0
 	button := NewGpioButton(SWITCH, func() {
 		wasRun++
@@ -212,7 +210,7 @@ func TestPushButton(t *testing.T) {
 		TestRelay.TurnOn()
 		time.Sleep(time.Second / 10)
 		TestRelay.TurnOff()
-		time.Sleep(time.Second)
+		time.Sleep(2 * time.Second)
 	}
 	if wasRun < 3 {
 		t.Errorf("Expected 3 button pushes")
