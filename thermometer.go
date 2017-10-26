@@ -78,6 +78,15 @@ func NewGpioThermometer(name string, manufacturer string,
 		NewGpio(gpio), capacitance_uF)
 }
 
+// Return the number of milliseconds represented by a given time.Duration
+func ms(t time.Duration) float64 {
+	return float64(t) / float64(time.Millisecond)
+}
+
+func us(t time.Duration) float64 {
+	return float64(t) / float64(time.Microsecond)
+}
+
 func newGpioThermometer(name string, manufacturer string,
 	pin PiPin, adjustment float64) *GpioThermometer {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
@@ -133,7 +142,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 }
 
 func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
-	uSec := t.adjust * float64(dischargeTime) / 1000.0
+	uSec := t.adjust * us(dischargeTime)
 	return uSec / t.microfarads
 }
 
@@ -150,15 +159,19 @@ func (t *GpioThermometer) getTemp(ohms float64) float64 {
 
 func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
 	calculated := ohms * t.microfarads
+	Debug("Expecting %0.3f ms", calculated)
 
 	// Take a sample of values
 	h := NewHistory(20)
 	for i := 0; i < 20; i++ {
-		if dt := t.getDischargeTime(); dt != 0 {
+		dt := t.getDischargeTime()
+		Debug("DischargeTime(%0.3f ms) Saving(%t)", dt, (dt != 0))
+		if dt != 0 {
 			h.Push(float64(dt))
 		}
 	}
 	value := calculated / h.Median()
+	Debug("Expecting %0.3f ms, found %0.3f ms, ratio %0.3f", calculated, h.Median(), value)
 	if h.Stddev() > h.Median()/100 || h.Len() < 10 {
 		return value, fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2%%) entries(%d)",
 			value, 100.0*h.Stddev()/h.Median(), h.Len())

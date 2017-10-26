@@ -77,35 +77,35 @@ func doStop(button *Button, b *bool, t time.Time) {
 	Info("doStop - Stopped after %d ms", time.Now().Sub(t)/time.Millisecond)
 }
 
-func TestPushButton(t *testing.T) {
-	Info("Running %s", t.Name())
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
+func runRelayTestOn(t *testing.T, relay *Relay) {
+	relay.TurnOn()
+	Info("Testing Relay On: %s is %s", relay.Name(), relay.Status())
+	if !relay.isOn() {
+		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
 	}
-	wasRun := 0
-	button := NewGpioButton(SWITCH, func() {
-		wasRun++
-		Info("Button Pushed %d!!!", wasRun)
-		Led.Output(High)
-		time.Sleep(time.Second / 2)
-		Led.Output(Low)
+}
+
+func runRelayTestOff(t *testing.T, relay *Relay) {
+	relay.TurnOff()
+	Info("Testing Relay Off: %s is %s", relay.Name(), relay.Status())
+	if relay.isOn() {
+		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
+	}
+}
+
+func runRelayTest(t *testing.T, r *Relay, sleep time.Duration) {
+	t.Run(fmt.Sprintf("%s.Test", r.Name()), func(t *testing.T) {
+		Info("Running %s", t.Name())
+		runRelayTestOn(t, r)
+		time.Sleep(sleep)
+		runRelayTestOff(t, r)
 	})
-	Info("Starting button test, push it 3 times!")
-	button.Start()
-	for i := 0; i < 30 && wasRun < 3; i++ {
-		time.Sleep(time.Second)
-	}
-	if wasRun < 3 {
-		t.Errorf("Expected 3 button pushes")
-	}
-	Info("Stopping button job")
-	exited := false
-	go doStop(button, &exited, time.Now())
-	time.Sleep(time.Second)
-	if !exited {
-		t.Errorf("Button loop should have stopped within time allotted")
-	}
-	Info("Button job stopped")
+}
+
+func TestRelays(t *testing.T) {
+	Info("Running %s", t.Name())
+	TestRelay = NewRelay(RELAY, "Relay", "Testing")
+	runRelayTest(t, TestRelay, time.Second)
 }
 
 func TestThermometer(t *testing.T) {
@@ -156,34 +156,37 @@ func TestThermometer(t *testing.T) {
 	})
 }
 
-func runRelayTestOn(t *testing.T, relay *Relay) {
-	relay.TurnOn()
-	Info("Testing Relay On: %s is %s", relay.Name(), relay.Status())
-	if !relay.isOn() {
-		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
-	}
-}
-
-func runRelayTestOff(t *testing.T, relay *Relay) {
-	relay.TurnOff()
-	Info("Testing Relay Off: %s is %s", relay.Name(), relay.Status())
-	if relay.isOn() {
-		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
-	}
-}
-
-func runRelayTest(t *testing.T, r *Relay, sleep time.Duration) {
-	t.Run(fmt.Sprintf("%s.Test", r.Name()), func(t *testing.T) {
-		Info("Running %s", t.Name())
-		runRelayTestOn(t, r)
-		time.Sleep(sleep)
-		runRelayTestOff(t, r)
-	})
-}
-
-func TestRelays(t *testing.T) {
+func TestPushButton(t *testing.T) {
 	Info("Running %s", t.Name())
-	GpioInit()
-	TestRelay = NewRelay(RELAY, "Relay", "Testing")
-	runRelayTest(t, TestRelay, time.Second)
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	wasRun := 0
+	button := NewGpioButton(SWITCH, func() {
+		wasRun++
+		Info("Button Pushed %d!!!", wasRun)
+		Led.Output(High)
+		time.Sleep(time.Second / 2)
+		Led.Output(Low)
+	})
+
+	Info("Starting button test, push it 3 times!")
+	button.Start()
+	for i := 0; i < 3; i++ {
+		TestRelay.TurnOn()
+		time.Sleep(time.Second / 10)
+		TestRelay.TurnOff()
+		time.Sleep(time.Second / 2)
+	}
+	if wasRun < 3 {
+		t.Errorf("Expected 3 button pushes")
+	}
+	Info("Stopping button job")
+	exited := false
+	go doStop(button, &exited, time.Now())
+	time.Sleep(time.Second)
+	if !exited {
+		t.Errorf("Button loop should have stopped within time allotted")
+	}
+	Info("Button job stopped")
 }
