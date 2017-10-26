@@ -36,13 +36,11 @@ func DisableDebug() {
 
 // Enables Debug logging and sends all log output to Stdout
 func StartTestMode() {
-	EnableDebug()
 	__test__ = true
 }
 
 // Disables Debug logging and no longer sends output to Stdout
 func EndTestMode() {
-	DisableDebug()
 	__test__ = false
 }
 
