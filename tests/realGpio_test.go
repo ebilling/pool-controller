@@ -7,20 +7,23 @@ import (
 )
 
 const (
-	LED    = 5  // Pin 29
-	CAP    = 6  // Pin 31
-	RELAY  = 13 // Pin 33
-	SWITCH = 19 // Pin 35: Also PCM capable
+	LED      = 5  // Pin 29
+	RELAY    = 13 // Pin 33
+	CAP4700  = 6  // Pin 31
+	CAP10000 = 19 // Pin 35: Also PCM capable
+	SWITCH   = 26 // Pin 37
 )
 
 func GpioStr(g PiPin) string {
 	switch g.Pin() {
 	case LED:
 		return "LED"
-	case CAP:
-		return "CAP"
 	case RELAY:
 		return "RELAY"
+	case CAP4700:
+		return "CAP4700"
+	case CAP10000:
+		return "CAP10000"
 	case SWITCH:
 		return "SWITCH"
 	default:
@@ -30,8 +33,9 @@ func GpioStr(g PiPin) string {
 }
 
 var Led PiPin        // Setup: GPIO -> <1k Resistor -> LED -> GND
-var Cap PiPin        // Setup: +3.3v -> 1k-20k Resistor -> GPIO -> 10uF capacitor -> GND
 var TestRelay *Relay // Setup GPIO -> 4.7k Resistor -> Relay Board
+var Cap4700 PiPin    // Setup: +3.3v -> 4.7k Resistor -> GPIO -> 10uF capacitor -> GND
+var Cap10000 PiPin   // Setup: +3.3v -> 10k Resistor -> GPIO -> 10uF capacitor -> GND
 var Switch PiPin     // Setup: GPIO -> Button Switch -> GND
 
 func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
@@ -74,6 +78,9 @@ func doStop(button *Button, b *bool, t time.Time) {
 }
 
 func TestPushButton(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	wasRun := 0
 	button := NewGpioButton(SWITCH, func() {
 		wasRun++
@@ -101,7 +108,7 @@ func TestPushButton(t *testing.T) {
 }
 
 func TestThermometer(t *testing.T) {
-	therm := NewGpioThermometer("FixedResistorTest", "TestManufacturer", CAP, 9.77)
+	therm := NewGpioThermometer("FixedResistorTest", "TestManufacturer", CAP, 10.0)
 	err := therm.Update()
 	if err != nil {
 		t.Errorf("Thermometer update failed: %s", err.Error())

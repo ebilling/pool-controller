@@ -12,6 +12,7 @@ type Thermometer interface {
 	Name() string
 	Temperature() float64
 	Update() error
+	SetAdjustment(float64)
 	Accessory() *accessory.Accessory
 }
 
@@ -40,6 +41,10 @@ func (t *SelectiveThermometer) Name() string {
 	return t.name
 }
 
+func (t *SelectiveThermometer) SetAdjustment(a float64) {
+	return // No adjustments on this thermometer
+}
+
 func (t *SelectiveThermometer) Temperature() float64 {
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()
 }
@@ -61,6 +66,7 @@ type GpioThermometer struct {
 	mutex       sync.Mutex
 	pin         PiPin
 	microfarads float64
+	adjust      float64
 	updated     time.Time
 	history     History
 	accessory   *accessory.Thermometer
@@ -73,19 +79,24 @@ func NewGpioThermometer(name string, manufacturer string,
 }
 
 func newGpioThermometer(name string, manufacturer string,
-	pin PiPin, capacitance_uF float64) *GpioThermometer {
+	pin PiPin, adjustment float64) *GpioThermometer {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
 		0.0, -20.0, 100.0, 1.0)
 	th := GpioThermometer{
 		name:        name,
 		mutex:       sync.Mutex{},
 		pin:         pin,
-		microfarads: capacitance_uF,
+		microfarads: 10.0,
+		adjust:      adjustment,
 		history:     *NewHistory(100),
 		updated:     time.Now().Add(-24 * time.Hour),
 		accessory:   acc,
 	}
 	return &th
+}
+
+func (t *GpioThermometer) SetAdjustment(a float64) {
+	t.adjust = a
 }
 
 func (t *GpioThermometer) Name() string {
@@ -99,7 +110,7 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 func (t *GpioThermometer) getDischargeTime() time.Duration {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	
+
 	//Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
 	time.Sleep(300 * time.Millisecond)
@@ -122,7 +133,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 }
 
 func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
-	uSec := float64(dischargeTime) / 1000.0
+	uSec := t.adjust * float64(dischargeTime) / 1000.0
 	return uSec / t.microfarads
 }
 
@@ -135,6 +146,24 @@ func (t *GpioThermometer) getTemp(ohms float64) float64 {
 		return 0.0
 	}
 	return d + (a-d)/(1+math.Pow(ohms/c, b))
+}
+
+func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
+	calculated := ohms * t.microfarads
+
+	// Take a sample of values
+	h := NewHistory(20)
+	for i := 0; i < 20; i++ {
+		if dt := t.getDischargeTime(); dt != 0 {
+			h.Push(float64(dt))
+		}
+	}
+	value := calculated / h.Median()
+	if h.Stddev() > h.Median()/100 {
+		return value, fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2%%)",
+			value, 100.0*h.Stddev()/h.Median())
+	}
+	return value, nil
 }
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
