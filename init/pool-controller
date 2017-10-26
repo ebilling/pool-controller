@@ -9,7 +9,7 @@
 # Short-Description:	Smart Pool Pump Functionality
 ### END INIT INFO
 
-#Redirect all output syslog
+
 set -e
 
 name='pool-controller'
@@ -19,13 +19,16 @@ data_dir="/var/cache/homekit"
 args="-p -data_dir=$data_dir"
 pidfile="/tmp/$name.pid"
 log="/tmp/pc.log"
+bindir="/usr/local/bin"
 
-exec 1> >(logger -p daemon.info -t $name) 2>&1
+#Redirect all output syslog
+exec 1> >(logger -t $name -p daemon.info) 2>&1
 
-test -x $daemonize || exit 0
-test -x $bin || exit 0
-umask 022
 export PATH="${PATH:+$PATH:}/usr/local/bin"
+
+test -x $bindir/$daemonize || exit 0
+test -x $bindir/$bin || exit 0
+umask 022
 
 check_data_dir() {
     # Create the Data empty dir if necessary
@@ -47,13 +50,17 @@ start_proc() {
 }
 
 stop_proc() {
-    pid=`cat $pidfile`
+    if [ -f $pidfile ]; then
+	pid=`cat $pidfile`
+    else
+	pid=`pgrep $name`
+    fi
+
     if kill -2 $pid; then
 	echo "Stopping $name: Success"
     else
 	echo "Stopping $name: Failed"
     fi
-
 }
 
 case "$1" in
@@ -63,7 +70,6 @@ case "$1" in
     stop)
 	stop_proc
 	;;
-
     restart)
 	stop_proc
 	sleep 2
