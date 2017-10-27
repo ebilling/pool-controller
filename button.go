@@ -22,7 +22,7 @@ func newButton(pin PiPin, callback func()) *Button {
 		bouncetime: 200 * time.Millisecond,
 		done:       make(chan bool),
 	}
-	pin.InputEdge(PullUp, FallingEdge)
+	pin.InputEdge(PullUp, RisingEdge)
 	return &b
 }
 

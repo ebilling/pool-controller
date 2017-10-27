@@ -148,9 +148,7 @@ func TestPushButton(t *testing.T) {
 		Info("Button Pushed %d!!!", wasRun)
 	})
 
-	Info("Starting button test, push it 3 times!")
 	button.Start()
-	time.Sleep(time.Second / 2) // let it start TODO Channel?
 	for i := 0; i < 3; i++ {
 		TestRelay.TurnOn()
 		time.Sleep(time.Second / 3)
