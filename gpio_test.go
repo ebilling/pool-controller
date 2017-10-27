@@ -21,16 +21,16 @@ func TestGpioThermometer(t *testing.T) {
 
 	t.Run("getDischargeTime", func(t *testing.T) {
 		d := therm.getDischargeTime() / time.Millisecond
-		s := 2 * sleeptime / time.Millisecond // Two checks, so 2x
+		s := sleeptime / time.Millisecond // Two checks, so 2x
 		if d < s-5 || d > s+5 {
 			t.Errorf("Expected ~%dms got %dms", s, d)
 		}
 	})
 
 	t.Run("getOhms", func(t *testing.T) {
-		expected := 100000
-		o := therm.getOhms(100000000)
-		if int(o) != expected {
+		expected := 10000 * therm.adjust
+		o := therm.getOhms(100 * time.Millisecond)
+		if int(o) != int(expected) {
 			t.Errorf("Expected %0.3f k-ohms found %0.3f k-ohms",
 				float64(expected)/1000.0, o/1000.0)
 		}
