@@ -187,6 +187,17 @@ func (ppc *PoolPumpController) Stop() {
 	ppc.done <- true
 }
 
+func (ppc *PoolPumpController) PersistCalibration() {
+	t, ok := ppc.pumpTemp.(*GpioThermometer)
+	if ok {
+		*ppc.config.adj_pump = t.adjust
+	}
+	t, ok = ppc.roofTemp.(*GpioThermometer)
+	if ok {
+		*ppc.config.adj_roof = t.adjust
+	}
+}
+
 func (ppc *PoolPumpController) WeatherC() float64 {
 	return ppc.weather.GetCurrentTempC(ppc.zipcode)
 }

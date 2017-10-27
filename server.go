@@ -294,7 +294,7 @@ func (h *Handler) calibrateHandler(w http.ResponseWriter, r *http.Request) {
 	h.writeResponse(w, []byte(html), "text/html")
 }
 
-func Calibrate(html *string, t Thermometer, res_str, name string) error {
+func (h *Handler) Calibrate(html *string, t Thermometer, res_str, name string) error {
 	r, err := strconv.ParseFloat(res_str, 64)
 	if err != nil {
 		*html += "<h2>Could not parse " + res_str + "for: " + name
@@ -306,7 +306,6 @@ func Calibrate(html *string, t Thermometer, res_str, name string) error {
 		*html += "<h2>Calibration failed, please try again.</h2><br>(" + err.Error() + ")"
 		return err
 	}
-
 	return nil
 }
 
@@ -331,9 +330,10 @@ func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) 
 		h.setRefresh(w, &retry, 10)
 		html += "<h2>Please provide valid resistance for each resistor.</h2> Redirecting..."
 	} else {
-		if Calibrate(&html, h.ppc.pumpTemp, pump_res, "Pump Probe") == nil &&
-			Calibrate(&html, h.ppc.roofTemp, roof_res, "Roof Probe") == nil {
+		if h.Calibrate(&html, h.ppc.pumpTemp, pump_res, "Pump Probe") == nil &&
+			h.Calibrate(&html, h.ppc.roofTemp, roof_res, "Roof Probe") == nil {
 			h.setRefresh(w, &success, 10)
+			h.ppc.PersistCalibration()
 			html += "<h2>Success</h2><br>"
 			p, ok := h.ppc.pumpTemp.(*GpioThermometer)
 			if ok {
@@ -469,8 +469,8 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Temperature Sensor Adjustment:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Pump Tuning", "cap_pump", fmt.Sprintf("%0.2f", *c.adj_pump), "")
-	html += h.configRow("Roof Tuning", "cap_roof", fmt.Sprintf("%0.2f", *c.adj_roof), "")
+	html += h.configRow("Pump Tuning", "adj_pump", fmt.Sprintf("%0.2f", *c.adj_pump), "")
+	html += h.configRow("Roof Tuning", "adj_roof", fmt.Sprintf("%0.2f", *c.adj_roof), "")
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Solar Settings:</th><td colspan=3></td></tr>\n"
