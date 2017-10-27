@@ -38,12 +38,6 @@ func (b *Button) RunLoop(started chan bool) {
 	start := time.Now()
 	started <- true
 	for true {
-		select {
-		case <-b.done:
-			return // End job
-		default: // Required to not block
-			break
-		}
 		if b.pin.WaitForEdge(time.Second) {
 			if start.Add(b.bouncetime).Before(time.Now()) {
 				start = time.Now() // filter noise of up/down
@@ -53,6 +47,12 @@ func (b *Button) RunLoop(started chan bool) {
 					b.callback()
 				}
 			}
+		}
+		select {
+		case <-b.done:
+			return // End job
+		default: // Required to not block
+			break
 		}
 	}
 }
