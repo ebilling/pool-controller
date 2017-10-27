@@ -36,51 +36,6 @@ var Switch PiPin
 var r10000 float64 = 9930.0
 var r4700 float64 = 4600.0
 
-func GpioStr(g PiPin) string {
-	switch g.Pin() {
-	case LED:
-		return "LED"
-	case RELAY:
-		return "RELAY"
-	case CAP4700:
-		return "CAP4700"
-	case CAP10000:
-		return "CAP10000"
-	case SWITCH:
-		return "SWITCH"
-	default:
-		return "UNKNOWN"
-	}
-	return ""
-}
-
-func SkipTestIfNotTestRig(t *testing.T) {
-	if TestRig {
-		return
-	}
-
-	if runtime.GOOS != "linux" {
-		t.Skipf("This system is not appropriate for the test: %s", runtime.GOOS)
-		return
-	}
-	if runtime.GOARCH != "arm" {
-		t.Skipf("This system is not appropriate for the test: %s", runtime.GOARCH)
-		return
-	}
-
-	if _, err := os.Stat("TestRig"); err == nil {
-		TestRig = true
-		return
-	}
-	t.SkipNow()
-}
-
-func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
-	if val := gpio.Read(); val != exp {
-		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio), exp, val)
-	}
-}
-
 func TestInitilization(t *testing.T) {
 	SkipTestIfNotTestRig(t)
 	err := GpioInit()
@@ -109,62 +64,11 @@ func TestBlinkLed(t *testing.T) {
 	}
 }
 
-func doStop(button *Button, b *bool, t time.Time) {
-	*b = false
-	button.Stop()
-	*b = true
-	Info("doStop - Stopped after %d ms", time.Now().Sub(t)/time.Millisecond)
-}
-
-func runRelayTestOn(t *testing.T, relay *Relay) {
-	relay.TurnOn()
-	Info("Testing Relay On: %s is %s", relay.Name(), relay.Status())
-	if !relay.isOn() {
-		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
-	}
-}
-
-func runRelayTestOff(t *testing.T, relay *Relay) {
-	relay.TurnOff()
-	Info("Testing Relay Off: %s is %s", relay.Name(), relay.Status())
-	if relay.isOn() {
-		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
-	}
-}
-
-func runRelayTest(t *testing.T, r *Relay, sleep time.Duration) {
-	t.Run(fmt.Sprintf("%s.Test", r.Name()), func(t *testing.T) {
-		Info("Running %s", t.Name())
-		runRelayTestOn(t, r)
-		time.Sleep(sleep)
-		runRelayTestOff(t, r)
-	})
-}
-
 func TestRelays(t *testing.T) {
+	SkipTestIfNotTestRig(t)
 	Info("Running %s", t.Name())
 	TestRelay = NewRelay(RELAY, "Relay", "Testing")
 	runRelayTest(t, TestRelay, time.Second)
-}
-
-func discharge_us(t *GpioThermometer, e Edge, p Pull) time.Duration {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	//Discharge the capacitor (low temps could make this really long)
-	t.pin.Output(Low)
-	time.Sleep(300 * time.Millisecond)
-
-	// Start polling
-	start := time.Now()
-	t.pin.InputEdge(p, e)
-	if !t.pin.WaitForEdge(time.Second / 2) {
-		Trace("Thermometer %s, Rising read timed out", t.Name())
-		return 0.0
-	}
-	stop := time.Now()
-	t.pin.Output(Low)
-	return stop.Sub(start)
 }
 
 func TestDischargeStrategies(t *testing.T) {
@@ -265,4 +169,99 @@ func TestPushButton(t *testing.T) {
 		t.Errorf("Button loop should have stopped within time allotted")
 	}
 	Info("Button job stopped")
+}
+
+func discharge_us(t *GpioThermometer, e Edge, p Pull) time.Duration {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	//Discharge the capacitor (low temps could make this really long)
+	t.pin.Output(Low)
+	time.Sleep(300 * time.Millisecond)
+
+	// Start polling
+	start := time.Now()
+	t.pin.InputEdge(p, e)
+	if !t.pin.WaitForEdge(time.Second / 2) {
+		Trace("Thermometer %s, Rising read timed out", t.Name())
+		return 0.0
+	}
+	stop := time.Now()
+	t.pin.Output(Low)
+	return stop.Sub(start)
+}
+
+func doStop(button *Button, b *bool, t time.Time) {
+	*b = false
+	button.Stop()
+	*b = true
+	Info("doStop - Stopped after %d ms", time.Now().Sub(t)/time.Millisecond)
+}
+
+func runRelayTestOn(t *testing.T, relay *Relay) {
+	relay.TurnOn()
+	Info("Testing Relay On: %s is %s", relay.Name(), relay.Status())
+	if !relay.isOn() {
+		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
+	}
+}
+
+func runRelayTestOff(t *testing.T, relay *Relay) {
+	relay.TurnOff()
+	Info("Testing Relay Off: %s is %s", relay.Name(), relay.Status())
+	if relay.isOn() {
+		t.Errorf("Relay(%s) is %s", relay.Name(), relay.Status())
+	}
+}
+
+func runRelayTest(t *testing.T, r *Relay, sleep time.Duration) {
+	t.Run(fmt.Sprintf("%s.Test", r.Name()), func(t *testing.T) {
+		Info("Running %s", t.Name())
+		runRelayTestOn(t, r)
+		time.Sleep(sleep)
+		runRelayTestOff(t, r)
+	})
+}
+
+func GpioStr(g PiPin) string {
+	switch g.Pin() {
+	case LED:
+		return "LED"
+	case RELAY:
+		return "RELAY"
+	case CAP4700:
+		return "CAP4700"
+	case CAP10000:
+		return "CAP10000"
+	case SWITCH:
+		return "SWITCH"
+	default:
+		return "UNKNOWN"
+	}
+	return ""
+}
+
+func SkipTestIfNotTestRig(t *testing.T) {
+	if TestRig {
+		return
+	}
+
+	if runtime.GOOS != "linux" {
+		t.SkipNow()
+	}
+	if runtime.GOARCH != "arm" {
+		t.SkipNow()
+	}
+
+	if _, err := os.Stat("TestRig"); err == nil {
+		TestRig = true
+		return
+	}
+	t.SkipNow()
+}
+
+func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
+	if val := gpio.Read(); val != exp {
+		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio), exp, val)
+	}
 }
