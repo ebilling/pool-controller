@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -32,6 +33,7 @@ func GpioStr(g PiPin) string {
 	return ""
 }
 
+var TestRig bool = false
 var Led PiPin        // Setup: GPIO -> <1k Resistor -> LED -> GND
 var TestRelay *Relay // Setup GPIO -> 4.7k Resistor -> Relay Board
 var Cap4700 PiPin    // Setup: +3.3v -> 4.7k Resistor -> GPIO -> 10uF capacitor -> GND
@@ -41,6 +43,27 @@ var Switch PiPin     // Setup: GPIO -> Button Switch -> GND
 var r10000 float64 = 9930.0
 var r4700 float64 = 4600.0
 
+func SkipTestIfNotTestRig(t *testing.T) {
+	if TestRig {
+		return
+	}
+
+	if runtime.GOOS != "linux" {
+		t.Skipf("This system is not appropriate for the test: %s", runtime.GOOS)
+		return
+	}
+	if runtime.GOARCH != "arm" {
+		t.Skipf("This system is not appropriate for the test: %s", runtime.GOARCH)
+		return
+	}
+
+	if _, err := Stat("TestRig"); err == nil {
+		TestRig = true
+		return
+	}
+	t.SkipNow()
+}
+
 func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
 	if val := gpio.Read(); val != exp {
 		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio), exp, val)
@@ -48,6 +71,7 @@ func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
 }
 
 func TestInitilization(t *testing.T) {
+	SkipTestIfNotTestRig(t)
 	err := GpioInit()
 	t.Run("Init Host", func(t *testing.T) {
 		if err != nil {
@@ -62,6 +86,7 @@ func TestInitilization(t *testing.T) {
 }
 
 func TestBlinkLed(t *testing.T) {
+	SkipTestIfNotTestRig(t)
 	Info("Running %s", t.Name())
 	for i := 0; i < 6; i++ {
 		time.Sleep(time.Second / 5)
@@ -132,6 +157,7 @@ func discharge_us(t *GpioThermometer, e Edge, p Pull) time.Duration {
 }
 
 func TestDischargeStrategies(t *testing.T) {
+	SkipTestIfNotTestRig(t)
 	t.Skip("Only for experimentation, not a real test")
 	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
@@ -153,6 +179,7 @@ func TestDischargeStrategies(t *testing.T) {
 }
 
 func TestThermometer(t *testing.T) {
+	SkipTestIfNotTestRig(t)
 	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
 
@@ -197,6 +224,7 @@ func TestThermometer(t *testing.T) {
 }
 
 func TestPushButton(t *testing.T) {
+	SkipTestIfNotTestRig(t)
 	Info("Running %s", t.Name())
 	wasRun := 0
 	button := NewGpioButton(SWITCH, func() {
