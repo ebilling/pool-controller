@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"log/syslog"
 	"os"
 	"os/user"
@@ -9,19 +10,23 @@ import (
 	"strings"
 )
 
-var __logger__ *syslog.Writer = nil
+var __syslog__ *syslog.Writer = nil
 var __debug__ bool = false
 var __test__ bool = false
+var priority syslog.Priority = syslog.LOG_USER
 
 func _init() {
-	if __logger__ == nil {
+	if __syslog__ == nil {
 		u, _ := user.Current()
 		if u.Username == "root" {
-			__logger__, _ = syslog.New(syslog.LOG_DAEMON, "")
-		} else {
-			__logger__, _ = syslog.New(syslog.LOG_USER, "")
+			__syslog__, _ = syslog.New(syslog.LOG_DAEMON, "")
 		}
 	}
+}
+
+func Logger() *log.Logger {
+	logger, _ := syslog.NewLogger(priority, log.LstdFlags)
+	return logger
 }
 
 // Enables all calls to {#Debug()} that follow to go to syslog.
@@ -35,7 +40,7 @@ func DisableDebug() {
 }
 
 // Enables Debug logging and sends all log output to Stdout
-func StartTestMode() {
+func LogTestMode() {
 	__test__ = true
 }
 
@@ -64,7 +69,7 @@ func Alert(format string, a ...interface{}) error {
 		return err
 	}
 	_init()
-	return __logger__.Alert(fmt.Sprintf(format, a...))
+	return __syslog__.Alert(fmt.Sprintf(format, a...))
 }
 
 func Crit(format string, a ...interface{}) error {
@@ -73,7 +78,7 @@ func Crit(format string, a ...interface{}) error {
 		return err
 	}
 	_init()
-	return __logger__.Crit(fmt.Sprintf(format, a...))
+	return __syslog__.Crit(fmt.Sprintf(format, a...))
 }
 
 func Fatal(format string, a ...interface{}) {
@@ -87,7 +92,7 @@ func Emerg(format string, a ...interface{}) error {
 		return err
 	}
 	_init()
-	return __logger__.Emerg(fmt.Sprintf(format, a...))
+	return __syslog__.Emerg(fmt.Sprintf(format, a...))
 }
 
 func Error(format string, a ...interface{}) error {
@@ -96,7 +101,7 @@ func Error(format string, a ...interface{}) error {
 		return err
 	}
 	_init()
-	return __logger__.Err(fmt.Sprintf(format, a...))
+	return __syslog__.Err(fmt.Sprintf(format, a...))
 }
 
 func Notice(format string, a ...interface{}) error {
@@ -105,7 +110,7 @@ func Notice(format string, a ...interface{}) error {
 		return err
 	}
 	_init()
-	return __logger__.Notice(fmt.Sprintf(format, a...))
+	return __syslog__.Notice(fmt.Sprintf(format, a...))
 }
 
 func Warn(format string, a ...interface{}) error {
@@ -114,7 +119,7 @@ func Warn(format string, a ...interface{}) error {
 		return err
 	}
 	_init()
-	return __logger__.Warning(fmt.Sprintf(format, a...))
+	return __syslog__.Warning(fmt.Sprintf(format, a...))
 }
 
 func Info(format string, a ...interface{}) error {
@@ -123,7 +128,7 @@ func Info(format string, a ...interface{}) error {
 		return err
 	}
 	_init()
-	return __logger__.Info(fmt.Sprintf(format, a...))
+	return __syslog__.Info(fmt.Sprintf(format, a...))
 }
 
 func Debug(format string, a ...interface{}) error {
@@ -135,7 +140,7 @@ func Debug(format string, a ...interface{}) error {
 		return err
 	}
 	_init()
-	return __logger__.Debug(fmt.Sprintf(format, a...))
+	return __syslog__.Debug(fmt.Sprintf(format, a...))
 }
 
 func Log(format string, a ...interface{}) error {

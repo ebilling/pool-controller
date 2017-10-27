@@ -255,7 +255,7 @@ func SkipTestIfNotTestRig(t *testing.T) {
 	}
 
 	if _, err := os.Stat("TestRig"); err == nil {
-		StartTestMode()
+		LogTestMode()
 		TestRig = true
 		return
 	}
@@ -267,4 +267,3 @@ func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
 		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio), exp, val)
 	}
 }
-

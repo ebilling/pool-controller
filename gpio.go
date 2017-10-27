@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"periph.io/x/periph/conn/gpio"
 	"periph.io/x/periph/conn/gpio/gpioreg"
 	"periph.io/x/periph/host"
@@ -9,7 +8,7 @@ import (
 	"time"
 )
 
-//var __no_gpio__ bool = false // For testing on non-test setups
+var GpioProvider func(uint8) PiPin = xgpio_provider // For testing on non-test setups
 
 type GpioState bool
 
@@ -95,18 +94,21 @@ type Gpio struct {
 	pin  gpio.PinIO
 }
 
-func NewGpio(gpio uint8) PiPin {
-	//  var p PiPin
-	//	if __no_gpio__ { // Special mode for when you aren't running on RaspberryPi
-	//		p = (PiPin)(&TestPin{sleepTime: 20 * time.Millisecond})
-	//		return p
-	//	}
+func SetGpioProvider(p func(uint8) PiPin) {
+	GpioProvider = p
+}
+
+func xgpio_provider(gpio uint8) PiPin {
 	g := Gpio{
 		gpio: gpio,
 		pin:  gpioreg.ByName(strconv.Itoa(int(gpio))),
 	}
 	gpioreg.Register(g.pin, false)
 	return (PiPin)(&g)
+}
+
+func NewGpio(gpio uint8) PiPin {
+	return GpioProvider(gpio)
 }
 
 func GpioInit() error {
@@ -155,59 +157,3 @@ const (
 	Input  Direction = false
 	Output Direction = true
 )
-
-type TestPin struct {
-	state     GpioState
-	pull      Pull
-	edge      Edge
-	direction Direction
-	sleepTime time.Duration
-	inputTime time.Time
-	pin       uint8
-}
-
-func (p *TestPin) Input() {
-	p.direction = Input
-	p.inputTime = time.Now()
-	p.pull = Float
-	p.edge = NoEdge
-}
-
-func (p *TestPin) InputEdge(pull Pull, e Edge) {
-	p.direction = Input
-	p.inputTime = time.Now()
-	p.pull = pull
-	p.edge = e
-}
-
-func (p *TestPin) Output(s GpioState) {
-	p.direction = Output
-	p.state = s
-}
-
-func (p *TestPin) Read() GpioState {
-	now := time.Now()
-	sleeptime := p.inputTime.Add(p.sleepTime)
-	if p.sleepTime > 0 && now.After(sleeptime) {
-		p.state = High
-	}
-	return p.state
-}
-
-func (p *TestPin) WaitForEdge(ignored time.Duration) bool {
-	time.Sleep(p.sleepTime)
-	return true
-}
-
-func (p *TestPin) Pin() uint8 {
-	return p.pin
-}
-
-func (p *TestPin) String() string {
-	direction := "Input"
-	if p.direction == Output {
-		direction = "Output"
-	}
-	return fmt.Sprintf("TestPin: {State: %s, Direction: %s, Edge: %s, Pull: %s, Duration: %d, InputTime: %s}",
-		p.state, direction, p.edge, p.pull, p.sleepTime, timeStr(p.inputTime))
-}

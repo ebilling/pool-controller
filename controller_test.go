@@ -6,7 +6,7 @@ import (
 )
 
 func TestJSONmap(t *testing.T) {
-	StartTestMode()
+	LogTestMode()
 	m := NewJSONmap()
 	swp_str := "timer.sweep.start"
 	swp_val := "1:00"

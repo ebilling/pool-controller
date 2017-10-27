@@ -35,6 +35,7 @@ func NewServer(port int, ppc *PoolPumpController) *Server {
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: s.handler,
 	}
+	s.server.ErrorLog = Logger() // Direct errors to common log
 	return &s
 }
 

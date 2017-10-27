@@ -1,8 +1,8 @@
-package httpTest
+package main
 
 import (
-	"testing"
 	"net/http"
+	"testing"
 )
 
 func handler(w http.ResponseWriter, req *http.Request) {
@@ -10,10 +10,12 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte("This is an example server.\n"))
 }
 
-func TestTLS(t *testing.T) {
-	http.HandleFunc("/", handler)
-	err := http.ListenAndServeTLS(":6767", "tests/test.crt", "tests/test.key", nil)
-	if err != nil {
-		t.Errorf("Could not create listener: %s", err.Error())
-	}
+func TestStartTLS(t *testing.T) {
+	LogTestMode()
+	SetGpioProvider(testpin_generator)
+	config := NewConfig()
+	ppc := NewPoolPumpController(config)
+	server := NewServer(8887, ppc)
+	server.Start(*config.ssl_cert, *config.ssl_key)
+
 }
