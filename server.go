@@ -223,6 +223,7 @@ func nav() string {
 	out := "<p><font face=helvetica color=#444444 size=-2>"
 	out += "<table cellspacing=5><tr><td><a href=/>graphs</a></td><td>&nbsp;</td>\n"
 	out += "<td><a href=/pair>homekit</a></td><td>&nbsp;</td>\n"
+	out += "<td><a href=/calibrate>calibrate</a></td><td>&nbsp;</td>\n"
 	out += "<td><a href=/config>config</a></td></tr></table></font>\n"
 	return out
 }
