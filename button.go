@@ -29,7 +29,9 @@ func newButton(pin PiPin, callback func()) *Button {
 func (b *Button) Start() {
 	started := make(chan bool)
 	go b.RunLoop(started)
-	<-started
+	if <-started {
+		Info("Button loop started")
+	}
 }
 
 func (b *Button) RunLoop(started chan bool) {
