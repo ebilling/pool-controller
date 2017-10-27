@@ -18,7 +18,7 @@ func main() {
 		flag.Usage()
 		fmt.Fprintf(os.Stderr, "Any changes put into the web interface will override these"+
 			"flags.\nThe config is stored in %s%s.  It can be carefully edited by hand",
-			config.data_dir, server_conf)
+			*config.data_dir, server_conf)
 		os.Exit(1)
 	}
 
