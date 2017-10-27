@@ -324,15 +324,23 @@ func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) 
 			RawPath: "/",
 		},
 	}
-	// Not submitted
-	if pump_res == "" || roof_res == "" {
+
+	if pump_res == "" || roof_res == "" { // No values submitted
 		h.setRefresh(w, &retry, 10)
 		html += "<h2>Please provide valid resistance for each resistor.</h2> Redirecting..."
 	} else {
 		if Calibrate(&html, h.ppc.pumpTemp, pump_res, "Pump Probe") == nil &&
 			Calibrate(&html, h.ppc.roofTemp, roof_res, "Roof Probe") == nil {
 			h.setRefresh(w, &success, 10)
-			html += "<h2>Success</h2>"
+			html += "<h2>Success</h2><br>"
+			p, ok := h.ppc.pumpTemp.(*GpioThermometer)
+			if ok {
+				html += fmt.Sprintf("<br>Pool Value: %0.3f", p.adjust)
+			}
+			p, ok = h.ppc.roofTemp.(*GpioThermometer)
+			if ok {
+				html += fmt.Sprintf("<br>Roof Value: %0.3f", p.adjust)
+			}
 		} else {
 			html += "<p>Redirecting...."
 			h.setRefresh(w, &retry, 10)

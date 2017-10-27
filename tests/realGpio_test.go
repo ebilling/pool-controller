@@ -132,42 +132,24 @@ func discharge_us(t *GpioThermometer, e Edge, p Pull) time.Duration {
 }
 
 func TestDischargeStrategies(t *testing.T) {
+	t.Skip("Only for experimentation, not a real test")
 	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
 	pulls := []Pull{PullDown, PullUp, Float}
 	edges := []Edge{RisingEdge, FallingEdge, BothEdges}
-	expected := r4700 * therm.microfarads
+	expected := r4700 * therm.microfarads / 2
 	Info("Strategy: Pull, Edge, Expected, Average, Stddev, PctVar")
 	for _, p := range pulls {
 		for _, e := range edges {
 			h := NewHistory(10)
 			for i := 0; i < 10; i++ {
 				dt := discharge_us(therm, e, p)
-				//Info("DischargeTime %f us,  %f k-ohms", us(dt), therm.getOhms(dt))
 				h.Push(us(dt))
 			}
 			Info("Strategy: %s, %s, %0.3f, %0.3f, %0.4f, %0.2f",
 				p, e, expected, h.Average(), h.Stddev(), 100.0*h.Stddev()/h.Average())
 		}
 	}
-}
-
-func TestBestDischargeStrategy(t *testing.T) {
-	Info("Running %s", t.Name())
-	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
-	expected := r4700 * therm.microfarads / 1000.0
-	Info("Strategy: Pull, Edge, Expected, Average, Stddev, PctVar")
-	h := NewHistory(10)
-	for i := 0; i < 10; i++ {
-		dt1 := discharge_us(therm, RisingEdge, PullDown)
-		dt2 := discharge_us(therm, FallingEdge, PullDown)
-		dt := dt1 + dt2
-		Info("DischargeTime dt1(%f ms),  dt2(%f ms), dt(%fms), %f k-ohms",
-			ms(dt1), ms(dt2), ms(dt), therm.getOhms(dt))
-		h.Push(ms(dt1 + dt2))
-	}
-	Info("Strategy: %0.3f, %0.3f, %0.4f, %0.2f",
-		expected, h.Average(), h.Stddev(), 100.0*h.Stddev()/h.Average())
 }
 
 func TestThermometer(t *testing.T) {
