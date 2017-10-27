@@ -16,9 +16,8 @@ name='pool-controller'
 daemonize="daemonize"
 bin="$name"
 data_dir="/var/cache/homekit"
-args="-p -data_dir=$data_dir"
 pidfile="/tmp/$name.pid"
-log="/tmp/pc.log"
+args="-p -data_dir=$data_dir -pid=$pidfile"
 bindir="/usr/local/bin"
 
 #Redirect all output syslog
@@ -42,7 +41,7 @@ check_data_dir() {
 start_proc() {
     check_data_dir
     cd $rundir
-    if $daemonize $bin $args -pid=$pidfile; then
+    if $daemonize $bin $args; then
 	echo "Starting $name: Success"
     else
         echo "Starting $name: Failed"
