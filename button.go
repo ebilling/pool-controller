@@ -27,11 +27,14 @@ func newButton(pin PiPin, callback func()) *Button {
 }
 
 func (b *Button) Start() {
-	go b.RunLoop()
+	started := make(chan bool)
+	go b.RunLoop(started)
+	<-started
 }
 
-func (b *Button) RunLoop() {
+func (b *Button) RunLoop(started chan bool) {
 	start := time.Now()
+	started <- true
 	for true {
 		select {
 		case <-b.done:
