@@ -25,8 +25,8 @@ var (
 	default_target    = 30.0
 	default_deltaT    = 12.0
 	default_tolerance = 0.5
-	default_cap_pump  = 10.0
-	default_cap_roof  = 10.0
+	default_adj_pump  = 1.0
+	default_adj_roof  = 1.0
 	default_forceRrd  = false
 	server_conf       = "/server.conf"
 )
@@ -47,8 +47,8 @@ type Config struct {
 	target    *float64
 	deltaT    *float64
 	tolerance *float64
-	cap_pump  *float64
-	cap_roof  *float64
+	adj_pump  *float64
+	adj_roof  *float64
 
 	// Internal
 	pidfile *string
@@ -84,9 +84,9 @@ func NewConfig() *Config {
 		"between roof and pumps to utilize solar panels")
 	c.tolerance = flag.Float64("tol", default_tolerance,
 		"Sets the temperature variance allowed around the target")
-	c.cap_pump = flag.Float64("pump_cap", default_cap_pump,
+	c.adj_pump = flag.Float64("pump_adj", default_adj_pump,
 		"Sets the measured capacitance in microFarads for the inline pump capacitor")
-	c.cap_roof = flag.Float64("roof_cap", default_cap_roof,
+	c.adj_roof = flag.Float64("roof_adj", default_adj_roof,
 		"Sets the measured capacitance in microFarads for the inline roof capacitor")
 	c.forceRrd = flag.Bool("f", default_forceRrd,
 		"force creation of new RRD files if present")
@@ -121,9 +121,9 @@ func (c *Config) GetAuth() []byte {
 func (c *Config) String() string {
 	return fmt.Sprintf("Config: {data_dir:\"%s\", pin:\"%s\", forceRrd:%t, auth:\"%5s...\", "+
 		"WUappId:\"%s\", zip:\"%s\", target:%0.2f, deltaT:%0.2f, tolerance:%0.2f, "+
-		"cap_pump:%0.2f, cap_roof:%0.2f mtime:\"%.19s\", ctime:\"%.19s\" }",
+		"adj_pump:%0.2f, adj_roof:%0.2f mtime:\"%.19s\", ctime:\"%.19s\" }",
 		*c.data_dir+server_conf, *c.pin, *c.forceRrd, c.GetAuth(), *c.WUappId, *c.zip, *c.target,
-		*c.deltaT, *c.tolerance, *c.cap_pump, *c.cap_roof, c.mtime, c.ctime)
+		*c.deltaT, *c.tolerance, *c.adj_pump, *c.adj_roof, c.mtime, c.ctime)
 }
 
 func (c *Config) OverwriteWithSaved() {
@@ -175,16 +175,16 @@ func (c *Config) OverwriteWithSaved() {
 				c.tolerance = &tol
 			}
 			break
-		case "cap_pump":
+		case "adj_pump":
 			cp, err := strconv.ParseFloat(l[1], 64)
 			if check(err, "Could not value %s", line) == nil {
-				c.cap_pump = &cp
+				c.adj_pump = &cp
 			}
 			break
-		case "cap_roof":
+		case "adj_roof":
 			cr, err := strconv.ParseFloat(l[1], 64)
 			if check(err, "Could not value %s", line) == nil {
-				c.cap_roof = &cr
+				c.adj_roof = &cr
 			}
 			break
 		}
@@ -214,11 +214,11 @@ func (c *Config) Save() error {
 	if *c.tolerance != default_tolerance {
 		out += fmt.Sprintf("tolerance:%f\n", *c.tolerance)
 	}
-	if *c.cap_pump != default_cap_pump {
-		out += fmt.Sprintf("cap_pump:%f\n", *c.cap_pump)
+	if *c.adj_pump != default_adj_pump {
+		out += fmt.Sprintf("adj_pump:%f\n", *c.adj_pump)
 	}
-	if *c.cap_roof != default_cap_roof {
-		out += fmt.Sprintf("cap_roof:%f\n", *c.cap_roof)
+	if *c.adj_roof != default_adj_roof {
+		out += fmt.Sprintf("adj_roof:%f\n", *c.adj_roof)
 	}
 	if len(out) > 0 {
 		return ioutil.WriteFile(*c.data_dir+server_conf, []byte(out), os.FileMode(0644))

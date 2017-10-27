@@ -176,12 +176,10 @@ func TestThermometer(t *testing.T) {
 
 	t.Run("Calibrate Cap4700", func(t *testing.T) {
 		Info("Running %s", t.Name())
-		c, err := therm.Calibrate(r4700)
+		err := therm.Calibrate(r4700)
 		if err != nil {
 			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
 		}
-		Debug("Setting calibration for %0.3f", c)
-		therm.SetAdjustment(c)
 	})
 	t.Run("Temperature Cap4700", func(t *testing.T) {
 		Info("Running %s", t.Name())
@@ -198,12 +196,10 @@ func TestThermometer(t *testing.T) {
 	therm = NewGpioThermometer("Fixed 10kOhm ResistorTest", "TestManufacturer", CAP10000)
 	t.Run("Calibrate Cap10000", func(t *testing.T) {
 		Info("Running %s", t.Name())
-		c, err := therm.Calibrate(r10000)
+		err := therm.Calibrate(r10000)
 		if err != nil {
 			t.Errorf("Failure to Calibrate successfully: %s", err.Error())
 		}
-		Debug("Setting calibration for %0.3f", c)
-		therm.SetAdjustment(c)
 	})
 	t.Run("Temperature Cap10000", func(t *testing.T) {
 		Info("Running %s", t.Name())

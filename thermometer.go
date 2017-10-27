@@ -12,7 +12,7 @@ type Thermometer interface {
 	Name() string
 	Temperature() float64
 	Update() error
-	SetAdjustment(float64)
+	Calibrate(float64) error
 	Accessory() *accessory.Accessory
 }
 
@@ -41,8 +41,8 @@ func (t *SelectiveThermometer) Name() string {
 	return t.name
 }
 
-func (t *SelectiveThermometer) SetAdjustment(a float64) {
-	return // No adjustments on this thermometer
+func (t *SelectiveThermometer) Calibrate(a float64) error {
+	return fmt.Errorf("Not supported")
 }
 
 func (t *SelectiveThermometer) Temperature() float64 {
@@ -154,7 +154,7 @@ func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
 	return uSec / t.microfarads
 }
 
-func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
+func (t *GpioThermometer) Calibrate(ohms float64) error {
 	calculated_ms := ohms * t.microfarads / 1000.0
 	Info("Expecting %0.3f ms", calculated_ms)
 
@@ -170,11 +170,13 @@ func (t *GpioThermometer) Calibrate(ohms float64) (float64, error) {
 	dt := time.Duration(int64(h.Median()))
 	value := calculated_ms / ms(dt)
 	Info("Expecting %0.3f ms, found %0.3f ms, ratio %0.3f", calculated_ms, ms(dt), value)
-	if h.Stddev() > h.Median()/20 || h.Len() < 10 {
-		return value, fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2f%%) entries(%d)",
+	if h.Stddev() > h.Median()*0.03 || h.Len() < 10 {
+		return fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2f%%) entries(%d)",
 			value, 100.0*h.Stddev()/h.Median(), h.Len())
 	}
-	return value, nil
+	Debug("Setting adjustment to %0.3f", value)
+	t.adjust = value
+	return nil
 }
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {

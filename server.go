@@ -6,6 +6,7 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -94,6 +95,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case "/config":
 		h.configHandler(w, r)
+		return
+	case "/runCalibration":
+		h.runCalibrationHandler(w, r)
+		return
+	case "/calibrate":
+		h.calibrateHandler(w, r)
 		return
 	default:
 		http.Error(w, "Unknown request type", 404)
@@ -268,6 +275,73 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	h.writeResponse(w, []byte(html), "text/html")
 }
 
+func (h *Handler) calibrateHandler(w http.ResponseWriter, r *http.Request) {
+	html := "<html><head><title>Thermometer Calibration</title></head><body><center>"
+	html += `<font face=helvetica color=#444444 size=-1>To calibrate your system, please 
+	insert resistors of known value across the terminals for BOTH temperature probes.  
+	<b>Suggested value is 10,000Ohms.</b>, but you can measure it for increased 
+	accuracy.</font><br>`
+	html += "<table><form action=/runCalibration method=POST>\n"
+	html += "<tr><td align=right><font face=helvetica color=#444444 size=-1>Pump Resistor Value</td>"
+	html += "<td><input name=pump_res value=10000 size=5></font> ohms</td></tr>\n"
+	html += "<tr><td align=right><font face=helvetica color=#444444 size=-1>Roof Resistor Value</td>"
+	html += "<td><input name=roof_res value=10000 size=5></font> ohms</td></tr>\n"
+	html += "<tr><td colspan=2 align=center><input type=submit name=submit value=Run Calibration></td></tr>\n"
+	html += "<tr><td colspan=2 align=center>" + nav() + "</td></tr>\n"
+	html += "</form></table></font></center></body></html>"
+	h.writeResponse(w, []byte(html), "text/html")
+}
+
+func Calibrate(html *string, t Thermometer, res_str, name string) error {
+	r, err := strconv.ParseFloat(res_str, 64)
+	if err != nil {
+		*html += "<h2>Could not parse " + res_str + "for: " + name
+		*html += ", please correct the value.</h2><br>(" + err.Error() + ")"
+		return err
+	}
+	err = t.Calibrate(r)
+	if err != nil {
+		*html += "<h2>Calibration failed, please try again.</h2><br>(" + err.Error() + ")"
+		return err
+	}
+
+	return nil
+}
+
+func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) {
+	pump_res := getFormValue(r, "pump_res", "")
+	roof_res := getFormValue(r, "roof_res", "")
+
+	html := "<html><head><title>Thermometer Calibration</title></head><body><center>"
+	retry := http.Request{
+		URL: &url.URL{
+			RawPath: "/calibrate",
+		},
+	}
+
+	success := http.Request{
+		URL: &url.URL{
+			RawPath: "/",
+		},
+	}
+	// Not submitted
+	if pump_res == "" || roof_res == "" {
+		h.setRefresh(w, &retry, 10)
+		html += "<h2>Please provide valid resistance for each resistor.</h2> Redirecting..."
+	} else {
+		if Calibrate(&html, h.ppc.pumpTemp, pump_res, "Pump Probe") == nil &&
+			Calibrate(&html, h.ppc.roofTemp, roof_res, "Roof Probe") == nil {
+			h.setRefresh(w, &success, 10)
+			html += "<h2>Success</h2>"
+		} else {
+			html += "<p>Redirecting...."
+			h.setRefresh(w, &retry, 10)
+		}
+	}
+	html += "</body></html>"
+	h.writeResponse(w, []byte(html), "text/html")
+}
+
 func (h *Handler) Authenticate(r *http.Request) bool {
 	user, password, ok := r.BasicAuth()
 	if !ok || user != "admin" {
@@ -335,10 +409,10 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	if processStringUpdate(r, "zipcode", &c.zip) {
 		foundone = true
 	}
-	if processFloatUpdate(r, "cap_pump", &c.cap_pump) {
+	if processFloatUpdate(r, "adj_pump", &c.adj_pump) {
 		foundone = true
 	}
-	if processFloatUpdate(r, "cap_roof", &c.cap_roof) {
+	if processFloatUpdate(r, "adj_roof", &c.adj_roof) {
 		foundone = true
 	}
 	if processFloatUpdate(r, "target", &c.target) {
@@ -385,8 +459,8 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Temperature Sensor Adjustment:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Pump Capacitance (uF)", "cap_pump", fmt.Sprintf("%0.2f&micro;F", *c.cap_pump), "")
-	html += h.configRow("Roof Capacitance (uF)", "cap_roof", fmt.Sprintf("%0.2f&micro;F", *c.cap_roof), "")
+	html += h.configRow("Pump Tuning", "cap_pump", fmt.Sprintf("%0.2f", *c.adj_pump), "")
+	html += h.configRow("Roof Tuning", "cap_roof", fmt.Sprintf("%0.2f", *c.adj_roof), "")
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Solar Settings:</th><td colspan=3></td></tr>\n"
