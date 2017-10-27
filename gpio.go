@@ -96,7 +96,7 @@ type Gpio struct {
 }
 
 func NewGpio(gpio uint8) PiPin {
-	var p PiPin
+	//  var p PiPin
 	//	if __no_gpio__ { // Special mode for when you aren't running on RaspberryPi
 	//		p = (PiPin)(&TestPin{sleepTime: 20 * time.Millisecond})
 	//		return p
