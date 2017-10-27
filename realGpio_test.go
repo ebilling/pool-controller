@@ -2,10 +2,21 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"testing"
 	"time"
 )
+
+//  To run these tests, you need to build a system that is set up as follows:
+//      GPIO5  -> <1k Resistor  -> LED    -> GND
+//      +3.3v  -> 4.7k Resistor -> GPIO19 -> 10uF capacitor -> GND
+//      +3.3v  ->  10k Resistor -> GPIO6  -> 10uF capacitor -> GND
+//      GPIO13 -> 4.7k Resistor -> Relay Input
+//      GPIO26 -> Open Relay Terminals -> GND, relay will push the button...
+//
+//      SUPER IMPORTANT: Create an empty file in the current directory named TestRig
+//                       to tell the test system it's ok to run these tests.
 
 const (
 	LED      = 5  // Pin 29
@@ -14,6 +25,16 @@ const (
 	CAP10000 = 6  // Pin 31
 	SWITCH   = 26 // Pin 37
 )
+
+var TestRig bool = false
+var Led PiPin
+var TestRelay *Relay
+var Cap4700 PiPin
+var Cap10000 PiPin
+var Switch PiPin
+
+var r10000 float64 = 9930.0
+var r4700 float64 = 4600.0
 
 func GpioStr(g PiPin) string {
 	switch g.Pin() {
@@ -33,16 +54,6 @@ func GpioStr(g PiPin) string {
 	return ""
 }
 
-var TestRig bool = false
-var Led PiPin        // Setup: GPIO -> <1k Resistor -> LED -> GND
-var TestRelay *Relay // Setup GPIO -> 4.7k Resistor -> Relay Board
-var Cap4700 PiPin    // Setup: +3.3v -> 4.7k Resistor -> GPIO -> 10uF capacitor -> GND
-var Cap10000 PiPin   // Setup: +3.3v -> 10k Resistor -> GPIO -> 10uF capacitor -> GND
-var Switch PiPin     // Setup: GPIO -> Button Switch -> GND
-
-var r10000 float64 = 9930.0
-var r4700 float64 = 4600.0
-
 func SkipTestIfNotTestRig(t *testing.T) {
 	if TestRig {
 		return
@@ -57,7 +68,7 @@ func SkipTestIfNotTestRig(t *testing.T) {
 		return
 	}
 
-	if _, err := Stat("TestRig"); err == nil {
+	if _, err := os.Stat("TestRig"); err == nil {
 		TestRig = true
 		return
 	}

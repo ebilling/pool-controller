@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var __no_gpio__ bool = false // For testing on non-test setups
+//var __no_gpio__ bool = false // For testing on non-test setups
 
 type GpioState bool
 
@@ -97,10 +97,10 @@ type Gpio struct {
 
 func NewGpio(gpio uint8) PiPin {
 	var p PiPin
-	if __no_gpio__ { // Special mode for when you aren't running on RaspberryPi
-		p = (PiPin)(&TestPin{sleepTime: 20 * time.Millisecond})
-		return p
-	}
+	//	if __no_gpio__ { // Special mode for when you aren't running on RaspberryPi
+	//		p = (PiPin)(&TestPin{sleepTime: 20 * time.Millisecond})
+	//		return p
+	//	}
 	g := Gpio{
 		gpio: gpio,
 		pin:  gpioreg.ByName(strconv.Itoa(int(gpio))),
@@ -110,9 +110,9 @@ func NewGpio(gpio uint8) PiPin {
 }
 
 func GpioInit() error {
-	if __no_gpio__ {
-		return nil
-	}
+	//	if __no_gpio__ {
+	//		return nil
+	//	}
 	if _, err := host.Init(); err != nil {
 		return err
 	}
