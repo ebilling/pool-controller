@@ -51,6 +51,44 @@ func TestInitilization(t *testing.T) {
 	ExpectedState(t, Led, Low)
 }
 
+func TestRelays(t *testing.T) {
+	SkipTestIfNotTestRig(t)
+	Info("Running %s", t.Name())
+	TestRelay = NewRelay(RELAY, "Relay", "Testing")
+	runRelayTest(t, TestRelay, time.Second)
+}
+
+func TestPushButton(t *testing.T) {
+	SkipTestIfNotTestRig(t)
+	Info("Running %s", t.Name())
+	wasRun := 0
+	button := NewGpioButton(SWITCH, func() {
+		Led.Output(High)
+		wasRun++
+		Info("Button Pushed %d!!!", wasRun)
+	})
+
+	button.Start()
+	for i := 0; i < 3; i++ {
+		TestRelay.TurnOn()
+		time.Sleep(time.Second / 4)
+		TestRelay.TurnOff()
+		Led.Output(Low)
+		time.Sleep(3 * time.Second)
+	}
+	if wasRun != 3 {
+		t.Errorf("Expected 3 button pushes, detected %d", wasRun)
+	}
+	Info("Stopping button job")
+	exited := false
+	go doStop(button, &exited, time.Now())
+	time.Sleep(time.Second)
+	if !exited {
+		t.Errorf("Button loop should have stopped within time allotted")
+	}
+	Info("Button job stopped")
+}
+
 func TestBlinkLed(t *testing.T) {
 	SkipTestIfNotTestRig(t)
 	Info("Running %s", t.Name())
@@ -62,13 +100,6 @@ func TestBlinkLed(t *testing.T) {
 		Led.Output(Low)
 		ExpectedState(t, Led, Low)
 	}
-}
-
-func TestRelays(t *testing.T) {
-	SkipTestIfNotTestRig(t)
-	Info("Running %s", t.Name())
-	TestRelay = NewRelay(RELAY, "Relay", "Testing")
-	runRelayTest(t, TestRelay, time.Second)
 }
 
 func TestDischargeStrategies(t *testing.T) {
@@ -95,6 +126,9 @@ func TestDischargeStrategies(t *testing.T) {
 
 func TestThermometer(t *testing.T) {
 	SkipTestIfNotTestRig(t)
+	if testing.Short() {
+		t.SkipNow()
+	}
 	Info("Running %s", t.Name())
 	therm := NewGpioThermometer("Fixed 4.7kOhm ResistorTest", "TestManufacturer", CAP4700)
 
@@ -136,37 +170,6 @@ func TestThermometer(t *testing.T) {
 				therm.Temperature())
 		}
 	})
-}
-
-func TestPushButton(t *testing.T) {
-	SkipTestIfNotTestRig(t)
-	Info("Running %s", t.Name())
-	wasRun := 0
-	button := NewGpioButton(SWITCH, func() {
-		wasRun++
-		Led.Output(High)
-		Info("Button Pushed %d!!!", wasRun)
-	})
-
-	button.Start()
-	for i := 0; i < 3; i++ {
-		TestRelay.TurnOn()
-		time.Sleep(time.Second / 3)
-		TestRelay.TurnOff()
-		Led.Output(Low)
-		time.Sleep(2 * time.Second)
-	}
-	if wasRun < 3 {
-		t.Errorf("Expected 3 button pushes")
-	}
-	Info("Stopping button job")
-	exited := false
-	go doStop(button, &exited, time.Now())
-	time.Sleep(time.Second)
-	if !exited {
-		t.Errorf("Button loop should have stopped within time allotted")
-	}
-	Info("Button job stopped")
 }
 
 func discharge_us(t *GpioThermometer, e Edge, p Pull) time.Duration {
@@ -252,6 +255,7 @@ func SkipTestIfNotTestRig(t *testing.T) {
 	}
 
 	if _, err := os.Stat("TestRig"); err == nil {
+		StartTestMode()
 		TestRig = true
 		return
 	}
@@ -263,3 +267,4 @@ func ExpectedState(t *testing.T, gpio PiPin, exp GpioState) {
 		t.Errorf("%s: Expected %s but found %s", GpioStr(gpio), exp, val)
 	}
 }
+
