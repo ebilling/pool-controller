@@ -61,6 +61,7 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 		pumpRrd: NewRrd(*config.data_dir + "/pumpstatus.rrd"),
 		done:    make(chan bool),
 	}
+	ppc.SyncAdjustments()
 	ppc.runningTemp = RunningWaterThermometer(ppc.pumpTemp, ppc.switches)
 	return &ppc
 }
@@ -195,6 +196,17 @@ func (ppc *PoolPumpController) PersistCalibration() {
 	t, ok = ppc.roofTemp.(*GpioThermometer)
 	if ok {
 		*ppc.config.adj_roof = t.adjust
+	}
+}
+
+func (ppc *PoolPumpController) SyncAdjustments() {
+	t, ok := ppc.pumpTemp.(*GpioThermometer)
+	if ok {
+		t.adjust = *ppc.config.adj_pump
+	}
+	t, ok = ppc.roofTemp.(*GpioThermometer)
+	if ok {
+		t.adjust = *ppc.config.adj_roof
 	}
 }
 

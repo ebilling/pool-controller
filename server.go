@@ -420,9 +420,11 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		foundone = true
 	}
 	if processFloatUpdate(r, "adj_pump", &c.adj_pump) {
+		h.ppc.SyncAdjustments()
 		foundone = true
 	}
 	if processFloatUpdate(r, "adj_roof", &c.adj_roof) {
+		h.ppc.SyncAdjustments()
 		foundone = true
 	}
 	if processFloatUpdate(r, "target", &c.target) {
