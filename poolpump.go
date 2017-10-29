@@ -79,6 +79,9 @@ func (ppc *PoolPumpController) Update() {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
+	if *ppc.config.solar_disabled {
+		return false
+	}
 	return ppc.pumpTemp.Temperature() > *ppc.solar.target+*ppc.solar.tolerance &&
 		ppc.pumpTemp.Temperature() > ppc.roofTemp.Temperature()+*ppc.solar.deltaT
 }
@@ -86,6 +89,9 @@ func (ppc *PoolPumpController) shouldCool() bool {
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
+	if *ppc.config.solar_disabled {
+		return false
+	}
 	return ppc.pumpTemp.Temperature() < *ppc.solar.target-*ppc.solar.tolerance &&
 		ppc.pumpTemp.Temperature() < ppc.roofTemp.Temperature()-*ppc.solar.deltaT
 }
@@ -96,7 +102,17 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 // the water as it approaches the target.
 func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	state := ppc.switches.State()
-	if state == STATE_DISABLED || ppc.switches.ManualState() {
+	if ppc.switches.ManualState() {
+		return
+	}
+	if state == STATE_DISABLED && !*ppc.config.disabled && !*ppc.config.solar_disabled {
+		ppc.switches.setSwitches(false, false, false, false, STATE_OFF)
+		return
+	}
+	if *ppc.config.disabled {
+		if state > STATE_DISABLED {
+			ppc.switches.setSwitches(false, false, false, false, STATE_DISABLED)
+		}
 		return
 	}
 	if state > STATE_OFF {
@@ -117,13 +133,15 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		}
 		return
 	}
-	if time.Now().Sub(ppc.switches.GetStopTime()) > 24*time.Hour {
+	// If the pumps havent run in a day, wait til midnight then start them
+	if time.Now().Sub(ppc.switches.GetStopTime()) > 24*time.Hour && time.Now().Hour() < 5 {
 		ppc.switches.SetState(STATE_SWEEP, false) // Clean pool
 		if time.Now().Sub(ppc.switches.GetStartTime()) > 2*time.Hour {
 			ppc.switches.StopAll(false) // End daily
 		}
 		return
 	}
+	// If there is no reason to turn on the pumps and it's not manual, turn off
 	if state > STATE_OFF {
 		ppc.switches.StopAll(false)
 	}

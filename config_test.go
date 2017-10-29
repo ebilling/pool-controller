@@ -27,10 +27,21 @@ func TestConfig(t *testing.T) {
 
 func TestConfig_forceRrd(t *testing.T) {
 	c := flagTestSetup([]string{"-f"})
-	if *c.forceRrd == default_forceRrd {
-		t.Errorf("Default value was not overwritten")
-	}
 	if !*c.forceRrd {
+		t.Errorf("Flag value not persisted")
+	}
+}
+
+func TestConfig_Disabled(t *testing.T) {
+	c := flagTestSetup([]string{"-disabled"})
+	if !*c.disabled {
+		t.Errorf("Flag value not persisted")
+	}
+}
+
+func TestConfig_SolarDisabled(t *testing.T) {
+	c := flagTestSetup([]string{"-solar_disabled"})
+	if !*c.solar_disabled {
 		t.Errorf("Flag value not persisted")
 	}
 }

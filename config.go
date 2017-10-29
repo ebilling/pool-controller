@@ -27,7 +27,6 @@ var (
 	default_tolerance = 0.5
 	default_adj_pump  = 1.0
 	default_adj_roof  = 1.0
-	default_forceRrd  = false
 	server_conf       = "/server.conf"
 )
 
@@ -36,19 +35,21 @@ type Config struct {
 	ssl_cert *string
 	ssl_key  *string
 	data_dir *string
-	pin      *string
 	forceRrd *bool
 	persist  *bool
 
 	// Updatable
-	auth      *[]byte
-	WUappId   *string
-	zip       *string
-	target    *float64
-	deltaT    *float64
-	tolerance *float64
-	adj_pump  *float64
-	adj_roof  *float64
+	disabled       *bool
+	solar_disabled *bool
+	auth           *[]byte
+	WUappId        *string
+	zip            *string
+	pin            *string
+	target         *float64
+	deltaT         *float64
+	tolerance      *float64
+	adj_pump       *float64
+	adj_roof       *float64
 
 	// Internal
 	pidfile *string
@@ -89,14 +90,18 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		"Sets the measured capacitance in microFarads for the inline pump capacitor")
 	c.adj_roof = fs.Float64("roof_adj", default_adj_roof,
 		"Sets the measured capacitance in microFarads for the inline roof capacitor")
-	c.forceRrd = fs.Bool("f", default_forceRrd,
-		"force creation of new RRD files if present")
 	c.pidfile = fs.String("pid", default_pidfile,
 		"File to write the process id into.")
+	c.forceRrd = fs.Bool("f", false,
+		"force creation of new RRD files if present")
 	c.persist = fs.Bool("p", false,
 		"If true, any parameter values changed via web interface are saved to a file and read on "+
 			"startup.  If false, any saved values will be ignored on start.  Saved changes "+
 			"supercede all flags.")
+	c.disabled = fs.Bool("disabled", false,
+		"Turns off the pumps and does not allow them to operate.")
+	c.solar_disabled = fs.Bool("solar_disabled", false,
+		"Turns off the solar.  The system will not attempt to reach the target temperature.")
 	fs.Parse(args)
 
 	default_auth = crypt(*c.pin)
@@ -119,15 +124,17 @@ func (c *Config) GetAuth() []byte {
 }
 
 func (c *Config) String() string {
-	return fmt.Sprintf("Config: {data_dir:\"%s\", pin:\"%s\", forceRrd:%t, auth:\"%5s...\", "+
-		"WUappId:\"%s\", zip:\"%s\", target:%0.2f, deltaT:%0.2f, tolerance:%0.2f, "+
-		"adj_pump:%0.2f, adj_roof:%0.2f mtime:\"%.19s\", ctime:\"%.19s\" }",
-		*c.data_dir, *c.pin, *c.forceRrd, c.GetAuth(), *c.WUappId, *c.zip, *c.target,
-		*c.deltaT, *c.tolerance, *c.adj_pump, *c.adj_roof, c.mtime, c.ctime)
+	return fmt.Sprintf("Config: {data_dir:\"%s\", pin:\"%s\", forceRrd:%t, "+
+		"auth:\"%5s...\", WUappId:\"%s\", zip:\"%s\", target:%0.2f, deltaT:%0.2f, "+
+		"tolerance:%0.2f, adj_pump:%0.2f, adj_roof:%0.2f disabled:%t "+
+		"solar_disabled:%t mtime:\"%.19s\", ctime:\"%.19s\" }",
+		*c.data_dir, *c.pin, *c.forceRrd,
+		c.GetAuth(), *c.WUappId, *c.zip, *c.target, *c.deltaT,
+		*c.tolerance, *c.adj_pump, *c.adj_roof, *c.disabled,
+		*c.solar_disabled, c.mtime, c.ctime)
 }
 
 func (c *Config) OverwriteWithSaved(path string) {
-	Info("Running OverwriteWithSaved - Current Config: %s", c.String())
 	if !*c.persist {
 		return
 	}
@@ -152,6 +159,20 @@ func (c *Config) OverwriteWithSaved(path string) {
 				Fatal("Corrupt authentication found, quiting")
 			}
 			c.auth = &auth_b
+			break
+		case "disabled":
+			if l[1] == "true" {
+				*c.disabled = true
+			} else {
+				*c.disabled = false
+			}
+			break
+		case "solar_disabled":
+			if l[1] == "true" {
+				*c.solar_disabled = true
+			} else {
+				*c.solar_disabled = false
+			}
 			break
 		case "WUappId":
 			c.WUappId = &l[1]
@@ -194,7 +215,6 @@ func (c *Config) OverwriteWithSaved(path string) {
 			break
 		}
 	}
-	Info("New Config: %s", c.String())
 }
 
 func (c *Config) Save(path string) error {
@@ -228,6 +248,12 @@ func (c *Config) Save(path string) error {
 	}
 	if *c.adj_roof != default_adj_roof {
 		out += fmt.Sprintf("adj_roof:%f\n", *c.adj_roof)
+	}
+	if *c.disabled {
+		out += "disabled:true\n"
+	}
+	if *c.solar_disabled {
+		out += "solar_disabled:true\n"
 	}
 	if len(out) > 0 {
 		return ioutil.WriteFile(path, []byte(out), os.FileMode(0644))
