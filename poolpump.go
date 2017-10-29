@@ -185,6 +185,7 @@ func (ppc *PoolPumpController) Start() {
 }
 
 func (ppc *PoolPumpController) Stop() {
+	ppc.switches.StopAll(true)
 	ppc.done <- true
 }
 
