@@ -122,7 +122,7 @@ func (c *Config) String() string {
 	return fmt.Sprintf("Config: {data_dir:\"%s\", pin:\"%s\", forceRrd:%t, auth:\"%5s...\", "+
 		"WUappId:\"%s\", zip:\"%s\", target:%0.2f, deltaT:%0.2f, tolerance:%0.2f, "+
 		"adj_pump:%0.2f, adj_roof:%0.2f mtime:\"%.19s\", ctime:\"%.19s\" }",
-		*c.data_dir+server_conf, *c.pin, *c.forceRrd, c.GetAuth(), *c.WUappId, *c.zip, *c.target,
+		*c.data_dir, *c.pin, *c.forceRrd, c.GetAuth(), *c.WUappId, *c.zip, *c.target,
 		*c.deltaT, *c.tolerance, *c.adj_pump, *c.adj_roof, c.mtime, c.ctime)
 }
 

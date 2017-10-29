@@ -165,3 +165,7 @@ func caller_traceback() string {
 func Trace(format string, a ...interface{}) error {
 	return Debug(fmt.Sprintf(format, a...) + fmt.Sprintf(": TraceBack -> %s", caller_traceback()))
 }
+
+func TraceInfo(format string, a ...interface{}) error {
+	return Info(fmt.Sprintf(format, a...) + fmt.Sprintf(": TraceBack -> %s", caller_traceback()))
+}

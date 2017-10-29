@@ -11,7 +11,7 @@ import (
 func main() {
 	fs := flag.NewFlagSet("pool-controller", flag.PanicOnError)
 	help := fs.Bool("h", false, "Display this usage message")
-	config := NewConfig(fs, os.Args) // Parses flags
+	config := NewConfig(fs, os.Args[1:]) // Parses flags
 
 	if *help {
 		flag.Usage()
@@ -22,6 +22,7 @@ func main() {
 	}
 
 	// Recover saved values, edit conf to clean them
+	Info("Args: %s", os.Args[1:])
 	config.OverwriteWithSaved(*config.data_dir + server_conf)
 
 	// Write PID
