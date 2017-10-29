@@ -127,7 +127,7 @@ func (c *Config) String() string {
 }
 
 func (c *Config) OverwriteWithSaved(path string) {
-	Info("Running OverwriteWithSaved - Current Config: %s", *c)
+	Info("Running OverwriteWithSaved - Current Config: %s", c.String())
 	if !*c.persist {
 		return
 	}
@@ -194,7 +194,7 @@ func (c *Config) OverwriteWithSaved(path string) {
 			break
 		}
 	}
-	Info("New Config: %s", *c)
+	Info("New Config: %s", c.String())
 }
 
 func (c *Config) Save(path string) error {
