@@ -15,24 +15,43 @@ type Handler struct {
 	ppc *PoolPumpController
 }
 
+type HostType uint8
+
+const (
+	LocalHost HostType = iota
+	AnyHost
+)
+
+func (h HostType) String() string {
+	switch h {
+	case LocalHost:
+		return "127.0.0.1"
+	case AnyHost:
+		return "0.0.0.0"
+	}
+	return ""
+}
+
 // A TLS server for the pool-controller
 type Server struct {
 	port    int
+	host    HostType
 	handler *Handler
 	server  http.Server
 	done    chan bool
 }
 
-func NewServer(port int, ppc *PoolPumpController) *Server {
+func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 	s := Server{
 		port: port,
+		host: host,
 		handler: &Handler{
 			ppc: ppc,
 		},
 		done: make(chan bool),
 	}
 	s.server = http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    fmt.Sprintf("%s:%d", host, port),
 		Handler: s.handler,
 	}
 	s.server.ErrorLog = Logger() // Direct errors to common log
@@ -50,7 +69,7 @@ func startServer(s *Server, cert, key string) {
 
 func (s *Server) Start(cert, key string) {
 	go startServer(s, cert, key)
-	Info("Starting HTTPS on 0.0.0.0:%d", s.port)
+	Info("Starting HTTPS on %s:%d", s.host, s.port)
 }
 
 func (s *Server) Stop() {
@@ -437,7 +456,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		foundone = true
 	}
 	if foundone {
-		c.Save()
+		c.Save(*h.ppc.config.data_dir + server_conf)
 	}
 
 	// Don't persist this one

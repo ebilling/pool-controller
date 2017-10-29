@@ -11,8 +11,9 @@ import (
 func main() {
 	help := flag.Bool("h", false, "Display this usage message")
 
-	config := NewConfig()       // Parses flags
-	config.OverwriteWithSaved() // Recover saved values, edit conf to clean them
+	flags := flag.CommandLine
+	config := NewConfig(flags, os.Args)                       // Parses flags
+	config.OverwriteWithSaved(*config.data_dir + server_conf) // Recover saved values, edit conf to clean them
 
 	if *help {
 		flag.Usage()
@@ -34,7 +35,7 @@ func main() {
 	ppc := NewPoolPumpController(config)
 	ppc.Start()
 
-	server := NewServer(9443, ppc)
+	server := NewServer(AnyHost, 9443, ppc)
 	server.Start(*config.ssl_cert, *config.ssl_key)
 
 	hcConfig := hc.Config{

@@ -36,6 +36,17 @@ func TestGpioThermometer(t *testing.T) {
 		}
 	})
 
+	t.Run("Calibrate", func(t *testing.T) {
+		orig := therm.adjust
+		therm.Calibrate(20000)
+		if therm.adjust == orig {
+			t.Errorf("Adjustment should have changed after calibrate")
+		}
+		if Round(therm.adjust, 0.05, 1) != 2.0 {
+			t.Errorf("Expected ~2.0, found %0.3f", therm.adjust)
+		}
+	})
+
 	t.Run("getTemp", func(t *testing.T) {
 		expected := [][]int{{105000, -20}, {25380, 5}, {9900, 25},
 			{3601, 50}, {670, 100}}

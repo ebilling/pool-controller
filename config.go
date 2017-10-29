@@ -56,47 +56,48 @@ type Config struct {
 	ctime   time.Time
 }
 
-func NewConfig() *Config {
+func NewConfig(fs *flag.FlagSet, args []string) *Config {
 	// **** TODO _ SWAP BACK ONCE FLAGS WORK IN ECLIPSE ON MACOSX
 	if __test__ {
 		default_ssl_cert = "tests/test.crt"
 		default_ssl_key = "tests/test.key"
 		default_data_dir = "tmp"
+		Info("In Testmode for config settings")
 	}
 	c := Config{
 		ctime: time.Now(),
 	}
-	c.ssl_cert = flag.String("ssl_cert", default_ssl_cert,
+	c.ssl_cert = fs.String("ssl_cert", default_ssl_cert,
 		"SSL cert to use for web server and homekit server")
-	c.ssl_key = flag.String("ssl_key", default_ssl_key,
+	c.ssl_key = fs.String("ssl_key", default_ssl_key,
 		"SSL private key to use for web server and homekit server")
-	c.data_dir = flag.String("data_dir", default_data_dir,
+	c.data_dir = fs.String("data_dir", default_data_dir,
 		"Directory for homekit data")
-	c.pin = flag.String("pin", default_pin,
+	c.pin = fs.String("pin", default_pin,
 		"8-digit Homekit Pin shown to users who want to add the device")
-	c.WUappId = flag.String("wuid", default_WUappId,
+	c.WUappId = fs.String("wuid", default_WUappId,
 		"AppId provided by WeatherUnderground (https://www.wunderground.com/weather/api/)")
-	c.zip = flag.String("zip", default_zip,
+	c.zip = fs.String("zip", default_zip,
 		"Local Zipcode.  If left blank, no weather will be fetched.")
-	c.target = flag.Float64("target", default_target,
+	c.target = fs.Float64("target", default_target,
 		"Sets the target temperature for the pool")
-	c.deltaT = flag.Float64("dt", default_deltaT, "Sets the minimum difference in temperature "+
+	c.deltaT = fs.Float64("dt", default_deltaT, "Sets the minimum difference in temperature "+
 		"between roof and pumps to utilize solar panels")
-	c.tolerance = flag.Float64("tol", default_tolerance,
+	c.tolerance = fs.Float64("tol", default_tolerance,
 		"Sets the temperature variance allowed around the target")
-	c.adj_pump = flag.Float64("pump_adj", default_adj_pump,
+	c.adj_pump = fs.Float64("pump_adj", default_adj_pump,
 		"Sets the measured capacitance in microFarads for the inline pump capacitor")
-	c.adj_roof = flag.Float64("roof_adj", default_adj_roof,
+	c.adj_roof = fs.Float64("roof_adj", default_adj_roof,
 		"Sets the measured capacitance in microFarads for the inline roof capacitor")
-	c.forceRrd = flag.Bool("f", default_forceRrd,
+	c.forceRrd = fs.Bool("f", default_forceRrd,
 		"force creation of new RRD files if present")
-	c.pidfile = flag.String("pid", default_pidfile,
+	c.pidfile = fs.String("pid", default_pidfile,
 		"File to write the process id into.")
-	c.persist = flag.Bool("p", false,
+	c.persist = fs.Bool("p", false,
 		"If true, any parameter values changed via web interface are saved to a file and read on "+
 			"startup.  If false, any saved values will be ignored on start.  Saved changes "+
 			"supercede all flags.")
-	flag.Parse()
+	fs.Parse(args)
 
 	default_auth = crypt(*c.pin)
 	c.auth = &default_auth
@@ -104,7 +105,6 @@ func NewConfig() *Config {
 }
 
 func crypt(s string) []byte {
-	Trace("Generating hash of %s", s)
 	hash, _ := bcrypt.GenerateFromPassword([]byte(s), bcrypt.DefaultCost)
 	return hash
 }
@@ -126,11 +126,11 @@ func (c *Config) String() string {
 		*c.deltaT, *c.tolerance, *c.adj_pump, *c.adj_roof, c.mtime, c.ctime)
 }
 
-func (c *Config) OverwriteWithSaved() {
+func (c *Config) OverwriteWithSaved(path string) {
 	if !*c.persist {
 		return
 	}
-	buf, err := ioutil.ReadFile(*c.data_dir + server_conf)
+	buf, err := ioutil.ReadFile(path)
 	if err != nil {
 		return
 	}
@@ -153,6 +153,9 @@ func (c *Config) OverwriteWithSaved() {
 			break
 		case "WUappId":
 			c.WUappId = &l[1]
+			break
+		case "HomekitPin":
+			c.pin = &l[1]
 			break
 		case "zip":
 			c.zip = &l[1]
@@ -191,7 +194,7 @@ func (c *Config) OverwriteWithSaved() {
 	}
 }
 
-func (c *Config) Save() error {
+func (c *Config) Save(path string) error {
 	if !*c.persist {
 		return nil
 	}
@@ -201,6 +204,9 @@ func (c *Config) Save() error {
 	}
 	if *c.WUappId != default_WUappId {
 		out += fmt.Sprintf("WUappId:%s\n", *c.WUappId)
+	}
+	if *c.pin != default_pin {
+		out += fmt.Sprintf("HomekitPin:%s\n", *c.pin)
 	}
 	if *c.zip != default_zip {
 		out += fmt.Sprintf("zip:%s\n", *c.zip)
@@ -221,7 +227,7 @@ func (c *Config) Save() error {
 		out += fmt.Sprintf("adj_roof:%f\n", *c.adj_roof)
 	}
 	if len(out) > 0 {
-		return ioutil.WriteFile(*c.data_dir+server_conf, []byte(out), os.FileMode(0644))
+		return ioutil.WriteFile(path, []byte(out), os.FileMode(0644))
 	}
 	return nil
 }

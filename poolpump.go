@@ -69,7 +69,7 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 // Updates the solar configuration parameters from the config file (if changed)
 // and updates the values of the Thermometers.
 func (ppc *PoolPumpController) Update() {
-	ppc.config.Save()
+	ppc.config.Save(*ppc.config.data_dir + server_conf)
 	ppc.pumpTemp.Update()
 	ppc.roofTemp.Update()
 	ppc.runningTemp.Update()
@@ -216,7 +216,7 @@ func (ppc *PoolPumpController) WeatherC() float64 {
 
 func (ppc *PoolPumpController) Status() string {
 	return fmt.Sprintf(
-		"Status(%s) Solar(%s) Pump(%s) Sweep(%s) Manual(%t) Target(%0.1f)"+
+		"Status(%s) Solar(%s) Pump(%s) Sweep(%s) Manual(%t) Target(%0.1f) "+
 			"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f) CurrentTemp(%0.1f)",
 		ppc.switches.State(), ppc.switches.solar.Status(),
 		ppc.switches.pump.Status(), ppc.switches.sweep.Status(),

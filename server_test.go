@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"net/http"
 	"testing"
 )
@@ -13,9 +14,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 func TestStartTLS(t *testing.T) {
 	LogTestMode()
 	SetGpioProvider(testpin_generator)
-	config := NewConfig()
+	flags := flag.NewFlagSet("ServerTest", flag.PanicOnError)
+	args := []string{}
+	config := NewConfig(flags, args)
 	ppc := NewPoolPumpController(config)
-	server := NewServer(8887, ppc)
+	server := NewServer(LocalHost, 8887, ppc)
 	server.Start(*config.ssl_cert, *config.ssl_key)
-
 }
