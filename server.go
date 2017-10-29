@@ -397,6 +397,21 @@ func processStringUpdate(r *http.Request, formname string, ptr **string) bool {
 	return false
 }
 
+func processBoolUpdate(r *http.Request, formname string, ptr **bool) bool {
+	value := false
+	strvalue := getFormValue(r, formname, "false")
+	if strvalue == "true" {
+		value = true
+	}
+	if value != **ptr {
+		Debug("Updating value for %s from %s to %s", formname, **ptr, value)
+		*ptr = &value
+		return true
+	}
+	Debug("No update to %s, value(%s) orig(%s)", formname, value, **ptr)
+	return false
+}
+
 func processFloatUpdate(r *http.Request, formname string, ptr **float64) bool {
 	curvalue := fmt.Sprintf("%0.2f", **ptr)
 	value := getFormValue(r, formname, "")
@@ -412,6 +427,15 @@ func processFloatUpdate(r *http.Request, formname string, ptr **float64) bool {
 	return false
 }
 
+func (h *Handler) configBoolRow(name, inputName string, value bool) string {
+	checkbox := "type=checkbox value=on"
+	checked := ""
+	if value {
+		checked = " checked"
+	}
+	return h.configRow(name, inputName, "", checkbox+checked)
+}
+
 func (h *Handler) configRow(name, inputName, configValue, extraArgs string) string {
 	return fmt.Sprintf(
 		"<tr><td align=right>%s:</td><td><font size=-1><input name=\"%s\" size=20 %s></font></td><td>%s</td></tr>\n",
@@ -419,6 +443,7 @@ func (h *Handler) configRow(name, inputName, configValue, extraArgs string) stri
 }
 
 func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: move this to a form on the page.
 	w.Header().Set("WWW-Authenticate", "Basic") //  realm=\"Bonnie Labs\"
 	if !h.Authenticate(r) {
 		http.Error(w, "Unauthorized", 401)
@@ -453,6 +478,12 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		foundone = true
 	}
 	if processFloatUpdate(r, "mindelta", &c.deltaT) {
+		foundone = true
+	}
+	if processBoolUpdate(r, "disabled", &c.disabled) {
+		foundone = true
+	}
+	if processBoolUpdate(r, "solar_disabled", &c.solar_disabled) {
 		foundone = true
 	}
 	if foundone {
@@ -501,11 +532,10 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Debug Settings:</th><td colspan=3></td></tr>\n"
-	d := "type=checkbox value=on"
-	if __debug__ {
-		d = "type=checkbox value=on checked"
-	}
-	html += h.configRow("Debug Logging Enabled", "debug", "", d)
+	html += h.configBoolRow("Debug Logging Enabled", "debug", __debug__)
+	html += h.configBoolRow("Disable all pumps", "disabled", *c.disabled)
+	html += h.configBoolRow("Disable solar", "solar_disabled", *c.solar_disabled)
+
 	html += "<input type=hidden name=posted value=true>\n"
 	html += "</table><input type=submit value=Save></font></font></form>\n"
 	html += nav()
