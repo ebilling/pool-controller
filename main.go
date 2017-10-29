@@ -9,11 +9,9 @@ import (
 )
 
 func main() {
-	help := flag.Bool("h", false, "Display this usage message")
-
-	flags := flag.CommandLine
-	config := NewConfig(flags, os.Args)                       // Parses flags
-	config.OverwriteWithSaved(*config.data_dir + server_conf) // Recover saved values, edit conf to clean them
+	fs := flag.NewFlagSet("pool-controller", flag.PanicOnError)
+	help := fs.Bool("h", false, "Display this usage message")
+	config := NewConfig(fs, os.Args) // Parses flags
 
 	if *help {
 		flag.Usage()
@@ -22,6 +20,9 @@ func main() {
 			*config.data_dir, server_conf)
 		os.Exit(1)
 	}
+
+	// Recover saved values, edit conf to clean them
+	config.OverwriteWithSaved(*config.data_dir + server_conf)
 
 	// Write PID
 	ioutil.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
