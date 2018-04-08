@@ -9,6 +9,7 @@ type Button struct {
 	callback   func()
 	bouncetime time.Duration
 	pushed     time.Time
+	disabled   bool
 	done       chan bool
 }
 
@@ -35,21 +36,37 @@ func (b *Button) Start() {
 	}
 }
 
+func (b *Button) Disable() {
+	b.disabled = true
+}
+
+func (b *Button) Enable() {
+	b.disabled = false
+}
+
+func (b *Button) IsDisabled() bool {
+	return b.disabled
+}
+
 func (b *Button) RunLoop(started *chan bool) {
 	b.pin.Output(Low)
 	b.pin.InputEdge(PullUp, RisingEdge)
 	*started <- true
 	for true {
 		if b.pin.WaitForEdge(time.Second) {
+			if b.IsDisabled() {
+				time.Sleep(time.Second)
+				continue
+			}
 			now := time.Now() // Here for debugging purposes
 			state := b.pin.Read()
 			if b.pushed.Add(b.bouncetime).Before(now) {
-				if state == High {
+				if state == Low {
 					b.pushed = now // filter noise of up/down
 					Debug("Button Pushed: Running Callback")
 					b.callback()
 				} else {
-					Debug("State is Low, no callback")
+					Debug("State is High, no callback")
 				}
 			} else {
 				Debug("Bouncetime not encountered")

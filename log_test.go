@@ -4,7 +4,7 @@ import "testing"
 
 func checkErr(t *testing.T, err error) {
 	if err != nil {
-		t.Errorf("Unexpected Error: %s", err.Error)
+		t.Errorf("Unexpected Error: %v", err)
 	}
 }
 

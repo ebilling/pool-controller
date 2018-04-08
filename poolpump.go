@@ -73,6 +73,11 @@ func (ppc *PoolPumpController) Update() {
 	ppc.pumpTemp.Update()
 	ppc.roofTemp.Update()
 	ppc.runningTemp.Update()
+	if *ppc.config.button_disabled {
+		ppc.button.Disable()
+	} else {
+		ppc.button.Enable()
+	}
 }
 
 // A return value of 'True' indicates that the pool is too hot and the roof is cold

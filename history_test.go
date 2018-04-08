@@ -21,7 +21,7 @@ func TestHistory(t *testing.T) {
 	for _, sz := range sizes {
 		h = *NewHistory(sz)
 		if h.sz != sz {
-			t.Errorf("Expected size=%d, found %d")
+			t.Errorf("Expected size=%d, found %d", h.sz, sz)
 		}
 		for _, f := range list {
 			h.Push(f)

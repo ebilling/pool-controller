@@ -39,17 +39,18 @@ type Config struct {
 	persist  *bool
 
 	// Updatable
-	disabled       *bool
-	solar_disabled *bool
-	auth           *[]byte
-	WUappId        *string
-	zip            *string
-	pin            *string
-	target         *float64
-	deltaT         *float64
-	tolerance      *float64
-	adj_pump       *float64
-	adj_roof       *float64
+	disabled        *bool
+	button_disabled *bool
+	solar_disabled  *bool
+	auth            *[]byte
+	WUappId         *string
+	zip             *string
+	pin             *string
+	target          *float64
+	deltaT          *float64
+	tolerance       *float64
+	adj_pump        *float64
+	adj_roof        *float64
 
 	// Internal
 	pidfile *string
@@ -98,6 +99,8 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		"If true, any parameter values changed via web interface are saved to a file and read on "+
 			"startup.  If false, any saved values will be ignored on start.  Saved changes "+
 			"supercede all flags.")
+	c.button_disabled = fs.Bool("button_disabled", false,
+		"If true, the button the controller will be ignored.")
 	c.disabled = fs.Bool("disabled", false,
 		"Turns off the pumps and does not allow them to operate.")
 	c.solar_disabled = fs.Bool("solar_disabled", false,
@@ -165,6 +168,13 @@ func (c *Config) OverwriteWithSaved(path string) {
 				*c.disabled = true
 			} else {
 				*c.disabled = false
+			}
+			break
+		case "button_disabled":
+			if l[1] == "true" {
+				*c.button_disabled = true
+			} else {
+				*c.button_disabled = false
 			}
 			break
 		case "solar_disabled":
@@ -251,6 +261,9 @@ func (c *Config) Save(path string) error {
 	}
 	if *c.disabled {
 		out += "disabled:true\n"
+	}
+	if *c.button_disabled {
+		out += "button_disabled:true\n"
 	}
 	if *c.solar_disabled {
 		out += "solar_disabled:true\n"

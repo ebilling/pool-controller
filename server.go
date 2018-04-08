@@ -298,9 +298,9 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) calibrateHandler(w http.ResponseWriter, r *http.Request) {
 	html := "<html><head><title>Thermometer Calibration</title></head><body><center>"
-	html += `<font face=helvetica color=#444444 size=-1>To calibrate your system, please 
-	insert resistors of known value across the terminals for BOTH temperature probes.  
-	<b>Suggested value is 10,000Ohms.</b>, but you can measure it for increased 
+	html += `<font face=helvetica color=#444444 size=-1>To calibrate your system, please
+	insert resistors of known value across the terminals for BOTH temperature probes.
+	<b>Suggested value is 10,000Ohms.</b>, but you can measure it for increased
 	accuracy.</font><br>`
 	html += "<table><form action=/runCalibration method=POST>\n"
 	html += "<tr><td align=right><font face=helvetica color=#444444 size=-1>Pump Resistor Value</td>"
@@ -483,6 +483,9 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	if processBoolUpdate(r, "disabled", &c.disabled) {
 		foundone = true
 	}
+	if processBoolUpdate(r, "button_disabled", &c.button_disabled) {
+		foundone = true
+	}
 	if processBoolUpdate(r, "solar_disabled", &c.solar_disabled) {
 		foundone = true
 	}
@@ -534,6 +537,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += "<tr><th align=left>Debug Settings:</th><td colspan=3></td></tr>\n"
 	html += h.configBoolRow("Debug Logging Enabled", "debug", __debug__)
 	html += h.configBoolRow("Disable all pumps", "disabled", *c.disabled)
+	html += h.configBoolRow("Disable button", "button_disabled", *c.button_disabled)
 	html += h.configBoolRow("Disable solar", "solar_disabled", *c.solar_disabled)
 
 	html += "<input type=hidden name=posted value=true>\n"
