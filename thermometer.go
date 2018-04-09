@@ -123,7 +123,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 
 	//Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(3 * time.Millisecond)
 
 	// Start polling
 	start := time.Now()

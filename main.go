@@ -17,13 +17,13 @@ func main() {
 		flag.Usage()
 		fmt.Fprintf(os.Stderr, "Any changes put into the web interface will override these"+
 			"flags.\nThe config is stored in %s%s.  It can be carefully edited by hand",
-			*config.data_dir, server_conf)
+			*config.dataDirectory, serverConfiguration)
 		os.Exit(1)
 	}
 
 	// Recover saved values, edit conf to clean them
 	Info("Args: %s", os.Args[1:])
-	config.OverwriteWithSaved(*config.data_dir + server_conf)
+	config.OverwriteWithSaved(*config.dataDirectory + serverConfiguration)
 
 	// Write PID
 	ioutil.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
@@ -38,11 +38,11 @@ func main() {
 	ppc.Start()
 
 	server := NewServer(AnyHost, 9443, ppc)
-	server.Start(*config.ssl_cert, *config.ssl_key)
+	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
 	hcConfig := hc.Config{
 		Pin:         *config.pin,
-		StoragePath: *config.data_dir,
+		StoragePath: *config.dataDirectory,
 	}
 
 	transport, err := hc.NewIPTransport(

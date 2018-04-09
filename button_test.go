@@ -22,7 +22,7 @@ func TestFakeButton(t *testing.T) {
 	Info("Running %s", t.Name())
 	timeout := 50 * time.Millisecond
 	pushed := make(chan bool)
-	pin, _ := testpin_generator(99).(*TestPin)
+	pin, _ := NewTestPin(99).(*TestPin)
 	pin.sleepTime = time.Second * 20 // Don't accidentally wake up and send a signal
 
 	button := newButton(pin, func() {

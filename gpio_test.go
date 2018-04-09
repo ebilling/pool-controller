@@ -262,7 +262,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 	})
 }
 
-func testpin_generator(gpio uint8) PiPin {
+func NewTestPin(gpio uint8) PiPin {
 	return (PiPin)(&TestPin{
 		sleepTime: 20 * time.Millisecond,
 		pin:       gpio,

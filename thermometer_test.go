@@ -5,9 +5,12 @@ import (
 	"time"
 )
 
-func TestGpioThermometer(t *testing.T) {
+func init() {
 	LogTestMode()
-	sleeptime := 100 * time.Millisecond
+}
+
+func TestGpioThermometer(t *testing.T) {
+	sleeptime := 1 * time.Millisecond
 	pin := TestPin{
 		state:     Low,
 		direction: Input,
@@ -38,7 +41,7 @@ func TestGpioThermometer(t *testing.T) {
 			t.Skip("Skipping calibrate test")
 		}
 		orig := therm.adjust
-		therm.Calibrate(20000)
+		therm.Calibrate(2000)
 		if therm.adjust == orig {
 			t.Errorf("Adjustment should have changed after calibrate")
 		}
@@ -79,7 +82,7 @@ func TestGpioThermometer(t *testing.T) {
 		ms := time.Millisecond
 		base := 60 * ms
 		testTimes := []time.Duration{base, base - ms/10, base + ms/10, base, 2 * base,
-			base, base + ms, base - ms, base + ms/5, base / 2}
+			base, base + ms, base - ms, base + ms/5, base / 3}
 		expected := []bool{true, true, true, true, false,
 			true, true, true, true, false}
 		// Seed the data
@@ -93,7 +96,7 @@ func TestGpioThermometer(t *testing.T) {
 			old := therm.updated
 			therm.Update()
 			if (therm.updated == old) == expected[i] {
-				t.Errorf("i(%d) temp(%0.1f) old(%s) expected(%t) "+
+				t.Errorf("Error: i(%d) temp(%0.1f) old(%s) expected(%t) "+
 					"Current(%0.1f) med(%0.1f) avg(%0.1f) stdd(%0.1f)",
 					i, therm.Temperature(), timeStr(old), expected[i],
 					float64(pin.sleepTime)/float64(time.Millisecond),

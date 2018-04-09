@@ -76,7 +76,7 @@ func NewTestRunPumps() *TestRunPumps {
 }
 
 func TestShouldCoolorWarm(t *testing.T) {
-	SetGpioProvider(testpin_generator)
+	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
 
 	t.Run("ColdWater,HotWeather", func(t *testing.T) {
@@ -142,7 +142,7 @@ func TestShouldCoolorWarm(t *testing.T) {
 }
 
 func TestRunPumpsIfNeeded(t *testing.T) {
-	SetGpioProvider(testpin_generator)
+	SetGpioProvider(NewTestPin)
 	//trp := NewTestRunPumps()
 
 	t.Run("", func(t *testing.T) {

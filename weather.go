@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// For Testing
+// Service is a simple interface for making a call to a weather service.
 type Service interface {
 	Read(string) string
 }

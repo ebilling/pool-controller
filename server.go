@@ -457,17 +457,17 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		c.SetAuth(pw1)
 		foundone = true
 	}
-	if processStringUpdate(r, "appid", &c.WUappId) {
+	if processStringUpdate(r, "appid", &c.weatherUndergroundAppID) {
 		foundone = true
 	}
 	if processStringUpdate(r, "zipcode", &c.zip) {
 		foundone = true
 	}
-	if processFloatUpdate(r, "adj_pump", &c.adj_pump) {
+	if processFloatUpdate(r, "adj_pump", &c.pumpAdjustment) {
 		h.ppc.SyncAdjustments()
 		foundone = true
 	}
-	if processFloatUpdate(r, "adj_roof", &c.adj_roof) {
+	if processFloatUpdate(r, "adj_roof", &c.roofAdjustment) {
 		h.ppc.SyncAdjustments()
 		foundone = true
 	}
@@ -483,14 +483,14 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	if processBoolUpdate(r, "disabled", &c.disabled) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "button_disabled", &c.button_disabled) {
+	if processBoolUpdate(r, "button_disabled", &c.buttonDisabled) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "solar_disabled", &c.solar_disabled) {
+	if processBoolUpdate(r, "solar_disabled", &c.solarDisabled) {
 		foundone = true
 	}
 	if foundone {
-		c.Save(*h.ppc.config.data_dir + server_conf)
+		c.Save(*h.ppc.config.dataDirectory + serverConfiguration)
 	}
 
 	// Don't persist this one
@@ -520,12 +520,12 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 
 	html += "<tr><th align=left>Weather:</th><td colspan=3></td></tr>\n"
 	html += h.configRow("Zipcode", "zipcode", *c.zip, "")
-	html += h.configRow("WeatherUnderground ID", "appid", *c.WUappId, "")
+	html += h.configRow("WeatherUnderground ID", "appid", *c.weatherUndergroundAppID, "")
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Temperature Sensor Adjustment:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Pump Tuning", "adj_pump", fmt.Sprintf("%0.2f", *c.adj_pump), "")
-	html += h.configRow("Roof Tuning", "adj_roof", fmt.Sprintf("%0.2f", *c.adj_roof), "")
+	html += h.configRow("Pump Tuning", "adj_pump", fmt.Sprintf("%0.2f", *c.pumpAdjustment), "")
+	html += h.configRow("Roof Tuning", "adj_roof", fmt.Sprintf("%0.2f", *c.roofAdjustment), "")
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Solar Settings:</th><td colspan=3></td></tr>\n"
@@ -537,8 +537,8 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += "<tr><th align=left>Debug Settings:</th><td colspan=3></td></tr>\n"
 	html += h.configBoolRow("Debug Logging Enabled", "debug", __debug__)
 	html += h.configBoolRow("Disable all pumps", "disabled", *c.disabled)
-	html += h.configBoolRow("Disable button", "button_disabled", *c.button_disabled)
-	html += h.configBoolRow("Disable solar", "solar_disabled", *c.solar_disabled)
+	html += h.configBoolRow("Disable button", "button_disabled", *c.buttonDisabled)
+	html += h.configBoolRow("Disable solar", "solar_disabled", *c.solarDisabled)
 
 	html += "<input type=hidden name=posted value=true>\n"
 	html += "</table><input type=submit value=Save></font></font></form>\n"

@@ -20,7 +20,7 @@ func TestConfig(t *testing.T) {
 
 	flags := flag.NewFlagSet("ConfigTest", flag.PanicOnError)
 	config := NewConfig(flags, emptyArgs)
-	if bcrypt.CompareHashAndPassword(*config.auth, []byte(default_pin)) != nil {
+	if bcrypt.CompareHashAndPassword(*config.auth, []byte(defaultPin)) != nil {
 		t.Errorf("Default auth should be the default homekit pin")
 	}
 }
@@ -41,7 +41,7 @@ func TestConfig_Disabled(t *testing.T) {
 
 func TestConfig_SolarDisabled(t *testing.T) {
 	c := flagTestSetup([]string{"-solar_disabled"})
-	if !*c.solar_disabled {
+	if !*c.solarDisabled {
 		t.Errorf("Flag value not persisted")
 	}
 }
@@ -58,7 +58,7 @@ func TestConfig_Persist(t *testing.T) {
 
 func TestConfig_Target(t *testing.T) {
 	c := flagTestSetup([]string{"-target", "67.3"})
-	if *c.target == default_target {
+	if *c.target == defaultTarget {
 		t.Errorf("Default value was not overwritten")
 	}
 	if *c.target != 67.3 {
@@ -68,7 +68,7 @@ func TestConfig_Target(t *testing.T) {
 
 func TestConfig_deltaT(t *testing.T) {
 	c := flagTestSetup([]string{"-dt", "21.001"})
-	if *c.deltaT == default_deltaT {
+	if *c.deltaT == defaultDeltaT {
 		t.Errorf("Default value was not overwritten")
 	}
 	if *c.deltaT != 21.001 {
@@ -78,7 +78,7 @@ func TestConfig_deltaT(t *testing.T) {
 
 func TestConfig_Tolerance(t *testing.T) {
 	c := flagTestSetup([]string{"-tol", "2.001"})
-	if *c.tolerance == default_tolerance {
+	if *c.tolerance == defaultTolerance {
 		t.Errorf("Default value was not overwritten")
 	}
 	if *c.tolerance != 2.001 {
@@ -88,20 +88,20 @@ func TestConfig_Tolerance(t *testing.T) {
 
 func TestConfig_PumpAdjustment(t *testing.T) {
 	c := flagTestSetup([]string{"-pump_adj", "2.222"})
-	if *c.adj_pump == default_adj_pump {
+	if *c.pumpAdjustment == defaultPumpAdjustment {
 		t.Errorf("Default value was not overwritten")
 	}
-	if *c.adj_pump != 2.222 {
+	if *c.pumpAdjustment != 2.222 {
 		t.Errorf("Flag value not persisted")
 	}
 }
 
 func TestConfig_RoofAdjustment(t *testing.T) {
 	c := flagTestSetup([]string{"-roof_adj", "3.333"})
-	if *c.adj_roof == default_adj_roof {
+	if *c.roofAdjustment == defaultRoofAdjustment {
 		t.Errorf("Default value was not overwritten")
 	}
-	if *c.adj_roof != 3.333 {
+	if *c.roofAdjustment != 3.333 {
 		t.Errorf("Flag value not persisted")
 	}
 }
@@ -110,10 +110,10 @@ func TestConfig_SslCert(t *testing.T) {
 	flag := "-ssl_cert"
 	value := "This is my ssl cert path"
 	c := flagTestSetup([]string{flag, value})
-	if *c.ssl_cert == default_ssl_cert {
+	if *c.sslCertificate == defaultSslCert {
 		t.Errorf("Default value was not overwritten")
 	}
-	if *c.ssl_cert != value {
+	if *c.sslCertificate != value {
 		t.Errorf("Flag value not persisted")
 	}
 }
@@ -122,10 +122,10 @@ func TestConfig_SslKey(t *testing.T) {
 	flag := "-ssl_key"
 	value := "This is my ssl key path"
 	c := flagTestSetup([]string{flag, value})
-	if *c.ssl_key == default_ssl_key {
+	if *c.sslPrivateKey == defaultSslKey {
 		t.Errorf("Default value was not overwritten")
 	}
-	if *c.ssl_key != value {
+	if *c.sslPrivateKey != value {
 		t.Errorf("Flag value not persisted")
 	}
 }
@@ -134,10 +134,10 @@ func TestConfig_DataDir(t *testing.T) {
 	flag := "-data_dir"
 	value := "This is my data_dir path"
 	c := flagTestSetup([]string{flag, value})
-	if *c.data_dir == default_data_dir {
+	if *c.dataDirectory == defaultDataDir {
 		t.Errorf("Default value was not overwritten")
 	}
-	if *c.data_dir != value {
+	if *c.dataDirectory != value {
 		t.Errorf("Flag value not persisted")
 	}
 }
@@ -146,7 +146,7 @@ func TestConfig_Pin(t *testing.T) {
 	flag := "-pin"
 	value := "This is my pin value"
 	c := flagTestSetup([]string{flag, value})
-	if *c.pin == default_pin {
+	if *c.pin == defaultPin {
 		t.Errorf("Default value was not overwritten")
 	}
 	if *c.pin != value {
@@ -158,10 +158,10 @@ func TestConfig_WUid(t *testing.T) {
 	flag := "-wuid"
 	value := "This is my Weather Underground ID"
 	c := flagTestSetup([]string{flag, value})
-	if *c.WUappId == default_WUappId {
+	if *c.weatherUndergroundAppID == defaultWUAppID {
 		t.Errorf("Default value was not overwritten")
 	}
-	if *c.WUappId != value {
+	if *c.weatherUndergroundAppID != value {
 		t.Errorf("Flag value not persisted")
 	}
 }
@@ -170,7 +170,7 @@ func TestConfig_Zip(t *testing.T) {
 	flag := "-zip"
 	value := "This is my zip code"
 	c := flagTestSetup([]string{flag, value})
-	if *c.zip == default_zip {
+	if *c.zip == defaultZipcode {
 		t.Errorf("Default value was not overwritten")
 	}
 	if *c.zip != value {
@@ -182,7 +182,7 @@ func TestConfig_Pidfile(t *testing.T) {
 	flag := "-pid"
 	value := "This is my Process ID path"
 	c := flagTestSetup([]string{flag, value})
-	if *c.pidfile == default_pidfile {
+	if *c.pidfile == defaultPidFile {
 		t.Errorf("Default value was not overwritten")
 	}
 	if *c.pidfile != value {
@@ -207,13 +207,13 @@ func TestConfigSave(t *testing.T) {
 	c = flagTestSetup([]string{"-p"})
 	t.Run("ReadTest", func(t *testing.T) {
 		c.OverwriteWithSaved(random)
-		if *c.pin == default_pin {
+		if *c.pin == defaultPin {
 			t.Errorf("Default value was not overwritten")
 		}
 		if *c.pin != testpin {
 			t.Errorf("Flag value not persisted")
 		}
-		if *c.adj_roof != 3.333 {
+		if *c.roofAdjustment != 3.333 {
 			t.Error("Roof adjustment not persisted")
 		}
 		if bcrypt.CompareHashAndPassword(*c.auth, []byte("FakePassword")) != nil {

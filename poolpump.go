@@ -48,7 +48,7 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 	ppc := PoolPumpController{
 		config:   config,
 		zipcode:  *config.zip,
-		weather:  NewWeather(*config.WUappId, 20*time.Minute),
+		weather:  NewWeather(*config.weatherUndergroundAppID, 20*time.Minute),
 		switches: NewSwitches(mftr),
 		pumpTemp: NewGpioThermometer("Pumphouse", mftr, waterGpio),
 		roofTemp: NewGpioThermometer("Poolhouse Roof", mftr, roofGpio),
@@ -57,8 +57,8 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 			deltaT:    config.deltaT,
 			tolerance: config.tolerance,
 		},
-		tempRrd: NewRrd(*config.data_dir + "/temperature.rrd"),
-		pumpRrd: NewRrd(*config.data_dir + "/pumpstatus.rrd"),
+		tempRrd: NewRrd(*config.dataDirectory + "/temperature.rrd"),
+		pumpRrd: NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
 		done:    make(chan bool),
 	}
 	ppc.SyncAdjustments()
@@ -69,11 +69,11 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 // Updates the solar configuration parameters from the config file (if changed)
 // and updates the values of the Thermometers.
 func (ppc *PoolPumpController) Update() {
-	ppc.config.Save(*ppc.config.data_dir + server_conf)
+	ppc.config.Save(*ppc.config.dataDirectory + serverConfiguration)
 	ppc.pumpTemp.Update()
 	ppc.roofTemp.Update()
 	ppc.runningTemp.Update()
-	if *ppc.config.button_disabled {
+	if *ppc.config.buttonDisabled {
 		ppc.button.Disable()
 	} else {
 		ppc.button.Enable()
@@ -84,7 +84,7 @@ func (ppc *PoolPumpController) Update() {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
-	if *ppc.config.solar_disabled {
+	if *ppc.config.solarDisabled {
 		return false
 	}
 	return ppc.pumpTemp.Temperature() > *ppc.solar.target+*ppc.solar.tolerance &&
@@ -94,7 +94,7 @@ func (ppc *PoolPumpController) shouldCool() bool {
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
-	if *ppc.config.solar_disabled {
+	if *ppc.config.solarDisabled {
 		return false
 	}
 	return ppc.pumpTemp.Temperature() < *ppc.solar.target-*ppc.solar.tolerance &&
@@ -110,7 +110,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	if ppc.switches.ManualState() {
 		return
 	}
-	if state == STATE_DISABLED && !*ppc.config.disabled && !*ppc.config.solar_disabled {
+	if state == STATE_DISABLED && !*ppc.config.disabled && !*ppc.config.solarDisabled {
 		ppc.switches.setSwitches(false, false, false, false, STATE_OFF)
 		return
 	}
@@ -211,22 +211,22 @@ func (ppc *PoolPumpController) Stop() {
 func (ppc *PoolPumpController) PersistCalibration() {
 	t, ok := ppc.pumpTemp.(*GpioThermometer)
 	if ok {
-		*ppc.config.adj_pump = t.adjust
+		*ppc.config.pumpAdjustment = t.adjust
 	}
 	t, ok = ppc.roofTemp.(*GpioThermometer)
 	if ok {
-		*ppc.config.adj_roof = t.adjust
+		*ppc.config.roofAdjustment = t.adjust
 	}
 }
 
 func (ppc *PoolPumpController) SyncAdjustments() {
 	t, ok := ppc.pumpTemp.(*GpioThermometer)
 	if ok {
-		t.adjust = *ppc.config.adj_pump
+		t.adjust = *ppc.config.pumpAdjustment
 	}
 	t, ok = ppc.roofTemp.(*GpioThermometer)
 	if ok {
-		t.adjust = *ppc.config.adj_roof
+		t.adjust = *ppc.config.roofAdjustment
 	}
 }
 
