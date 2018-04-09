@@ -35,8 +35,8 @@ func TestFakeButton(t *testing.T) {
 		pin.state = Low                                        // Not a push
 		button.pushed = time.Now().Add(-1 * button.bouncetime) // Not a bounce
 		pin.wake <- true
-		if testBoolChan(pushed, timeout) != false {
-			t.Errorf("Expected pushed(false), found true")
+		if testBoolChan(pushed, timeout) != true {
+			t.Errorf("Expected pushed(true), found false")
 		}
 	})
 
@@ -54,8 +54,8 @@ func TestFakeButton(t *testing.T) {
 		pin.state = High   // Push
 		button.pushed = tm // Not a bounce
 		pin.wake <- true
-		if testBoolChan(pushed, timeout) != true {
-			t.Errorf("Expected pushed(true), found false, pushed_t(%s), now(%s)",
+		if testBoolChan(pushed, timeout) != false {
+			t.Errorf("Expected pushed(false), found true, pushed_t(%s), now(%s)",
 				timeStr(button.pushed), timeStr(tm))
 		}
 	})

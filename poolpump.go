@@ -183,17 +183,13 @@ func (ppc *PoolPumpController) runLoop() {
 func (ppc *PoolPumpController) Start() {
 	ppc.button = NewGpioButton(buttonGpio, func() {
 		switch ppc.switches.State() {
-		case STATE_DISABLED:
-			break
 		case STATE_OFF:
 			ppc.switches.SetState(STATE_PUMP, true)
-			break
 		case STATE_PUMP:
 			ppc.switches.SetState(STATE_SWEEP, true)
-			break
 		case STATE_SOLAR:
 			ppc.switches.SetState(STATE_SOLAR_MIXING, true)
-			break
+		case STATE_DISABLED:
 		default:
 			ppc.switches.SetState(STATE_OFF, true)
 		}
@@ -240,9 +236,9 @@ func (ppc *PoolPumpController) WeatherC() float64 {
 
 func (ppc *PoolPumpController) Status() string {
 	return fmt.Sprintf(
-		"Status(%s) Solar(%s) Pump(%s) Sweep(%s) Manual(%t) Target(%0.1f) "+
+		"Status(%s) Button(%s) Solar(%s) Pump(%s) Sweep(%s) Manual(%t) Target(%0.1f) "+
 			"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f) CurrentTemp(%0.1f)",
-		ppc.switches.State(), ppc.switches.solar.Status(),
+		ppc.switches.State(), ppc.button.pin.Read(), ppc.switches.solar.Status(),
 		ppc.switches.pump.Status(), ppc.switches.sweep.Status(),
 		ppc.switches.ManualState(), *ppc.config.target,
 		ppc.runningTemp.Temperature(), ppc.pumpTemp.Temperature(),

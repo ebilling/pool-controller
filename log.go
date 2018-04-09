@@ -15,12 +15,15 @@ var __debug__ bool = false
 var __test__ bool = false
 var priority syslog.Priority = syslog.LOG_USER
 
-func _init() {
+func init() {
 	if __syslog__ == nil {
 		u, _ := user.Current()
 		if u.Username == "root" {
-			__syslog__, _ = syslog.New(syslog.LOG_DAEMON, "")
+			__syslog__, _ = syslog.New(syslog.LOG_DAEMON, "pool-controller")
+		} else {
+			__syslog__, _ = syslog.New(syslog.LOG_USER, "pool-controller")
 		}
+
 	}
 }
 
@@ -68,7 +71,6 @@ func Alert(format string, a ...interface{}) error {
 		_, err := fmt.Printf("Alert: "+format+"\n", a...)
 		return err
 	}
-	_init()
 	return __syslog__.Alert(fmt.Sprintf(format, a...))
 }
 
@@ -77,7 +79,6 @@ func Crit(format string, a ...interface{}) error {
 		_, err := fmt.Printf("Crit: "+format+"\n", a...)
 		return err
 	}
-	_init()
 	return __syslog__.Crit(fmt.Sprintf(format, a...))
 }
 
@@ -91,7 +92,6 @@ func Emerg(format string, a ...interface{}) error {
 		_, err := fmt.Printf("Emerg: "+format+"\n", a...)
 		return err
 	}
-	_init()
 	return __syslog__.Emerg(fmt.Sprintf(format, a...))
 }
 
@@ -100,7 +100,6 @@ func Error(format string, a ...interface{}) error {
 		_, err := fmt.Printf("Error: "+format+"\n", a...)
 		return err
 	}
-	_init()
 	return __syslog__.Err(fmt.Sprintf(format, a...))
 }
 
@@ -109,7 +108,6 @@ func Notice(format string, a ...interface{}) error {
 		_, err := fmt.Printf("Notice: "+format+"\n", a...)
 		return err
 	}
-	_init()
 	return __syslog__.Notice(fmt.Sprintf(format, a...))
 }
 
@@ -118,7 +116,6 @@ func Warn(format string, a ...interface{}) error {
 		_, err := fmt.Printf("Warn: "+format+"\n", a...)
 		return err
 	}
-	_init()
 	return __syslog__.Warning(fmt.Sprintf(format, a...))
 }
 
@@ -127,7 +124,6 @@ func Info(format string, a ...interface{}) error {
 		_, err := fmt.Printf("Info: "+format+"\n", a...)
 		return err
 	}
-	_init()
 	return __syslog__.Info(fmt.Sprintf(format, a...))
 }
 
@@ -139,7 +135,6 @@ func Debug(format string, a ...interface{}) error {
 		_, err := fmt.Printf("Debug: "+format+"\n", a...)
 		return err
 	}
-	_init()
 	return __syslog__.Debug(fmt.Sprintf(format, a...))
 }
 
