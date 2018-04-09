@@ -8,11 +8,11 @@ import (
 )
 
 type FakeThermometer struct {
-	name          string
-	temp          float64
-	update_err    error
-	calibrate_err error
-	acc           *accessory.Thermometer
+	name           string
+	temp           float64
+	updateError    error
+	calibrateError error
+	acc            *accessory.Thermometer
 }
 
 func (t *FakeThermometer) Name() string {
@@ -22,10 +22,10 @@ func (t *FakeThermometer) Temperature() float64 {
 	return t.temp
 }
 func (t *FakeThermometer) Update() error {
-	return t.update_err
+	return t.updateError
 }
 func (t *FakeThermometer) Calibrate(float64) error {
-	return t.calibrate_err
+	return t.calibrateError
 }
 func (t *FakeThermometer) Accessory() *accessory.Accessory {
 	if t.acc == nil {
@@ -40,7 +40,7 @@ type FakeWeatherService struct {
 	radiation float64
 }
 
-func (t *FakeWeatherService) Read(ignoredUrl string) string {
+func (t *FakeWeatherService) Read(ignoredURL string) string {
 	return fmt.Sprintf("{\"current_observation\":{\"temp_c\":%0.1f, \"solarradiation\":\"%0.1f\"}}	",
 		t.temp, t.radiation)
 }
