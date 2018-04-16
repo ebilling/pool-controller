@@ -57,7 +57,7 @@ func (ppc *PoolPumpController) createRrds() {
 	pg.Line(2.0, "t3", colorStr(6), "Manual Operation")
 }
 
-// Writes updates to RRD files and generates cached graphs
+// UpdateRrd writes updates to RRD files and generates cached graphs
 func (ppc *PoolPumpController) UpdateRrd() {
 	update := fmt.Sprintf("N:%f:%f:%f:%f:%f:%f",
 		ppc.pumpTemp.Temperature(), ppc.WeatherC(), ppc.roofTemp.Temperature(),
