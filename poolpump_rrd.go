@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/ebilling/pool-controller/weather"
+)
 
 func (r *Rrd) addTemp(name, title string, colorid, which int) {
 	r.creator.DS(name, "GAUGE", "30", "-273", "1000")
@@ -59,12 +63,16 @@ func (ppc *PoolPumpController) createRrds() {
 
 // UpdateRrd writes updates to RRD files and generates cached graphs
 func (ppc *PoolPumpController) UpdateRrd() {
-	wd, _ := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
+	wd, err := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
+	if err != nil {
+		Log("Error requesting weather: %s", err)
+		wd = &weather.Data{} // use empty data
+	}
 	update := fmt.Sprintf("N:%f:%f:%f:%f:%f:%f",
 		ppc.pumpTemp.Temperature(), ppc.WeatherC(), ppc.roofTemp.Temperature(),
 		wd.SolarRadiation, ppc.runningTemp.Temperature(), ppc.config.cfg.Target)
 	Debug("Updating TempRrd: %s", update)
-	err := ppc.tempRrd.Updater().Update(update)
+	err = ppc.tempRrd.Updater().Update(update)
 	if err != nil {
 		Error("Update failed for TempRrd {%s}: %s", update, err.Error())
 	}
