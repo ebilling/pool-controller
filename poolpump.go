@@ -225,7 +225,7 @@ func (ppc *PoolPumpController) SyncAdjustments() {
 // WeatherC returns the current temperature outside in degrees Celsius
 func (ppc *PoolPumpController) WeatherC() float64 {
 	wd, err := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
-	if err != nil {
+	if err != nil || wd == nil {
 		Log("Error while reading weather: %s", err.Error())
 		return 0.0
 	}

@@ -57,7 +57,7 @@ func (w *Weather) GetWeatherByZip(zipcode string) (*Data, error) {
 		return &Data{}, fmt.Errorf("Cannot return weather for empty zipcode")
 	}
 	data, present := w.cache[zipcode]
-	if present && time.Now().Before(data.Updated.Add(w.ttl)) {
+	if data != nil && present && time.Now().Before(data.Updated.Add(w.ttl)) {
 		return data, nil
 	}
 	// Don't keep sending requests when they are not going through
