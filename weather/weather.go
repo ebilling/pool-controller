@@ -54,7 +54,7 @@ func NewWeather(appID string, ttl time.Duration) *Weather {
 // GetWeatherByZip makes a call to the service and updates the weather if the cache has expired
 func (w *Weather) GetWeatherByZip(zipcode string) (*Data, error) {
 	if zipcode == "" {
-		return nil, fmt.Errorf("Cannot return weather for empty zipcode")
+		return &Data{}, fmt.Errorf("Cannot return weather for empty zipcode")
 	}
 	data, present := w.cache[zipcode]
 	if present && time.Now().Before(data.Updated.Add(w.ttl)) {
@@ -66,7 +66,7 @@ func (w *Weather) GetWeatherByZip(zipcode string) (*Data, error) {
 		w.backoff = time.Now()
 		data, err = w.service.Read(zipcode)
 		if err != nil {
-			return nil, err
+			return &Data{}, err
 		}
 		w.mtx.Lock()
 		defer w.mtx.Unlock()

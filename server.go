@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	qrcode "github.com/skip2/go-qrcode"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/ebilling/pool-controller/weather"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 // Handler will handle the http requests
@@ -270,7 +272,10 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 		modeStr = "Manual"
 	}
 
-	weatherData, _ := h.ppc.weather.GetWeatherByZip(h.ppc.config.cfg.Zip)
+	weatherData, err := h.ppc.weather.GetWeatherByZip(h.ppc.config.cfg.Zip)
+	if err != nil {
+		weatherData = &weather.Data{}
+	}
 
 	html := "<html><head><title>Pool Pump Controller</title></head><body><center>" +
 		"<table>\n"
