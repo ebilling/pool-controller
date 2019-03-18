@@ -23,7 +23,6 @@ func main() {
 
 	// Recover saved values, edit conf to clean them
 	Info("Args: %s", os.Args[1:])
-	config.OverwriteWithSaved(*config.dataDirectory + serverConfiguration)
 
 	// Write PID
 	ioutil.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
@@ -41,7 +40,7 @@ func main() {
 	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
 	hcConfig := hc.Config{
-		Pin:         *config.pin,
+		Pin:         config.cfg.Pin,
 		StoragePath: *config.dataDirectory,
 	}
 

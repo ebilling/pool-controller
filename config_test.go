@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
 	"math/rand"
 	"os"
 	"testing"
@@ -20,8 +19,11 @@ func TestConfig(t *testing.T) {
 
 	flags := flag.NewFlagSet("ConfigTest", flag.PanicOnError)
 	config := NewConfig(flags, emptyArgs)
-	if bcrypt.CompareHashAndPassword(*config.auth, []byte(defaultPin)) != nil {
-		t.Errorf("Default auth should be the default homekit pin")
+	if !config.Authorized(defaultPin) {
+		t.Error("Authorization failed")
+	}
+	if config.Authorized("bogus-password") {
+		t.Error("Authorization should have failed")
 	}
 }
 
@@ -32,76 +34,12 @@ func TestConfig_forceRrd(t *testing.T) {
 	}
 }
 
-func TestConfig_Disabled(t *testing.T) {
-	c := flagTestSetup([]string{"-disabled"})
-	if !*c.disabled {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
-func TestConfig_SolarDisabled(t *testing.T) {
-	c := flagTestSetup([]string{"-solar_disabled"})
-	if !*c.solarDisabled {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
 func TestConfig_Persist(t *testing.T) {
 	c := flagTestSetup([]string{"-p"})
 	if *c.persist == false {
 		t.Errorf("Default value was not overwritten")
 	}
 	if !*c.persist {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
-func TestConfig_Target(t *testing.T) {
-	c := flagTestSetup([]string{"-target", "67.3"})
-	if *c.target == defaultTarget {
-		t.Errorf("Default value was not overwritten")
-	}
-	if *c.target != 67.3 {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
-func TestConfig_deltaT(t *testing.T) {
-	c := flagTestSetup([]string{"-dt", "21.001"})
-	if *c.deltaT == defaultDeltaT {
-		t.Errorf("Default value was not overwritten")
-	}
-	if *c.deltaT != 21.001 {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
-func TestConfig_Tolerance(t *testing.T) {
-	c := flagTestSetup([]string{"-tol", "2.001"})
-	if *c.tolerance == defaultTolerance {
-		t.Errorf("Default value was not overwritten")
-	}
-	if *c.tolerance != 2.001 {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
-func TestConfig_PumpAdjustment(t *testing.T) {
-	c := flagTestSetup([]string{"-pump_adj", "2.222"})
-	if *c.pumpAdjustment == defaultPumpAdjustment {
-		t.Errorf("Default value was not overwritten")
-	}
-	if *c.pumpAdjustment != 2.222 {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
-func TestConfig_RoofAdjustment(t *testing.T) {
-	c := flagTestSetup([]string{"-roof_adj", "3.333"})
-	if *c.roofAdjustment == defaultRoofAdjustment {
-		t.Errorf("Default value was not overwritten")
-	}
-	if *c.roofAdjustment != 3.333 {
 		t.Errorf("Flag value not persisted")
 	}
 }
@@ -142,42 +80,6 @@ func TestConfig_DataDir(t *testing.T) {
 	}
 }
 
-func TestConfig_Pin(t *testing.T) {
-	flag := "-pin"
-	value := "This is my pin value"
-	c := flagTestSetup([]string{flag, value})
-	if *c.pin == defaultPin {
-		t.Errorf("Default value was not overwritten")
-	}
-	if *c.pin != value {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
-func TestConfig_WUid(t *testing.T) {
-	flag := "-wuid"
-	value := "This is my Weather Underground ID"
-	c := flagTestSetup([]string{flag, value})
-	if *c.weatherUndergroundAppID == defaultWUAppID {
-		t.Errorf("Default value was not overwritten")
-	}
-	if *c.weatherUndergroundAppID != value {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
-func TestConfig_Zip(t *testing.T) {
-	flag := "-zip"
-	value := "This is my zip code"
-	c := flagTestSetup([]string{flag, value})
-	if *c.zip == defaultZipcode {
-		t.Errorf("Default value was not overwritten")
-	}
-	if *c.zip != value {
-		t.Errorf("Flag value not persisted")
-	}
-}
-
 func TestConfig_Pidfile(t *testing.T) {
 	flag := "-pid"
 	value := "This is my Process ID path"
@@ -191,32 +93,30 @@ func TestConfig_Pidfile(t *testing.T) {
 }
 
 func TestConfigSave(t *testing.T) {
-	random := fmt.Sprintf("/tmp/test-server-%d.conf", rand.Uint32())
+	serverConfiguration = fmt.Sprintf("/test-server-%d.conf", rand.Uint32())
 	testpin := "This-is-my-test-pin"
-	args := []string{"-p", "-f", "-data_dir", "/tmp", "-pin", testpin, "-pump_adj", "6.666", "-roof_adj", "3.333",
-		"-zip", "95436", "-tol", "1.1", "-dt", "0.25", "-target", "33.001", "-wuid", "WU_IDN_WHAT?"}
+	args := []string{"-p", "-f", "-data_dir", "/tmp"}
 	c := flagTestSetup(args)
 	c.SetAuth("FakePassword")
+	c.cfg.RoofAdjustment = 3.333
+	c.cfg.Pin = testpin
 	t.Run("SaveTest", func(t *testing.T) {
-		err := c.Save(random)
+		err := c.Save()
 		if err != nil {
 			t.Error(err.Error())
 		}
 	})
 
-	c = flagTestSetup([]string{"-p"})
+	c = flagTestSetup([]string{"-p", "-data_dir", "/tmp"})
 	t.Run("ReadTest", func(t *testing.T) {
-		c.OverwriteWithSaved(random)
-		if *c.pin == defaultPin {
-			t.Errorf("Default value was not overwritten")
-		}
-		if *c.pin != testpin {
+		c.Save()
+		if c.cfg.Pin != testpin {
 			t.Errorf("Flag value not persisted")
 		}
-		if *c.roofAdjustment != 3.333 {
+		if c.cfg.RoofAdjustment != 3.333 {
 			t.Error("Roof adjustment not persisted")
 		}
-		if bcrypt.CompareHashAndPassword(*c.auth, []byte("FakePassword")) != nil {
+		if !c.Authorized("FakePassword") {
 			t.Errorf("Auth was not persisted")
 		}
 	})
@@ -224,18 +124,17 @@ func TestConfigSave(t *testing.T) {
 	if len(c.String()) < 100 {
 		t.Error("Really just for coverage, but it should be at least 100 characters long...")
 	}
-	os.Remove(random) // Clean up the detritis
+	os.Remove("/tmp" + serverConfiguration) // Clean up the detritis
 
 	c = flagTestSetup(args[1:])
 	t.Run("NoSaveUnlessPersist", func(t *testing.T) {
-		err := c.Save(random)
+		err := c.Save()
 		if err != nil {
 			t.Error("Expected no error")
 		}
-		_, err = os.Stat(random)
+		_, err = os.Stat("/tmp" + serverConfiguration)
 		if err == nil {
 			t.Error("Should have returned a PathError")
 		}
 	})
-
 }

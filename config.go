@@ -3,13 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"flag"
-	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
-	"os"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -25,9 +22,12 @@ var (
 	defaultTarget         = 30.0
 	defaultDeltaT         = 12.0
 	defaultTolerance      = 0.5
-	defaultPumpAdjustment = 1.0
-	defaultRoofAdjustment = 1.0
+	defaultPumpAdjustment = 2.5
+	defaultRoofAdjustment = 2.5
 	serverConfiguration   = "/server.conf"
+	defaultCfg            = PersistedConfig{
+		Disabled: false,
+	}
 )
 
 // Config holds various configuration entries for the system.
@@ -39,24 +39,30 @@ type Config struct {
 	forceRrd       *bool
 	persist        *bool
 
-	// Updatable
-	disabled                *bool
-	buttonDisabled          *bool
-	solarDisabled           *bool
-	auth                    *[]byte
-	weatherUndergroundAppID *string
-	zip                     *string
-	pin                     *string
-	target                  *float64
-	deltaT                  *float64
-	tolerance               *float64
-	pumpAdjustment          *float64
-	roofAdjustment          *float64
-
 	// Internal
 	pidfile *string
-	mtime   time.Time
-	ctime   time.Time
+
+	// Persisted
+	cfg *PersistedConfig
+}
+
+// PersistedConfig is the portion of the configuration that can be altered and saved from the UI
+type PersistedConfig struct {
+	// Updatable
+	Disabled                bool
+	ButtonDisabled          bool
+	SolarDisabled           bool
+	Auth                    string
+	WeatherUndergroundAppID string
+	Zip                     string
+	Pin                     string
+	Target                  float64
+	DeltaT                  float64
+	Tolerance               float64
+	PumpAdjustment          float64
+	RoofAdjustment          float64
+	Mtime                   time.Time
+	Ctime                   time.Time
 }
 
 // NewConfig creates a config objects based on a given flagset and arguments.
@@ -69,30 +75,15 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 	// 	Info("In Testmode for config settings")
 	// }
 	c := Config{
-		ctime: time.Now(),
+		cfg: &PersistedConfig{},
 	}
+
 	c.sslCertificate = fs.String("ssl_cert", defaultSslCert,
 		"SSL cert to use for web server and homekit server")
 	c.sslPrivateKey = fs.String("ssl_key", defaultSslKey,
 		"SSL private key to use for web server and homekit server")
 	c.dataDirectory = fs.String("data_dir", defaultDataDir,
 		"Directory for homekit data")
-	c.pin = fs.String("pin", defaultPin,
-		"8-digit Homekit Pin shown to users who want to add the device")
-	c.weatherUndergroundAppID = fs.String("wuid", defaultWUAppID,
-		"AppId provided by WeatherUnderground (https://www.wunderground.com/weather/api/)")
-	c.zip = fs.String("zip", defaultZipcode,
-		"Local Zipcode.  If left blank, no weather will be fetched.")
-	c.target = fs.Float64("target", defaultTarget,
-		"Sets the target temperature for the pool")
-	c.deltaT = fs.Float64("dt", defaultDeltaT, "Sets the minimum difference in temperature "+
-		"between roof and pumps to utilize solar panels")
-	c.tolerance = fs.Float64("tol", defaultTolerance,
-		"Sets the temperature variance allowed around the target")
-	c.pumpAdjustment = fs.Float64("pump_adj", defaultPumpAdjustment,
-		"Sets the measured capacitance in microFarads for the inline pump capacitor")
-	c.roofAdjustment = fs.Float64("roof_adj", defaultRoofAdjustment,
-		"Sets the measured capacitance in microFarads for the inline roof capacitor")
 	c.pidfile = fs.String("pid", defaultPidFile,
 		"File to write the process id into.")
 	c.forceRrd = fs.Bool("f", false,
@@ -101,16 +92,18 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		"If true, any parameter values changed via web interface are saved to a file and read on "+
 			"startup.  If false, any saved values will be ignored on start.  Saved changes "+
 			"supercede all flags.")
-	c.buttonDisabled = fs.Bool("button_disabled", false,
-		"If true, the button the controller will be ignored.")
-	c.disabled = fs.Bool("disabled", false,
-		"Turns off the pumps and does not allow them to operate.")
-	c.solarDisabled = fs.Bool("solar_disabled", false,
-		"Turns off the solar.  The system will not attempt to reach the target temperature.")
 	fs.Parse(args)
-
-	defaultAuth = crypt(*c.pin)
-	c.auth = &defaultAuth
+	err := c.Read()
+	if err != nil {
+		c.SetAuth(defaultPin)
+		c.cfg.Pin = defaultPin
+		c.cfg.DeltaT = defaultDeltaT
+		c.cfg.PumpAdjustment = defaultPumpAdjustment
+		c.cfg.RoofAdjustment = defaultRoofAdjustment
+		c.cfg.Target = defaultTarget
+		c.cfg.Tolerance = defaultTolerance
+		c.cfg.Zip = defaultZipcode
+	}
 	return &c
 }
 
@@ -122,161 +115,71 @@ func crypt(s string) []byte {
 // SetAuth saves the given password in a crypt form.
 func (c *Config) SetAuth(password string) {
 	str := crypt(password)
-	c.auth = &str
+	buf := bytes.NewBuffer(nil)
+	baseEncoder := base64.NewEncoder(base64.StdEncoding, buf)
+	baseEncoder.Write([]byte(str))
+	c.cfg.Auth = buf.String()
 }
 
-// GetAuth returns a password that has been stored in a crypt form.
-func (c *Config) GetAuth() []byte {
-	return *c.auth
+// GetAuth returns a password that has been stored in a base64 encoded crypt form.
+func (c *Config) GetAuth() string {
+	return c.cfg.Auth
 }
 
 func (c *Config) String() string {
-	return fmt.Sprintf("Config: {data_dir:\"%s\", pin:\"%s\", forceRrd:%t, "+
-		"auth:\"%5s...\", WUappId:\"%s\", zip:\"%s\", target:%0.2f, deltaT:%0.2f, "+
-		"tolerance:%0.2f, adj_pump:%0.2f, adj_roof:%0.2f disabled:%t "+
-		"solar_disabled:%t mtime:\"%.19s\", ctime:\"%.19s\" }",
-		*c.dataDirectory, *c.pin, *c.forceRrd,
-		c.GetAuth(), *c.weatherUndergroundAppID, *c.zip, *c.target, *c.deltaT,
-		*c.tolerance, *c.pumpAdjustment, *c.roofAdjustment, *c.disabled,
-		*c.solarDisabled, c.mtime, c.ctime)
-}
-
-// OverwriteWithSaved if persist is true, the configuration stored in the config file will be used to
-// overwrite whatever settings have been made.
-func (c *Config) OverwriteWithSaved(path string) {
-	if !*c.persist {
-		return
-	}
-	buf, err := ioutil.ReadFile(path)
+	str, err := json.Marshal(c.cfg)
 	if err != nil {
-		return
+		Log("Error trying marshal configuration: %s", err.Error())
 	}
-	Info("Reading the file")
-	lines := strings.Split(string(buf), "\n")
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		l := strings.Split(line, ":")
-		if len(l) != 2 {
-			Error("Found bad line in config, aborting load: \"%s\"", line)
-		}
-		switch l[0] {
-		case "auth":
-			authB64, err := base64.StdEncoding.DecodeString(l[1])
-			if err != nil {
-				Fatal("Corrupt authentication found, quiting")
-			}
-			c.auth = &authB64
-			break
-		case "disabled":
-			if l[1] == "true" {
-				*c.disabled = true
-			} else {
-				*c.disabled = false
-			}
-			break
-		case "button_disabled":
-			if l[1] == "true" {
-				*c.buttonDisabled = true
-			} else {
-				*c.buttonDisabled = false
-			}
-			break
-		case "solar_disabled":
-			if l[1] == "true" {
-				*c.solarDisabled = true
-			} else {
-				*c.solarDisabled = false
-			}
-			break
-		case "WUappId":
-			c.weatherUndergroundAppID = &l[1]
-			break
-		case "HomekitPin":
-			c.pin = &l[1]
-			break
-		case "zip":
-			c.zip = &l[1]
-			break
-		case "target":
-			tgt, err := strconv.ParseFloat(l[1], 64)
-			if check(err, "Could not value %s", line) == nil {
-				c.target = &tgt
-			}
-			break
-		case "deltaT":
-			dt, err := strconv.ParseFloat(l[1], 64)
-			if check(err, "Could not value %s", line) == nil {
-				c.deltaT = &dt
-			}
-			break
-		case "tolerance":
-			tol, err := strconv.ParseFloat(l[1], 64)
-			if check(err, "Could not value %s", line) == nil {
-				c.tolerance = &tol
-			}
-			break
-		case "adj_pump":
-			cp, err := strconv.ParseFloat(l[1], 64)
-			if check(err, "Could not value %s", line) == nil {
-				c.pumpAdjustment = &cp
-			}
-			break
-		case "adj_roof":
-			cr, err := strconv.ParseFloat(l[1], 64)
-			if check(err, "Could not value %s", line) == nil {
-				c.roofAdjustment = &cr
-			}
-			break
-		}
-	}
+	return "Config: " + string(str)
 }
 
 // Save commits the current configuration settings to the configuration file so they aren't lost on restart.
-func (c *Config) Save(path string) error {
+func (c *Config) Save() error {
 	if !*c.persist {
 		return nil
 	}
-	out := ""
-	if bytes.Compare(c.GetAuth(), defaultAuth) != 0 {
-		out += fmt.Sprintf("auth:%s\n", base64.StdEncoding.EncodeToString(c.GetAuth()))
+	var timeZero time.Time
+	if c.cfg.Ctime == timeZero {
+		c.cfg.Ctime = time.Now()
 	}
-	if *c.weatherUndergroundAppID != defaultWUAppID {
-		out += fmt.Sprintf("WUappId:%s\n", *c.weatherUndergroundAppID)
+	c.cfg.Mtime = time.Now()
+
+	buf, err := json.Marshal(c.cfg)
+	if err != nil {
+		return err
 	}
-	if *c.pin != defaultPin {
-		out += fmt.Sprintf("HomekitPin:%s\n", *c.pin)
+	Log("Config:\n%s", string(buf))
+
+	err = ioutil.WriteFile(*c.dataDirectory+serverConfiguration, buf, 0600)
+	return err
+}
+
+// Read reads the config from the fileystem
+func (c *Config) Read() error {
+	cfg, err := ioutil.ReadFile(*c.dataDirectory + serverConfiguration)
+	if err != nil {
+		Log("Unable to read configuration file: %s", err.Error())
+		return err
 	}
-	if *c.zip != defaultZipcode {
-		out += fmt.Sprintf("zip:%s\n", *c.zip)
-	}
-	if *c.target != defaultTarget {
-		out += fmt.Sprintf("target:%f\n", *c.target)
-	}
-	if *c.deltaT != defaultDeltaT {
-		out += fmt.Sprintf("deltaT:%f\n", *c.deltaT)
-	}
-	if *c.tolerance != defaultTolerance {
-		out += fmt.Sprintf("tolerance:%f\n", *c.tolerance)
-	}
-	if *c.pumpAdjustment != defaultPumpAdjustment {
-		out += fmt.Sprintf("adj_pump:%f\n", *c.pumpAdjustment)
-	}
-	if *c.roofAdjustment != defaultRoofAdjustment {
-		out += fmt.Sprintf("adj_roof:%f\n", *c.roofAdjustment)
-	}
-	if *c.disabled {
-		out += "disabled:true\n"
-	}
-	if *c.buttonDisabled {
-		out += "button_disabled:true\n"
-	}
-	if *c.solarDisabled {
-		out += "solar_disabled:true\n"
-	}
-	if len(out) > 0 {
-		return ioutil.WriteFile(path, []byte(out), os.FileMode(0644))
+	err = json.Unmarshal(cfg, &c.cfg)
+	if err != nil {
+		Log("Unable to marshal config file: %s", err.Error())
+		return err
 	}
 	return nil
+}
+
+// Authorized returns true if the password matches the one stored in the configuration
+func (c *Config) Authorized(password string) bool {
+	var out = make([]byte, base64.StdEncoding.DecodedLen(len(c.cfg.Auth)))
+	_, err := base64.StdEncoding.Decode(out, []byte(c.cfg.Auth))
+	if err != nil {
+		Error("Could not decode password: %s", err.Error())
+	}
+	err = bcrypt.CompareHashAndPassword(out, []byte(password))
+	if err == nil {
+		return true
+	}
+	return false
 }

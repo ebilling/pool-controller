@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/brutella/hc/accessory"
+	"github.com/ebilling/pool-controller/weather"
+	"github.com/ebilling/pool-controller/weather/fakeWeather"
 	"testing"
 )
 
@@ -53,15 +55,16 @@ type TestRunPumps struct {
 }
 
 func (t *TestRunPumps) setConditions(target, pump, roof, outside float64, state State) {
-	*t.ppc.config.target = target
+	t.ppc.config.cfg.Target = target
 	t.pumpTemp.temp = pump
 	t.roofTemp.temp = roof
 	t.service.temp = outside
 	t.ppc.switches.state = state
-	t.ppc.weather.cache = make(map[string]*WeatherData)
+	t.ppc.weather = weather.NewWeatherFromService(&fakeweather.TestService{})
 }
 
 func NewTestRunPumps() *TestRunPumps {
+	defaultDataDir = "/tmp"
 	config := NewConfig(flag.NewFlagSet("TestPumpController", flag.PanicOnError), []string{})
 	t := TestRunPumps{
 		pumpTemp: FakeThermometer{name: "pool", temp: 0.0},
@@ -71,74 +74,80 @@ func NewTestRunPumps() *TestRunPumps {
 	}
 	t.ppc.pumpTemp = &t.pumpTemp
 	t.ppc.roofTemp = &t.roofTemp
-	t.ppc.weather.service = &t.service
+	t.ppc.weather = weather.NewWeatherFromService(&fakeweather.TestService{})
 	return &t
 }
 
-func TestShouldCoolorWarm(t *testing.T) {
+func TestColdWaterHotWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
+	trp.setConditions(30.0, 15.0, 50.0, 33.0, STATE_OFF)
+	if trp.ppc.shouldCool() {
+		t.Error("Should not be cooling")
+	}
+	if !trp.ppc.shouldWarm() {
+		t.Error("Should be trying to warm the pool")
+	}
+}
 
-	t.Run("ColdWater,HotWeather", func(t *testing.T) {
-		trp.setConditions(30.0, 15.0, 50.0, 33.0, STATE_OFF)
-		if trp.ppc.shouldCool() {
-			t.Error("Should not be cooling")
-		}
-		if !trp.ppc.shouldWarm() {
-			t.Error("Should be trying to warm the pool")
-		}
-	})
+func TestWarmWaterHotWeather(t *testing.T) {
+	SetGpioProvider(NewTestPin)
+	trp := NewTestRunPumps()
+	trp.setConditions(30.0, 29.98, 50.0, 33.0, STATE_OFF)
+	if trp.ppc.shouldCool() {
+		t.Error("Should not be cooling")
+	}
+	if trp.ppc.shouldWarm() {
+		t.Error("Should not try to warm water that is already so close to the target")
+	}
+}
 
-	t.Run("WarmWater,HotWeather", func(t *testing.T) {
-		trp.setConditions(30.0, 29.98, 50.0, 33.0, STATE_OFF)
-		if trp.ppc.shouldCool() {
-			t.Error("Should not be cooling")
-		}
-		if trp.ppc.shouldWarm() {
-			t.Error("Should not try to warm water that is already so close to the target")
-		}
-	})
+func TestHotWaterHotWeather(t *testing.T) {
+	SetGpioProvider(NewTestPin)
+	trp := NewTestRunPumps()
+	trp.setConditions(30.0, 29.98, 50.0, 33.0, STATE_OFF)
+	if trp.ppc.shouldCool() {
+		t.Error("Should not be cooling")
+	}
+	if trp.ppc.shouldWarm() {
+		t.Error("Should not try to warm water that is already so close to the target")
+	}
+}
 
-	t.Run("HotWater,HotWeather", func(t *testing.T) {
-		trp.setConditions(30.0, 29.98, 50.0, 33.0, STATE_OFF)
-		if trp.ppc.shouldCool() {
-			t.Error("Should not be cooling")
-		}
-		if trp.ppc.shouldWarm() {
-			t.Error("Should not try to warm water that is already so close to the target")
-		}
-	})
+func TestColdWaterWarmWeather(t *testing.T) {
+	SetGpioProvider(NewTestPin)
+	trp := NewTestRunPumps()
+	trp.setConditions(30.0, 15.0, 40.0, 29.0, STATE_OFF)
+	if trp.ppc.shouldCool() {
+		t.Error("Should not be cooling")
+	}
+	if !trp.ppc.shouldWarm() {
+		t.Error("Should be trying to warm the pool")
+	}
+}
 
-	t.Run("ColdWater,WarmWeather", func(t *testing.T) {
-		trp.setConditions(30.0, 15.0, 40.0, 29.0, STATE_OFF)
-		if trp.ppc.shouldCool() {
-			t.Error("Should not be cooling")
-		}
-		if !trp.ppc.shouldWarm() {
-			t.Error("Should be trying to warm the pool")
-		}
-	})
+func TestWarmWaterWarmWeather(t *testing.T) {
+	SetGpioProvider(NewTestPin)
+	trp := NewTestRunPumps()
+	trp.setConditions(30.0, 29.98, 40.0, 29.0, STATE_OFF)
+	if trp.ppc.shouldCool() {
+		t.Error("Should not be cooling")
+	}
+	if trp.ppc.shouldWarm() {
+		t.Error("Should not try to warm water that is already so close to the target")
+	}
+}
 
-	t.Run("WarmWater,WarmWeather", func(t *testing.T) {
-		trp.setConditions(30.0, 29.98, 40.0, 29.0, STATE_OFF)
-		if trp.ppc.shouldCool() {
-			t.Error("Should not be cooling")
-		}
-		if trp.ppc.shouldWarm() {
-			t.Error("Should not try to warm water that is already so close to the target")
-		}
-	})
-
-	t.Run("HotWater,WarmWeather", func(t *testing.T) {
-		trp.setConditions(30.0, 29.98, 40.0, 29.0, STATE_OFF)
-		if trp.ppc.shouldCool() {
-			t.Error("Should not be cooling")
-		}
-		if trp.ppc.shouldWarm() {
-			t.Error("Should not try to warm water that is already so close to the target")
-		}
-	})
-
+func TestHotWaterWarmWeather(t *testing.T) {
+	SetGpioProvider(NewTestPin)
+	trp := NewTestRunPumps()
+	trp.setConditions(30.0, 29.98, 40.0, 29.0, STATE_OFF)
+	if trp.ppc.shouldCool() {
+		t.Error("Should not be cooling")
+	}
+	if trp.ppc.shouldWarm() {
+		t.Error("Should not try to warm water that is already so close to the target")
+	}
 }
 
 func TestRunPumpsIfNeeded(t *testing.T) {

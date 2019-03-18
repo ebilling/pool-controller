@@ -35,17 +35,32 @@ func TestGpioThermometer(t *testing.T) {
 				float64(expected)/1000.0, o/1000.0)
 		}
 	})
+}
+
+func TestCalibration(t *testing.T) {
+	sleeptime := 50 * time.Millisecond
+	pin := TestPin{
+		state:     Low,
+		direction: Input,
+		sleepTime: sleeptime,
+		inputTime: time.Now(),
+	}
+	therm := newGpioThermometer("Test Thermometer", mftr, &pin)
 
 	t.Run("Calibrate", func(t *testing.T) {
 		if testing.Short() {
 			t.Skip("Skipping calibrate test")
 		}
 		orig := therm.adjust
-		therm.Calibrate(2000)
+		err := therm.Calibrate(10000)
+		if err != nil {
+			t.Error("Unexpected error", err)
+		}
 		if therm.adjust == orig {
 			t.Errorf("Adjustment should have changed after calibrate")
 		}
-		if Round(therm.adjust, 0.05, 1) != 2.0 {
+
+		if therm.adjust < 1.8 || therm.adjust > 2.2 {
 			t.Errorf("Expected ~2.0, found %0.3f", therm.adjust)
 		}
 	})

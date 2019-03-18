@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"time"
+
+	"github.com/ebilling/pool-controller/weather"
 )
 
 const (
@@ -12,30 +14,22 @@ const (
 	buttonGpio = 18
 )
 
-type SolarVariables struct {
-	target    *float64
-	deltaT    *float64
-	tolerance *float64
-}
-
 // The PoolPumpController manages the relays that control the pumps based on
 // data from temperature probes and the weather.
 type PoolPumpController struct {
 	config      *Config
-	zipcode     string
-	weather     *Weather
+	weather     *weather.Weather
 	switches    *Switches
 	pumpTemp    Thermometer
 	runningTemp Thermometer
 	roofTemp    Thermometer
-	solar       SolarVariables
 	button      *Button
 	tempRrd     *Rrd
 	pumpRrd     *Rrd
 	done        chan bool
 }
 
-// Creates a thermometer that remembers the temperature of the water when the
+// RunningWaterThermometer creates a thermometer that remembers the temperature of the water when the
 // pumps were running.  This is more reprsentative of the actual water temperature,
 // as the water temperature probe is near the pump, not actually in the pool.
 func RunningWaterThermometer(t Thermometer, s *Switches) *SelectiveThermometer {
@@ -44,36 +38,31 @@ func RunningWaterThermometer(t Thermometer, s *Switches) *SelectiveThermometer {
 	})
 }
 
+// NewPoolPumpController creates a new pump controller
 func NewPoolPumpController(config *Config) *PoolPumpController {
 	ppc := PoolPumpController{
 		config:   config,
-		zipcode:  *config.zip,
-		weather:  NewWeather(*config.weatherUndergroundAppID, 20*time.Minute),
+		weather:  weather.NewWeather(config.cfg.WeatherUndergroundAppID, 20*time.Minute),
 		switches: NewSwitches(mftr),
 		pumpTemp: NewGpioThermometer("Pumphouse", mftr, waterGpio),
 		roofTemp: NewGpioThermometer("Poolhouse Roof", mftr, roofGpio),
-		solar: SolarVariables{
-			target:    config.target,
-			deltaT:    config.deltaT,
-			tolerance: config.tolerance,
-		},
-		tempRrd: NewRrd(*config.dataDirectory + "/temperature.rrd"),
-		pumpRrd: NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
-		done:    make(chan bool),
+		tempRrd:  NewRrd(*config.dataDirectory + "/temperature.rrd"),
+		pumpRrd:  NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
+		done:     make(chan bool),
 	}
 	ppc.SyncAdjustments()
 	ppc.runningTemp = RunningWaterThermometer(ppc.pumpTemp, ppc.switches)
 	return &ppc
 }
 
-// Updates the solar configuration parameters from the config file (if changed)
+// Update the solar configuration parameters from the config file (if changed)
 // and updates the values of the Thermometers.
 func (ppc *PoolPumpController) Update() {
-	ppc.config.Save(*ppc.config.dataDirectory + serverConfiguration)
+	ppc.config.Save()
 	ppc.pumpTemp.Update()
 	ppc.roofTemp.Update()
 	ppc.runningTemp.Update()
-	if *ppc.config.buttonDisabled {
+	if ppc.config.cfg.ButtonDisabled {
 		ppc.button.Disable()
 	} else {
 		ppc.button.Enable()
@@ -84,37 +73,37 @@ func (ppc *PoolPumpController) Update() {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
-	if *ppc.config.solarDisabled {
+	if ppc.config.cfg.SolarDisabled {
 		return false
 	}
-	return ppc.pumpTemp.Temperature() > *ppc.solar.target+*ppc.solar.tolerance &&
-		ppc.pumpTemp.Temperature() > ppc.roofTemp.Temperature()+*ppc.solar.deltaT
+	return ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance &&
+		ppc.pumpTemp.Temperature() > ppc.roofTemp.Temperature()+ppc.config.cfg.DeltaT
 }
 
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
-	if *ppc.config.solarDisabled {
+	if ppc.config.cfg.SolarDisabled {
 		return false
 	}
-	return ppc.pumpTemp.Temperature() < *ppc.solar.target-*ppc.solar.tolerance &&
-		ppc.pumpTemp.Temperature() < ppc.roofTemp.Temperature()-*ppc.solar.deltaT
+	return ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.Tolerance &&
+		ppc.pumpTemp.Temperature() < ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT
 }
 
-// If the water is not within the tolerance limit of the target, and the roof temperature would
-// help get the temperature to be closer to the target, the pumps will be turned on.  If the
-// outdoor temperature is low or the pool is very cold, the sweep will also be run to help mix
-// the water as it approaches the target.
+// RunPumpsIfNeeded - If the water is not within the tolerance limit of the target, and the roof
+// temperature would help get the temperature to be closer to the target, the pumps will be
+// turned on.  If the outdoor temperature is low or the pool is very cold, the sweep will also be
+// run to help mix the water as it approaches the target.
 func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	state := ppc.switches.State()
 	if ppc.switches.ManualState() {
 		return
 	}
-	if state == STATE_DISABLED && !*ppc.config.disabled && !*ppc.config.solarDisabled {
+	if state == STATE_DISABLED && !ppc.config.cfg.Disabled && !ppc.config.cfg.SolarDisabled {
 		ppc.switches.setSwitches(false, false, false, false, STATE_OFF)
 		return
 	}
-	if *ppc.config.disabled {
+	if ppc.config.cfg.Disabled {
 		if state > STATE_DISABLED {
 			ppc.switches.setSwitches(false, false, false, false, STATE_DISABLED)
 		}
@@ -125,12 +114,12 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 			return // Don't bounce the motors, let them run
 		}
 	}
-	temp := ppc.weather.GetCurrentTempC(ppc.zipcode)
+	wd, werr := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
 	if ppc.shouldCool() || ppc.shouldWarm() {
 		// Wide deltaT between target and temp or when it's cold, run sweep
-		if ppc.pumpTemp.Temperature() < *ppc.solar.target-*ppc.solar.deltaT ||
-			temp < *ppc.solar.target || // Cool Weather
-			ppc.pumpTemp.Temperature() > *ppc.solar.target+*ppc.solar.tolerance {
+		if ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.DeltaT ||
+			(werr == nil && wd.CurrentTempC < ppc.config.cfg.Target) || // Cool Weather
+			ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance {
 			ppc.switches.SetState(STATE_SOLAR_MIXING, false)
 		} else {
 			// Just push water through the panels
@@ -179,7 +168,7 @@ func (ppc *PoolPumpController) runLoop() {
 	Info("Exiting Controller")
 }
 
-// Finishes initializing the PoolPumpController, and kicks off the control thread.
+// Start finishes initializing the PoolPumpController, and kicks off the control thread.
 func (ppc *PoolPumpController) Start() {
 	ppc.button = NewGpioButton(buttonGpio, func() {
 		switch ppc.switches.State() {
@@ -203,44 +192,50 @@ func (ppc *PoolPumpController) Start() {
 	go ppc.runLoop()
 }
 
+// Stop stops all of the pumps
 func (ppc *PoolPumpController) Stop() {
 	ppc.switches.StopAll(true)
 	ppc.done <- true
 }
 
+// PersistCalibration saves the callibration data
 func (ppc *PoolPumpController) PersistCalibration() {
 	t, ok := ppc.pumpTemp.(*GpioThermometer)
 	if ok {
-		*ppc.config.pumpAdjustment = t.adjust
+		ppc.config.cfg.PumpAdjustment = t.adjust
 	}
 	t, ok = ppc.roofTemp.(*GpioThermometer)
 	if ok {
-		*ppc.config.roofAdjustment = t.adjust
+		ppc.config.cfg.RoofAdjustment = t.adjust
 	}
 }
 
+// SyncAdjustments syncrhonizes the adjustments to temperature sensors
 func (ppc *PoolPumpController) SyncAdjustments() {
 	t, ok := ppc.pumpTemp.(*GpioThermometer)
 	if ok {
-		t.adjust = *ppc.config.pumpAdjustment
+		t.adjust = ppc.config.cfg.PumpAdjustment
 	}
 	t, ok = ppc.roofTemp.(*GpioThermometer)
 	if ok {
-		t.adjust = *ppc.config.roofAdjustment
+		t.adjust = ppc.config.cfg.RoofAdjustment
 	}
 }
 
+// WeatherC returns the current temperature outside in degrees Celsius
 func (ppc *PoolPumpController) WeatherC() float64 {
-	return ppc.weather.GetCurrentTempC(ppc.zipcode)
+	wd, _ := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
+	return wd.CurrentTempC
 }
 
+// Status prints the status of the system
 func (ppc *PoolPumpController) Status() string {
 	return fmt.Sprintf(
 		"Status(%s) Button(%s) Solar(%s) Pump(%s) Sweep(%s) Manual(%t) Target(%0.1f) "+
 			"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f) CurrentTemp(%0.1f)",
 		ppc.switches.State(), ppc.button.pin.Read(), ppc.switches.solar.Status(),
 		ppc.switches.pump.Status(), ppc.switches.sweep.Status(),
-		ppc.switches.ManualState(), *ppc.config.target,
+		ppc.switches.ManualState(), ppc.config.cfg.Target,
 		ppc.runningTemp.Temperature(), ppc.pumpTemp.Temperature(),
 		ppc.roofTemp.Temperature(), ppc.WeatherC())
 }

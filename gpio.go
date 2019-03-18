@@ -123,7 +123,7 @@ func xGpioProvider(gpio uint8) PiPin {
 		gpio: gpio,
 		pin:  gpioreg.ByName(strconv.Itoa(int(gpio))),
 	}
-	gpioreg.Register(g.pin, false)
+	gpioreg.Register(g.pin)
 	return (PiPin)(&g)
 }
 

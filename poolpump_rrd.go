@@ -59,10 +59,10 @@ func (ppc *PoolPumpController) createRrds() {
 
 // UpdateRrd writes updates to RRD files and generates cached graphs
 func (ppc *PoolPumpController) UpdateRrd() {
+	wd, _ := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
 	update := fmt.Sprintf("N:%f:%f:%f:%f:%f:%f",
 		ppc.pumpTemp.Temperature(), ppc.WeatherC(), ppc.roofTemp.Temperature(),
-		ppc.weather.GetSolarRadiation(ppc.zipcode),
-		ppc.runningTemp.Temperature(), *ppc.solar.target)
+		wd.SolarRadiation, ppc.runningTemp.Temperature(), ppc.config.cfg.Target)
 	Debug("Updating TempRrd: %s", update)
 	err := ppc.tempRrd.Updater().Update(update)
 	if err != nil {

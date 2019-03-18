@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/brutella/hc/accessory"
 	"fmt"
+	"github.com/brutella/hc/accessory"
 	"time"
 )
 
@@ -14,29 +14,29 @@ const (
 )
 
 type Relay struct {
-	name       string
-	pin        PiPin
-	startTime  time.Time
-	stopTime   time.Time
-	accessory  *accessory.Switch
-	enabled    bool
+	name      string
+	pin       PiPin
+	startTime time.Time
+	stopTime  time.Time
+	accessory *accessory.Switch
+	enabled   bool
 }
 
-func AccessoryInfo(name string, manufacturer string) (accessory.Info) {
+func AccessoryInfo(name string, manufacturer string) accessory.Info {
 	info := accessory.Info{Name: name, Manufacturer: manufacturer}
 	return info
 }
 
-func timeStr(t time.Time) string{
+func timeStr(t time.Time) string {
 	return fmt.Sprintf("%02d:%02d:%02d.%09d",
-		t.Hour(), t.Minute(), t.Second(), t.Nanosecond())	
+		t.Hour(), t.Minute(), t.Second(), t.Nanosecond())
 }
 
-func NewRelay(pin uint8, name string, manufacturer string) (*Relay) {
+func NewRelay(pin uint8, name string, manufacturer string) *Relay {
 	return newRelay(NewGpio(pin), name, manufacturer)
 }
 
-func newRelay(pin PiPin, name string, manufacturer string) (*Relay) {
+func newRelay(pin PiPin, name string, manufacturer string) *Relay {
 	relay := Relay{
 		name:      name,
 		pin:       pin,
@@ -49,7 +49,7 @@ func newRelay(pin PiPin, name string, manufacturer string) (*Relay) {
 	return &relay
 }
 
-func (r *Relay) Accessory() (*accessory.Accessory) {
+func (r *Relay) Accessory() *accessory.Accessory {
 	return r.accessory.Accessory
 }
 
@@ -59,7 +59,7 @@ func (r *Relay) Name() string {
 
 func (r *Relay) String() string {
 	return fmt.Sprintf(
-		"Relay: { Name: %s, Pin: %v, StartTime: %s, StopTime: %s, Accessory: %s}",
+		"Relay: { Name: %s, Pin: %v, StartTime: %s, StopTime: %s, Accessory: %v}",
 		r.Name(), r.pin, timeStr(r.startTime), timeStr(r.stopTime), r.accessory)
 }
 

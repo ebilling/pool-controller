@@ -239,7 +239,6 @@ func GpioStr(g PiPin) string {
 	default:
 		return "UNKNOWN"
 	}
-	return ""
 }
 
 func SkipTestIfNotTestRig(t *testing.T) {

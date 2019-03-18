@@ -24,7 +24,7 @@ type CurrentObservation struct {
 	ObservationEpoch string  `json:"observation_epoch"`
 	Description      string  `json:"weather"`
 	SolarRadiation   string  `json:"solarradiation"`
-	TemperatureC     float32 `json:"temp_c"`
+	TemperatureC     float64 `json:"temp_c"`
 }
 
 func (w *WUService) Read(zip string) (*Data, error) {
@@ -54,7 +54,7 @@ func (w *WUService) convert(zipcode string, co *CurrentObservation) (*Data, erro
 		Zipcode:        zipcode,
 		Updated:        time.Unix(epoch, 0),
 		CurrentTempC:   co.TemperatureC,
-		SolarRadiation: float32(solarradiation),
+		SolarRadiation: solarradiation,
 		Description:    co.Description,
 	}, nil
 }

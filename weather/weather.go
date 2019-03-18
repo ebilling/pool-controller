@@ -15,8 +15,8 @@ type Service interface {
 type Data struct {
 	Zipcode        string
 	Updated        time.Time
-	CurrentTempC   float32
-	SolarRadiation float32
+	CurrentTempC   float64
+	SolarRadiation float64
 	Description    string
 }
 
@@ -29,11 +29,21 @@ type Weather struct {
 	mtx     sync.Mutex
 }
 
+// NewWeatherFromService is used for testing
+func NewWeatherFromService(service Service) *Weather {
+	return &Weather{
+		service: service,
+		ttl:     time.Hour,
+		backoff: time.Now().Add(-1 * time.Hour),
+		cache:   make(map[string]*Data),
+	}
+}
+
 // NewWeather provides a weather underground service.
 func NewWeather(appID string, ttl time.Duration) *Weather {
-	service := WUService{appID: appID}
+	service := &WUService{appID: appID}
 	w := Weather{
-		service: &service,
+		service: service,
 		ttl:     ttl,
 		backoff: time.Now().Add(-1 * time.Hour),
 		cache:   make(map[string]*Data),
