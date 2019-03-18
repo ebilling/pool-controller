@@ -226,7 +226,7 @@ func (ppc *PoolPumpController) SyncAdjustments() {
 func (ppc *PoolPumpController) WeatherC() float64 {
 	wd, err := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
 	if err != nil || wd == nil {
-		Log("Error while reading weather: %s", err.Error())
+		Log("Error while reading weather: %v", err)
 		return 0.0
 	}
 	return wd.CurrentTempC

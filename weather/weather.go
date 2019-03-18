@@ -71,6 +71,8 @@ func (w *Weather) GetWeatherByZip(zipcode string) (*Data, error) {
 		w.mtx.Lock()
 		defer w.mtx.Unlock()
 		w.cache[zipcode] = data
+	} else {
+		data = &Data{} // First calls will not be run to prevent restarts from clobbering server
 	}
 	return data, nil
 }
