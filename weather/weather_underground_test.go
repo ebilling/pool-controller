@@ -1,5 +1,0 @@
-package weather
-
-import (
-	"testing"
-)

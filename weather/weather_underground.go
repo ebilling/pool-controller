@@ -1,8 +1,10 @@
 package weather
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,7 +26,7 @@ type CurrentObservation struct {
 	ObservationEpoch string  `json:"observation_epoch"`
 	Description      string  `json:"weather"`
 	SolarRadiation   string  `json:"solarradiation"`
-	TemperatureC     float32 `json:"temp_c"`
+	TemperatureC     float64 `json:"temp_c"`
 }
 
 func (w *WUService) Read(zip string) (*Data, error) {
@@ -38,12 +40,15 @@ func (w *WUService) Read(zip string) (*Data, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	buf := bytes.NewBuffer(nil)
+	n, cerr := io.Copy(buf, resp.Body)
+	fmt.Printf("Copied %d bytes (%v): %s", n, cerr, buf.String())
 	response := &APIResponse{}
-	err = json.NewDecoder(resp.Body).Decode(response)
+	err = json.NewDecoder(buf).Decode(response)
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Printf("Result: %+v", response)
 	return w.convert(zip, &response.CurrentObservation)
 }
 
@@ -54,7 +59,7 @@ func (w *WUService) convert(zipcode string, co *CurrentObservation) (*Data, erro
 		Zipcode:        zipcode,
 		Updated:        time.Unix(epoch, 0),
 		CurrentTempC:   co.TemperatureC,
-		SolarRadiation: float32(solarradiation),
+		SolarRadiation: solarradiation,
 		Description:    co.Description,
 	}, nil
 }

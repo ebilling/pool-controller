@@ -3,22 +3,27 @@ package main
 import (
 	"context"
 	"fmt"
-	qrcode "github.com/skip2/go-qrcode"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/ebilling/pool-controller/weather"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
+// Handler will handle the http requests
 type Handler struct {
 	ppc *PoolPumpController
 }
 
+// HostType is used to specify how to listen
 type HostType uint8
 
 const (
+	// LocalHost is 127.0.0.1
 	LocalHost HostType = iota
+	// AnyHost is 0.0.0.0
 	AnyHost
 )
 
@@ -32,7 +37,7 @@ func (h HostType) String() string {
 	return ""
 }
 
-// A TLS server for the pool-controller
+// Server for the pool-controller
 type Server struct {
 	port    int
 	host    HostType
@@ -41,6 +46,7 @@ type Server struct {
 	done    chan bool
 }
 
+// NewServer creates a webserver
 func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 	s := Server{
 		port: port,
@@ -67,14 +73,17 @@ func startServer(s *Server, cert, key string) {
 	Info("Exiting HttpServer")
 }
 
+// Start the server
 func (s *Server) Start(cert, key string) {
 	go startServer(s, cert, key)
 	Info("Starting HTTPS on %s:%d", s.host, s.port)
 }
 
+// Stop takes down the server
 func (s *Server) Stop() {
 	interval := time.Second
-	ctx, _ := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 	err := s.server.Shutdown(ctx)
 	if err != nil {
 		Info("HttpServerShutdown: %s", err.Error())
@@ -90,7 +99,9 @@ func (s *Server) Stop() {
 }
 
 const (
+	// PumpImage is the pump data graph
 	PumpImage = 0
+	// TempImage is the temperature data graph
 	TempImage = 1
 )
 
@@ -220,7 +231,7 @@ func indent(howmany int) string {
 
 func (h *Handler) pin() string {
 	var p1, p2, p3 string
-	fmt.Sscanf(*h.ppc.config.pin, "%3s%2s%3s", &p1, &p2, &p3)
+	fmt.Sscanf(h.ppc.config.cfg.Pin, "%3s%2s%3s", &p1, &p2, &p3)
 	return fmt.Sprintf("%3s-%2s-%3s", p1, p2, p3)
 }
 
@@ -234,7 +245,7 @@ func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) qrHandler(w http.ResponseWriter, r *http.Request) {
-	png, _ := qrcode.Encode(*h.ppc.config.pin, qrcode.Medium, 256)
+	png, _ := qrcode.Encode(h.ppc.config.cfg.Pin, qrcode.Medium, 256)
 	h.writeResponse(w, []byte(png), "image/png")
 }
 
@@ -261,6 +272,11 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 		modeStr = "Manual"
 	}
 
+	weatherData, err := h.ppc.weather.GetWeatherByZip(h.ppc.config.cfg.Zip)
+	if err != nil {
+		weatherData = &weather.Data{}
+	}
+
 	html := "<html><head><title>Pool Pump Controller</title></head><body><center>" +
 		"<table>\n"
 	html += indent(1) + "<tr><td colspan=2 align=center><font face=helvetica color=#444444 " +
@@ -268,12 +284,11 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 		scale + "\" size=5> ex. 12h (w, d, h, m)</form></font></td></tr>\n"
 	html += indent(1) + "<tr><td>" + image("temps", 640, 300, scale) + "</td>"
 	html += "<td align=left nowrap><font face=helvetica color=#444444 size=-1>"
-	html += fmt.Sprintf("Target: %0.1f F<br>", toFarenheit(*h.ppc.config.target))
+	html += fmt.Sprintf("Target: %0.1f F<br>", toFarenheit(h.ppc.config.cfg.Target))
 	html += fmt.Sprintf("Pool: %0.1f F<br>", toFarenheit(h.ppc.runningTemp.Temperature()))
 	html += fmt.Sprintf("Roof: %0.1f F<br>", toFarenheit(h.ppc.roofTemp.Temperature()))
-	html += fmt.Sprintf("Weather: %0.1f F<br>",
-		toFarenheit(h.ppc.weather.GetCurrentTempC(h.ppc.zipcode)))
-	html += fmt.Sprintf("Solar: %0.1f W/sqm", h.ppc.weather.GetSolarRadiation(h.ppc.zipcode))
+	html += fmt.Sprintf("Weather: %0.1f F<br>", toFarenheit(weatherData.CurrentTempC))
+	html += fmt.Sprintf("Solar: %0.1f W/sqm", weatherData.SolarRadiation)
 	html += "</font></td></tr>\n"
 	html += indent(1) + "<tr><td colspan=2><br></td></tr>"
 	html += indent(1) + "<tr>"
@@ -313,10 +328,11 @@ func (h *Handler) calibrateHandler(w http.ResponseWriter, r *http.Request) {
 	h.writeResponse(w, []byte(html), "text/html")
 }
 
-func (h *Handler) Calibrate(html *string, t Thermometer, res_str, name string) error {
-	r, err := strconv.ParseFloat(res_str, 64)
+// Calibrate runs a routine to calibrate the thermometers using measured resistors
+func (h *Handler) Calibrate(html *string, t Thermometer, resStr, name string) error {
+	r, err := strconv.ParseFloat(resStr, 64)
 	if err != nil {
-		*html += "<h2>Could not parse " + res_str + "for: " + name
+		*html += "<h2>Could not parse " + resStr + "for: " + name
 		*html += ", please correct the value.</h2><br>(" + err.Error() + ")"
 		return err
 	}
@@ -329,8 +345,8 @@ func (h *Handler) Calibrate(html *string, t Thermometer, res_str, name string) e
 }
 
 func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) {
-	pump_res := getFormValue(r, "pump_res", "")
-	roof_res := getFormValue(r, "roof_res", "")
+	pumpResistance := getFormValue(r, "pump_res", "")
+	roofResistance := getFormValue(r, "roof_res", "")
 
 	html := "<html><head><title>Thermometer Calibration</title></head><body><center>"
 	retry := http.Request{
@@ -345,12 +361,12 @@ func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) 
 		},
 	}
 
-	if pump_res == "" || roof_res == "" { // No values submitted
+	if pumpResistance == "" || roofResistance == "" { // No values submitted
 		h.setRefresh(w, &retry, 10)
 		html += "<h2>Please provide valid resistance for each resistor.</h2> Redirecting..."
 	} else {
-		if h.Calibrate(&html, h.ppc.pumpTemp, pump_res, "Pump Probe") == nil &&
-			h.Calibrate(&html, h.ppc.roofTemp, roof_res, "Roof Probe") == nil {
+		if h.Calibrate(&html, h.ppc.pumpTemp, pumpResistance, "Pump Probe") == nil &&
+			h.Calibrate(&html, h.ppc.roofTemp, roofResistance, "Roof Probe") == nil {
 			h.setRefresh(w, &success, 10)
 			h.ppc.PersistCalibration()
 			html += "<h2>Success</h2><br>"
@@ -371,55 +387,56 @@ func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) 
 	h.writeResponse(w, []byte(html), "text/html")
 }
 
+// Authenticate the user
 func (h *Handler) Authenticate(r *http.Request) bool {
 	user, password, ok := r.BasicAuth()
 	if !ok || user != "admin" {
 		Error("Unknown user (%s) attempting to configure server", user)
 		return false
 	}
-	err := bcrypt.CompareHashAndPassword(h.ppc.config.GetAuth(), []byte(password))
-	if err == nil {
+	if h.ppc.config.Authorized(password) {
 		Debug("User %s logged in", user)
 		return true
 	}
-	Error("Login for User (%s) failed: %s", user, err.Error())
+	Error("Login for User (%s) failed", user)
 	return false
 }
 
-func processStringUpdate(r *http.Request, formname string, ptr **string) bool {
-	value := getFormValue(r, formname, **ptr)
-	if value != **ptr {
-		Debug("Updating value for %s from %s to %s", formname, **ptr, value)
-		*ptr = &value
+func processStringUpdate(r *http.Request, formname string, ptr *string) bool {
+	value := getFormValue(r, formname, *ptr)
+	if value != *ptr {
+		Debug("Updating value for %s from %s to %s", formname, *ptr, value)
+		*ptr = value
 		return true
 	}
-	Debug("No update to %s, value(%s) orig(%s)", formname, value, **ptr)
+	Debug("No update to %s, value(%s) orig(%s)", formname, value, *ptr)
 	return false
 }
 
-func processBoolUpdate(r *http.Request, formname string, ptr **bool) bool {
+func processBoolUpdate(r *http.Request, formname string, ptr *bool) bool {
 	value := false
 	strvalue := getFormValue(r, formname, "false")
+	Log("Update to boolean: %q = %q", formname, strvalue)
 	if strvalue == "true" {
 		value = true
 	}
-	if value != **ptr {
-		Debug("Updating value for %s from %s to %s", formname, **ptr, value)
-		*ptr = &value
+	if value != *ptr {
+		Debug("Updating value for %s from %t to %t", formname, *ptr, value)
+		*ptr = value
 		return true
 	}
-	Debug("No update to %s, value(%s) orig(%s)", formname, value, **ptr)
+	Debug("No update to %s, value(%t) orig(%t)", formname, value, *ptr)
 	return false
 }
 
-func processFloatUpdate(r *http.Request, formname string, ptr **float64) bool {
-	curvalue := fmt.Sprintf("%0.2f", **ptr)
+func processFloatUpdate(r *http.Request, formname string, ptr *float64) bool {
+	curvalue := fmt.Sprintf("%0.2f", *ptr)
 	value := getFormValue(r, formname, "")
 	if value != curvalue {
 		flt, err := strconv.ParseFloat(value, 64)
 		if err == nil {
 			Debug("Updating value for %s from %s to %s", formname, curvalue, value)
-			*ptr = &flt
+			*ptr = flt
 			return true
 		}
 	}
@@ -428,7 +445,7 @@ func processFloatUpdate(r *http.Request, formname string, ptr **float64) bool {
 }
 
 func (h *Handler) configBoolRow(name, inputName string, value bool) string {
-	checkbox := "type=checkbox value=on"
+	checkbox := "type=checkbox value=true"
 	checked := ""
 	if value {
 		checked = " checked"
@@ -457,40 +474,40 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		c.SetAuth(pw1)
 		foundone = true
 	}
-	if processStringUpdate(r, "appid", &c.weatherUndergroundAppID) {
+	if processStringUpdate(r, "appid", &c.cfg.WeatherUndergroundAppID) {
 		foundone = true
 	}
-	if processStringUpdate(r, "zipcode", &c.zip) {
+	if processStringUpdate(r, "zipcode", &c.cfg.Zip) {
 		foundone = true
 	}
-	if processFloatUpdate(r, "adj_pump", &c.pumpAdjustment) {
+	if processFloatUpdate(r, "adj_pump", &c.cfg.PumpAdjustment) {
 		h.ppc.SyncAdjustments()
 		foundone = true
 	}
-	if processFloatUpdate(r, "adj_roof", &c.roofAdjustment) {
+	if processFloatUpdate(r, "adj_roof", &c.cfg.RoofAdjustment) {
 		h.ppc.SyncAdjustments()
 		foundone = true
 	}
-	if processFloatUpdate(r, "target", &c.target) {
+	if processFloatUpdate(r, "target", &c.cfg.Target) {
 		foundone = true
 	}
-	if processFloatUpdate(r, "tolerance", &c.tolerance) {
+	if processFloatUpdate(r, "tolerance", &c.cfg.Tolerance) {
 		foundone = true
 	}
-	if processFloatUpdate(r, "mindelta", &c.deltaT) {
+	if processFloatUpdate(r, "mindelta", &c.cfg.DeltaT) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "disabled", &c.disabled) {
+	if processBoolUpdate(r, "disabled", &c.cfg.Disabled) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "button_disabled", &c.buttonDisabled) {
+	if processBoolUpdate(r, "button_disabled", &c.cfg.ButtonDisabled) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "solar_disabled", &c.solarDisabled) {
+	if processBoolUpdate(r, "solar_disabled", &c.cfg.SolarDisabled) {
 		foundone = true
 	}
 	if foundone {
-		c.Save(*h.ppc.config.dataDirectory + serverConfiguration)
+		c.Save()
 	}
 
 	// Don't persist this one
@@ -519,26 +536,26 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Weather:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Zipcode", "zipcode", *c.zip, "")
-	html += h.configRow("WeatherUnderground ID", "appid", *c.weatherUndergroundAppID, "")
+	html += h.configRow("Zipcode", "zipcode", c.cfg.Zip, "")
+	html += h.configRow("WeatherUnderground ID", "appid", c.cfg.WeatherUndergroundAppID, "")
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Temperature Sensor Adjustment:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Pump Tuning", "adj_pump", fmt.Sprintf("%0.2f", *c.pumpAdjustment), "")
-	html += h.configRow("Roof Tuning", "adj_roof", fmt.Sprintf("%0.2f", *c.roofAdjustment), "")
+	html += h.configRow("Pump Tuning", "adj_pump", fmt.Sprintf("%0.2f", c.cfg.PumpAdjustment), "")
+	html += h.configRow("Roof Tuning", "adj_roof", fmt.Sprintf("%0.2f", c.cfg.RoofAdjustment), "")
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Solar Settings:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Target", "target", fmt.Sprintf("%0.2f&deg;C", *c.target), "")
-	html += h.configRow("Tolerance", "tolerance", fmt.Sprintf("%0.2f&deg;C", *c.tolerance), "")
-	html += h.configRow("MinDelta", "mindelta", fmt.Sprintf("%0.2f&deg;C", *c.deltaT), "")
+	html += h.configRow("Target", "target", fmt.Sprintf("%0.2f&deg;C", c.cfg.Target), "")
+	html += h.configRow("Tolerance", "tolerance", fmt.Sprintf("%0.2f&deg;C", c.cfg.Tolerance), "")
+	html += h.configRow("MinDelta", "mindelta", fmt.Sprintf("%0.2f&deg;C", c.cfg.DeltaT), "")
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
 	html += "<tr><th align=left>Debug Settings:</th><td colspan=3></td></tr>\n"
 	html += h.configBoolRow("Debug Logging Enabled", "debug", __debug__)
-	html += h.configBoolRow("Disable all pumps", "disabled", *c.disabled)
-	html += h.configBoolRow("Disable button", "button_disabled", *c.buttonDisabled)
-	html += h.configBoolRow("Disable solar", "solar_disabled", *c.solarDisabled)
+	html += h.configBoolRow("Disable all pumps", "disabled", c.cfg.Disabled)
+	html += h.configBoolRow("Disable button", "button_disabled", c.cfg.ButtonDisabled)
+	html += h.configBoolRow("Disable solar", "solar_disabled", c.cfg.SolarDisabled)
 
 	html += "<input type=hidden name=posted value=true>\n"
 	html += "</table><input type=submit value=Save></font></font></form>\n"
