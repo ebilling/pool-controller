@@ -41,7 +41,7 @@ func NewWeatherFromService(service Service) *Weather {
 
 // NewWeather provides a weather underground service.
 func NewWeather(appID string, ttl time.Duration) *Weather {
-	service := &WUService{appID: appID}
+	service := &OpenWeatherService{appID: appID}
 	w := Weather{
 		service: service,
 		ttl:     ttl,

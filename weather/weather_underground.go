@@ -1,8 +1,10 @@
 package weather
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -38,12 +40,15 @@ func (w *WUService) Read(zip string) (*Data, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	buf := bytes.NewBuffer(nil)
+	n, cerr := io.Copy(buf, resp.Body)
+	fmt.Printf("Copied %d bytes (%v): %s", n, cerr, buf.String())
 	response := &APIResponse{}
-	err = json.NewDecoder(resp.Body).Decode(response)
+	err = json.NewDecoder(buf).Decode(response)
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Printf("Result: %+v", response)
 	return w.convert(zip, &response.CurrentObservation)
 }
 
