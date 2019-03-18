@@ -149,7 +149,6 @@ func (c *Config) Save() error {
 	if err != nil {
 		return err
 	}
-	Log("Config:\n%s", string(buf))
 
 	err = ioutil.WriteFile(*c.dataDirectory+serverConfiguration, buf, 0600)
 	return err
