@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"testing"
+
 	"github.com/brutella/hc/accessory"
 	"github.com/ebilling/pool-controller/weather"
 	"github.com/ebilling/pool-controller/weather/fakeWeather"
-	"testing"
 )
 
 type FakeThermometer struct {
