@@ -445,7 +445,7 @@ func processFloatUpdate(r *http.Request, formname string, ptr *float64) bool {
 }
 
 func (h *Handler) configBoolRow(name, inputName string, value bool) string {
-	checkbox := "type=checkbox value=on"
+	checkbox := "type=checkbox value=true"
 	checked := ""
 	if value {
 		checked = " checked"
