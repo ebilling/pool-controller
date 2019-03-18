@@ -129,7 +129,7 @@ func (c *Config) GetAuth() string {
 func (c *Config) String() string {
 	str, err := json.Marshal(c.cfg)
 	if err != nil {
-		Log("Error trying marshal configuration: %s", err.Error())
+		Error("Error trying marshal configuration: %s", err.Error())
 	}
 	return "Config: " + string(str)
 }
@@ -158,12 +158,12 @@ func (c *Config) Save() error {
 func (c *Config) Read() error {
 	cfg, err := ioutil.ReadFile(*c.dataDirectory + serverConfiguration)
 	if err != nil {
-		Log("Unable to read configuration file: %s", err.Error())
+		Error("Unable to read configuration file: %s", err.Error())
 		return err
 	}
 	err = json.Unmarshal(cfg, &c.cfg)
 	if err != nil {
-		Log("Unable to marshal config file: %s", err.Error())
+		Error("Unable to marshal config file: %s", err.Error())
 		return err
 	}
 	return nil
