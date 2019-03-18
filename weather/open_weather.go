@@ -3,6 +3,7 @@ package weather
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,6 +32,22 @@ type OWConditions struct {
 	TemperatureC float64 `json:"temp"`
 }
 
+// SolarRadiation returns a bad approximation to solar radiation based on the cloud cover (does not know if the sun is up)
+func (r *OWResponse) SolarRadiation() float64 {
+	if r.Clouds != nil {
+		return 500.0 * (100.0 - r.Clouds.Percentage) / 100.0
+	}
+	return 0.0
+}
+
+// TempC returns the temperature if it is available
+func (r *OWResponse) TempC() float64 {
+	if r.Conditions != nil {
+		return r.Conditions.TemperatureC
+	}
+	return 0.0
+}
+
 // Read sends a request to the API and converts the data expects "95125,us" as an input
 func (w *OpenWeatherService) Read(zipCommaCountry string) (*Data, error) {
 	if w.appID == "" {
@@ -56,12 +73,15 @@ func (w *OpenWeatherService) Read(zipCommaCountry string) (*Data, error) {
 }
 
 func (w *OpenWeatherService) convert(zipcode string, co *OWResponse) (*Data, error) {
-	solarradiation := 500.0 * (100.0 - co.Clouds.Percentage) / 100.0
+	if co == nil {
+		return &Data{}, errors.New("invalid response")
+	}
+
 	return &Data{
 		Zipcode:        zipcode,
 		Updated:        time.Unix(co.ObservationEpoch, 0),
-		CurrentTempC:   co.Conditions.TemperatureC,
-		SolarRadiation: solarradiation,
+		CurrentTempC:   co.TempC(),
+		SolarRadiation: co.SolarRadiation(),
 		Description:    "OpenWeatherMap current observation",
 	}, nil
 }
