@@ -110,8 +110,8 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		return
 	}
 	if state > STATE_OFF {
-		if ppc.switches.GetStartTime().Add(30 * time.Minute).After(time.Now()) {
-			return // Don't bounce the motors, let them run
+		if time.Now().Sub(ppc.switches.GetStartTime()) > 60*time.Minute {
+			return // Don't bounce the motors, let them run for at least an hour
 		}
 	}
 	wd, werr := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
@@ -149,7 +149,7 @@ func (ppc *PoolPumpController) runLoop() {
 	keepRunning := true
 	for keepRunning {
 		if postStatus.Before(time.Now()) {
-			postStatus = time.Now().Add(5 * time.Minute)
+			postStatus = time.Now().Add(15 * time.Minute)
 			Info(ppc.Status())
 		}
 		select {
