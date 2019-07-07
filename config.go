@@ -7,6 +7,7 @@ import (
 	"flag"
 	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
+	"path/filepath"
 	"time"
 )
 
@@ -149,14 +150,17 @@ func (c *Config) Save() error {
 	if err != nil {
 		return err
 	}
-
-	err = ioutil.WriteFile(*c.dataDirectory+serverConfiguration, buf, 0600)
+	cfgFilename := filepath.Join(*c.dataDirectory, serverConfiguration)
+	Info("Writing config file to: %s\n%s", cfgFilename, string(buf))
+	err = ioutil.WriteFile(cfgFilename, buf, 0600)
 	return err
 }
 
 // Read reads the config from the fileystem
 func (c *Config) Read() error {
-	cfg, err := ioutil.ReadFile(*c.dataDirectory + serverConfiguration)
+	cfgFilename := filepath.Join(*c.dataDirectory, serverConfiguration)
+	Info("Reading config file from: %s\n%s", cfgFilename, string(buf))
+	cfg, err := ioutil.ReadFile(cfgFilename)
 	if err != nil {
 		Error("Unable to read configuration file: %s", err.Error())
 		return err
