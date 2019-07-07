@@ -159,12 +159,12 @@ func (c *Config) Save() error {
 // Read reads the config from the fileystem
 func (c *Config) Read() error {
 	cfgFilename := filepath.Join(*c.dataDirectory, serverConfiguration)
-	Info("Reading config file from: %s\n%s", cfgFilename, string(buf))
 	cfg, err := ioutil.ReadFile(cfgFilename)
 	if err != nil {
 		Error("Unable to read configuration file: %s", err.Error())
 		return err
 	}
+	Info("Reading config file from: %s\n%s", cfgFilename, string(cfg))
 	err = json.Unmarshal(cfg, &c.cfg)
 	if err != nil {
 		Error("Unable to marshal config file: %s", err.Error())
