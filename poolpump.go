@@ -58,7 +58,6 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 // Update the solar configuration parameters from the config file (if changed)
 // and updates the values of the Thermometers.
 func (ppc *PoolPumpController) Update() {
-	ppc.config.Save()
 	ppc.pumpTemp.Update()
 	ppc.roofTemp.Update()
 	ppc.runningTemp.Update()
