@@ -204,6 +204,10 @@ func (ppc *PoolPumpController) PersistCalibration() {
 	if ok {
 		ppc.config.cfg.RoofAdjustment = t.adjust
 	}
+	err := ppc.config.Save()
+	if err != nil {
+		Error("Could not persist config: %v", err)
+	}
 }
 
 // SyncAdjustments syncrhonizes the adjustments to temperature sensors
