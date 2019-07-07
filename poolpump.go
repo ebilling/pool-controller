@@ -110,11 +110,6 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		}
 		return
 	}
-	if state > STATE_OFF {
-		if ppc.switches.GetStartTime().Add(30 * time.Minute).After(time.Now()) {
-			return // Don't bounce the motors, let them run
-		}
-	}
 	wd, werr := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
 	if ppc.shouldCool() || ppc.shouldWarm() {
 		// Wide deltaT between target and temp or when it's cold, run sweep
@@ -129,7 +124,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		return
 	}
 	// If the pumps havent run in a day, wait til midnight then start them
-	if time.Now().Sub(ppc.switches.GetStopTime()) > 24*time.Hour && time.Now().Hour() < 5 {
+	if time.Now().Sub(ppc.switches.GetStopTime()) > 22*time.Hour {
 		ppc.switches.SetState(STATE_SWEEP, false) // Clean pool
 		if time.Now().Sub(ppc.switches.GetStartTime()) > 2*time.Hour {
 			ppc.switches.StopAll(false) // End daily
@@ -137,7 +132,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		return
 	}
 	// If there is no reason to turn on the pumps and it's not manual, turn off
-	if state > STATE_OFF {
+	if state > STATE_OFF && ppc.switches.GetStartTime().Add(time.Hour).Before(time.Now()) {
 		ppc.switches.StopAll(false)
 	}
 }
@@ -145,7 +140,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 // Runs calls PoolPumpController.Update() and PoolPumpController.RunPumpsIfNeeded()
 // repeatedly until PoolPumpController.Stop() is called
 func (ppc *PoolPumpController) runLoop() {
-	interval := 5 * time.Second
+	interval := time.Minute
 	postStatus := time.Now()
 	keepRunning := true
 	for keepRunning {
@@ -153,6 +148,7 @@ func (ppc *PoolPumpController) runLoop() {
 			postStatus = time.Now().Add(5 * time.Minute)
 			Info(ppc.Status())
 		}
+		ppc.SyncAdjustments()
 		select {
 		case <-ppc.done:
 			ppc.button.Stop()
