@@ -23,7 +23,7 @@ func newButton(pin PiPin, callback func()) *Button {
 	b := Button{
 		pin:        pin,
 		callback:   callback,
-		bouncetime: 300 * time.Millisecond,
+		bouncetime: 200 * time.Millisecond,
 		pushed:     time.Now().Add(-1 * time.Second),
 		done:       make(chan bool),
 	}

@@ -58,7 +58,6 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 // Update the solar configuration parameters from the config file (if changed)
 // and updates the values of the Thermometers.
 func (ppc *PoolPumpController) Update() {
-	ppc.config.Save()
 	ppc.pumpTemp.Update()
 	ppc.roofTemp.Update()
 	ppc.runningTemp.Update()
@@ -110,11 +109,6 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		}
 		return
 	}
-	if state > STATE_OFF {
-		if ppc.switches.GetStartTime().Add(30 * time.Minute).After(time.Now()) {
-			return // Don't bounce the motors, let them run
-		}
-	}
 	wd, werr := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
 	if ppc.shouldCool() || ppc.shouldWarm() {
 		// Wide deltaT between target and temp or when it's cold, run sweep
@@ -129,7 +123,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		return
 	}
 	// If the pumps havent run in a day, wait til midnight then start them
-	if time.Now().Sub(ppc.switches.GetStopTime()) > 24*time.Hour && time.Now().Hour() < 5 {
+	if time.Now().Sub(ppc.switches.GetStopTime()) > 22*time.Hour {
 		ppc.switches.SetState(STATE_SWEEP, false) // Clean pool
 		if time.Now().Sub(ppc.switches.GetStartTime()) > 2*time.Hour {
 			ppc.switches.StopAll(false) // End daily
@@ -137,7 +131,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		return
 	}
 	// If there is no reason to turn on the pumps and it's not manual, turn off
-	if state > STATE_OFF {
+	if state > STATE_OFF && ppc.switches.GetStartTime().Add(time.Hour).Before(time.Now()) {
 		ppc.switches.StopAll(false)
 	}
 }
@@ -145,7 +139,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 // Runs calls PoolPumpController.Update() and PoolPumpController.RunPumpsIfNeeded()
 // repeatedly until PoolPumpController.Stop() is called
 func (ppc *PoolPumpController) runLoop() {
-	interval := 5 * time.Second
+	interval := time.Second * 5
 	postStatus := time.Now()
 	keepRunning := true
 	for keepRunning {
@@ -153,6 +147,7 @@ func (ppc *PoolPumpController) runLoop() {
 			postStatus = time.Now().Add(5 * time.Minute)
 			Info(ppc.Status())
 		}
+		ppc.SyncAdjustments()
 		select {
 		case <-ppc.done:
 			ppc.button.Stop()
@@ -208,6 +203,10 @@ func (ppc *PoolPumpController) PersistCalibration() {
 	t, ok = ppc.roofTemp.(*GpioThermometer)
 	if ok {
 		ppc.config.cfg.RoofAdjustment = t.adjust
+	}
+	err := ppc.config.Save()
+	if err != nil {
+		Error("Could not persist config: %v", err)
 	}
 }
 
