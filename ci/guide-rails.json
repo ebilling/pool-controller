@@ -131,7 +131,13 @@
 				"code_analysis": null
 			}
 		},
-		"default_properties": null,
+		"default_properties": [
+			{
+				"name": "application.hostname",
+				"value": "delete-soon",
+				"type": "string"
+			}
+		],
 		"deployment_files": [],
 		"application_init": {
 			"command": "",
