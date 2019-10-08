@@ -65,20 +65,20 @@ func (r *Relay) String() string {
 
 func (r *Relay) TurnOn() {
 	Trace("TurnOn %s", r.name)
-	r.pin.Output(Low)
+	r.pin.Output(High)
 	r.startTime = time.Now()
 	r.accessory.Switch.On.SetValue(true)
 }
 
 func (r *Relay) TurnOff() {
 	Trace("TurnOff %s", r.name)
-	r.pin.Output(High)
+	r.pin.Output(Low)
 	r.stopTime = time.Now()
 	r.accessory.Switch.On.SetValue(false)
 }
 
 func (r *Relay) isOn() bool {
-	if r.pin.Read() == Low {
+	if r.pin.Read() == High {
 		r.accessory.Switch.On.SetValue(true)
 		return true
 	}
@@ -87,7 +87,7 @@ func (r *Relay) isOn() bool {
 }
 
 func (r *Relay) Status() string {
-	if r.pin.Read() == Low {
+	if r.pin.Read() == High {
 		return "On"
 	}
 	return "Off"
