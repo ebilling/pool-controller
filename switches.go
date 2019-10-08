@@ -53,7 +53,9 @@ func (p *Switches) String() string {
 		timeStr(p.manualOp))
 }
 
+// NewSwitches sets up the switches that are configured
 func NewSwitches(manufacturer string) *Switches {
+	NewRelay(Relay4, "Unused", manufacturer)
 	return newSwitches(
 		NewRelay(Relay1, "Pool Pump", manufacturer),
 		NewRelay(Relay2, "Pool Sweep", manufacturer),
@@ -187,7 +189,7 @@ func (p *Switches) StopAll(manual bool) {
 	if p.state == STATE_DISABLED {
 		state = STATE_DISABLED
 	}
-	p.setSwitches(false, false, true, manual, state)
+	p.setSwitches(false, false, false, manual, state)
 }
 
 func (p *Switches) SetState(s State, manual bool) {
@@ -213,16 +215,16 @@ func (p *Switches) SetState(s State, manual bool) {
 		p.StopAll(manual)
 		return
 	case STATE_PUMP:
-		p.setSwitches(true, false, true, manual, s)
-		return
-	case STATE_SWEEP:
-		p.setSwitches(true, true, true, manual, s)
-		return
-	case STATE_SOLAR:
 		p.setSwitches(true, false, false, manual, s)
 		return
-	case STATE_SOLAR_MIXING:
+	case STATE_SWEEP:
 		p.setSwitches(true, true, false, manual, s)
+		return
+	case STATE_SOLAR:
+		p.setSwitches(true, false, true, manual, s)
+		return
+	case STATE_SOLAR_MIXING:
+		p.setSwitches(true, true, true, manual, s)
 		return
 	}
 }
