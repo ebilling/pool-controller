@@ -8,7 +8,7 @@ import (
 type State int8
 
 const (
-	STATE_DISABLED State  = iota - 1
+	STATE_DISABLED State = iota - 1
 	STATE_OFF
 	STATE_PUMP
 	STATE_SWEEP
@@ -38,12 +38,12 @@ func (s State) String() string {
 }
 
 type Switches struct {
-	state       State
-	pump        *Relay
-	sweep       *Relay
-	solar       *Relay
-	solarLed    PiPin
-	manualOp    time.Time
+	state    State
+	pump     *Relay
+	sweep    *Relay
+	solar    *Relay
+	solarLed PiPin
+	manualOp time.Time
 }
 
 func (p *Switches) String() string {
@@ -53,7 +53,7 @@ func (p *Switches) String() string {
 		timeStr(p.manualOp))
 }
 
-func NewSwitches(manufacturer string) (*Switches) {
+func NewSwitches(manufacturer string) *Switches {
 	return newSwitches(
 		NewRelay(Relay1, "Pool Pump", manufacturer),
 		NewRelay(Relay2, "Pool Sweep", manufacturer),
@@ -61,12 +61,12 @@ func NewSwitches(manufacturer string) (*Switches) {
 		NewGpio(SolarLED))
 }
 
-func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) (*Switches) {
+func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) *Switches {
 	p := Switches{
-		state: STATE_OFF,
-		pump:  pump,
-		sweep: sweep,
-		solar: solar,
+		state:    STATE_OFF,
+		pump:     pump,
+		sweep:    sweep,
+		solar:    solar,
 		solarLed: solarLed,
 		manualOp: time.Now().Add(time.Hour * -24),
 	}
@@ -77,12 +77,12 @@ func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) (*Swit
 
 func (p *Switches) bindHK() {
 	p.pump.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
-                if on == true {
+		if on == true {
 			p.SetState(STATE_PUMP, true)
-                } else {
-                        p.StopAll(true)
-                }
-        })
+		} else {
+			p.StopAll(true)
+		}
+	})
 
 	p.sweep.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		state := p.state
@@ -105,7 +105,7 @@ func (p *Switches) bindHK() {
 			}
 		}
 		p.SetState(state, true)
-        })
+	})
 
 	p.solar.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		state := p.state
@@ -131,7 +131,7 @@ func (p *Switches) bindHK() {
 			}
 		}
 		p.SetState(state, true)
-        })
+	})
 
 }
 
@@ -164,7 +164,11 @@ func turnOn(relay *Relay, on bool) {
 }
 
 func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state State) {
-	if solarOn { p.solarLed.Output(High) } else { p.solarLed.Output(Low) }
+	if solarOn {
+		p.solarLed.Output(High)
+	} else {
+		p.solarLed.Output(Low)
+	}
 	turnOn(p.solar, solarOn)
 	turnOn(p.pump, pumpOn)
 	turnOn(p.sweep, sweepOn)
@@ -180,8 +184,10 @@ func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state St
 
 func (p *Switches) StopAll(manual bool) {
 	state := STATE_OFF
-	if p.state == STATE_DISABLED { state = STATE_DISABLED }
-	p.setSwitches(false, false, false, manual, state)
+	if p.state == STATE_DISABLED {
+		state = STATE_DISABLED
+	}
+	p.setSwitches(false, false, true, manual, state)
 }
 
 func (p *Switches) SetState(s State, manual bool) {
@@ -190,28 +196,34 @@ func (p *Switches) SetState(s State, manual bool) {
 	}
 	if p.state == STATE_DISABLED {
 		Info("Disabled, can't change state from %s to %s",
-			p.state, s);
+			p.state, s)
 		return
 	}
 	if p.ManualState() && !manual {
 		Debug("Manual override, can't change state from %s to %s",
-			p.state, s);
+			p.state, s)
 		return // Don't override a manual operation
 	}
 	Info("State change from %s to %s", p.state, s)
 	switch s {
 	case STATE_DISABLED:
-		p.Disable(); return
+		p.Disable()
+		return
 	case STATE_OFF:
-		p.StopAll(manual); return
+		p.StopAll(manual)
+		return
 	case STATE_PUMP:
-		p.setSwitches(true, false, false, manual, s); return
+		p.setSwitches(true, false, true, manual, s)
+		return
 	case STATE_SWEEP:
-		p.setSwitches(true, true, false, manual, s); return
+		p.setSwitches(true, true, true, manual, s)
+		return
 	case STATE_SOLAR:
-		p.setSwitches(true, false, true, manual, s); return
+		p.setSwitches(true, false, false, manual, s)
+		return
 	case STATE_SOLAR_MIXING:
-		p.setSwitches(true, true, true, manual, s); return
+		p.setSwitches(true, true, false, manual, s)
+		return
 	}
 }
 
@@ -220,7 +232,7 @@ func (p *Switches) State() State {
 }
 
 func (p *Switches) ManualState() bool {
-	if time.Now().Sub(p.manualOp) > 2 * time.Hour {
+	if time.Now().Sub(p.manualOp) > 2*time.Hour {
 		return false
 	}
 	if p.manualOp.Equal(p.GetStartTime()) && p.GetStartTime().After(p.GetStopTime()) {
