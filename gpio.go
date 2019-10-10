@@ -1,11 +1,12 @@
 package main
 
 import (
+	"strconv"
+	"time"
+
 	"periph.io/x/periph/conn/gpio"
 	"periph.io/x/periph/conn/gpio/gpioreg"
 	"periph.io/x/periph/host"
-	"strconv"
-	"time"
 )
 
 // gpioProvider generates pins for the platform (used for testing)
