@@ -111,6 +111,9 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	wd, werr := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
 	if ppc.shouldCool() || ppc.shouldWarm() {
 		// Wide deltaT between target and temp or when it's cold, run sweep
+		if state == STATE_SOLAR_MIXING {
+			return
+		}
 		if ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.DeltaT ||
 			(werr == nil && wd.CurrentTempC < ppc.config.cfg.Target) || // Cool Weather
 			ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance {
