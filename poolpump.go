@@ -126,11 +126,11 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	}
 
 	// If the pumps havent run in a day, wait til 4AM then start them
-	if time.Now().Sub(ppc.switches.GetStopTime()) > 23*time.Hour &&
+	if time.Now().Sub(ppc.switches.GetStopTime()) > 47*time.Hour &&
 		time.Now().Hour() > 4 &&
 		time.Now().Hour() < 6 {
 		ppc.switches.SetState(STATE_SWEEP, false) // Clean pool
-		if time.Now().Sub(ppc.switches.GetStartTime()) > 1*time.Hour {
+		if time.Now().Sub(ppc.switches.GetStartTime()) > 4*time.Hour {
 			ppc.switches.StopAll(false) // End daily
 		}
 		return

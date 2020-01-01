@@ -234,7 +234,7 @@ func (p *Switches) State() State {
 }
 
 func (p *Switches) ManualState() bool {
-	if time.Now().Sub(p.manualOp) > 2*time.Hour {
+	if time.Now().Sub(p.manualOp) > 4*time.Hour {
 		return false
 	}
 	if p.manualOp.Equal(p.GetStartTime()) && p.GetStartTime().After(p.GetStopTime()) {
