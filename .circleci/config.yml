@@ -11,7 +11,7 @@ jobs:
       - image: circleci/golang:latest
     steps:
       - checkout
-      - run: go -v test ./...
+      - run: go test -v ./...
 workflows:
   version: 2
   build_and_test:
