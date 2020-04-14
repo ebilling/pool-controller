@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/brutella/hc/accessory"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/brutella/hc/accessory"
 )
 
 type Thermometer interface {

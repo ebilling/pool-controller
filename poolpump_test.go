@@ -7,7 +7,7 @@ import (
 
 	"github.com/brutella/hc/accessory"
 	"github.com/ebilling/pool-controller/weather"
-	"github.com/ebilling/pool-controller/weather/fakeWeather"
+	fakeweather "github.com/ebilling/pool-controller/weather/fakeWeather"
 )
 
 type FakeThermometer struct {

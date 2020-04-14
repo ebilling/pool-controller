@@ -80,7 +80,7 @@ func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) *Switc
 func (p *Switches) bindHK() {
 	p.pump.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		if on == true {
-			p.SetState(STATE_PUMP, true)
+			p.SetState(STATE_PUMP, true, 1.0)
 		} else {
 			p.StopAll(true)
 		}
@@ -106,7 +106,7 @@ func (p *Switches) bindHK() {
 				state = STATE_PUMP
 			}
 		}
-		p.SetState(state, true)
+		p.SetState(state, true, 1.0)
 	})
 
 	p.solar.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
@@ -132,7 +132,7 @@ func (p *Switches) bindHK() {
 				state = STATE_OFF
 			}
 		}
-		p.SetState(state, true)
+		p.SetState(state, true, 1.0)
 	})
 
 }
@@ -192,7 +192,7 @@ func (p *Switches) StopAll(manual bool) {
 	p.setSwitches(false, false, false, manual, state)
 }
 
-func (p *Switches) SetState(s State, manual bool) {
+func (p *Switches) SetState(s State, manual bool, runtime float64) {
 	if p.state == s {
 		return // Nothing to do here
 	}
@@ -201,7 +201,7 @@ func (p *Switches) SetState(s State, manual bool) {
 			p.state, s)
 		return
 	}
-	if p.ManualState() && !manual {
+	if p.ManualState(runtime) && !manual {
 		Debug("Manual override, can't change state from %s to %s",
 			p.state, s)
 		return // Don't override a manual operation
@@ -233,8 +233,15 @@ func (p *Switches) State() State {
 	return p.state
 }
 
-func (p *Switches) ManualState() bool {
-	if time.Now().Sub(p.manualOp) > 4*time.Hour {
+func DurationFromHours(hours float64, minHours float64) time.Duration {
+	if hours < minHours {
+		hours = minHours
+	}
+	return time.Duration(hours * float64(time.Hour))
+}
+
+func (p *Switches) ManualState(runtime float64) bool {
+	if time.Now().Sub(p.manualOp) > DurationFromHours(runtime, 2.0) {
 		return false
 	}
 	if p.manualOp.Equal(p.GetStartTime()) && p.GetStartTime().After(p.GetStopTime()) {

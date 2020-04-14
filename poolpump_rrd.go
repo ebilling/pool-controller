@@ -82,7 +82,7 @@ func (ppc *PoolPumpController) UpdateRrd() {
 		solar = 1.03
 	}
 	manual := 0.02
-	if ppc.switches.ManualState() {
+	if ppc.switches.ManualState(ppc.config.cfg.RunTime) {
 		manual = 1.06
 	}
 	update = fmt.Sprintf("N:%d.001:%0.3f:%0.3f", ppc.switches.State(), solar, manual)

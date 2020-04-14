@@ -258,6 +258,8 @@ func nav() string {
 	return out
 }
 
+// TODO: update ui to set runtime and frequency
+
 func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	scale := getscale(r)
 	cookie := &http.Cookie{
@@ -268,7 +270,7 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, cookie)
 	h.setRefresh(w, r, 60)
 	modeStr := "Auto"
-	if h.ppc.switches.ManualState() {
+	if h.ppc.switches.ManualState(h.ppc.config.cfg.RunTime) {
 		modeStr = "Manual"
 	}
 
@@ -506,6 +508,12 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	if processBoolUpdate(r, "solar_disabled", &c.cfg.SolarDisabled) {
 		foundone = true
 	}
+	if processFloatUpdate(r, "daily_freq", &c.cfg.DailyFrequency) {
+		foundone = true
+	}
+	if processFloatUpdate(r, "run_time", &c.cfg.RunTime) {
+		foundone = true
+	}
 	if foundone {
 		c.Save()
 	}
@@ -549,8 +557,12 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += h.configRow("Target", "target", fmt.Sprintf("%0.2f&deg;C", c.cfg.Target), "")
 	html += h.configRow("Tolerance", "tolerance", fmt.Sprintf("%0.2f&deg;C", c.cfg.Tolerance), "")
 	html += h.configRow("MinDelta", "mindelta", fmt.Sprintf("%0.2f&deg;C", c.cfg.DeltaT), "")
-	html += "<tr><td colspan=3><br></td></tr>\n"
 
+	html += "<tr><td colspan=3><br></td></tr>\n"
+	html += h.configRow("Daily Run Frequency", "daily_freq", fmt.Sprintf("%0.2f Days", c.cfg.DailyFrequency), "")
+	html += h.configRow("Run period", "run_time", fmt.Sprintf("%0.2f hours", c.cfg.RunTime), "")
+
+	html += "<tr><td colspan=3><br></td></tr>\n"
 	html += "<tr><th align=left>Debug Settings:</th><td colspan=3></td></tr>\n"
 	html += h.configBoolRow("Debug Logging Enabled", "debug", __debug__)
 	html += h.configBoolRow("Disable all pumps", "disabled", c.cfg.Disabled)

@@ -5,10 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"flag"
-	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
 	"path/filepath"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -25,6 +26,8 @@ var (
 	defaultTolerance      = 0.5
 	defaultPumpAdjustment = 2.5
 	defaultRoofAdjustment = 2.5
+	defaultFrequency      = 2
+	defaultRunTime        = 6
 	serverConfiguration   = "/server.conf"
 	defaultCfg            = PersistedConfig{
 		Disabled: false,
@@ -62,6 +65,8 @@ type PersistedConfig struct {
 	Tolerance               float64
 	PumpAdjustment          float64
 	RoofAdjustment          float64
+	DailyFrequency          float64 // days between automated runs
+	RunTime                 float64 // hours when a pump is manually engaged it will run for this many hours
 	Mtime                   time.Time
 	Ctime                   time.Time
 }
@@ -104,6 +109,8 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		c.cfg.Target = defaultTarget
 		c.cfg.Tolerance = defaultTolerance
 		c.cfg.Zip = defaultZipcode
+		c.cfg.DailyFrequency = float64(defaultFrequency)
+		c.cfg.RunTime = float64(defaultRunTime)
 	}
 	return &c
 }
