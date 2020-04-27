@@ -1,6 +1,6 @@
 {
 	"metadata": {
-		"version": 1
+		"version": 2
 	},
 	"application": {
 		"name": "github-pool-controller",
@@ -28,19 +28,6 @@
 			{
 				"name": "Build",
 				"segment_type": "build",
-				"job_steps": [
-					{
-						"name": "Get Dependencies",
-						"definition": "Get Dependencies",
-						"command": "go get -t -d ./...",
-						"properties": null
-					},
-					{
-						"name": "Unit Tests and Coverage",
-						"definition": "Unit Tests and Coverage",
-						"command": "ginkgo -cover -r -v -skipPackage=pb,test -outputdir=./ | tee ginkgo.output \ncat ginkgo.output 2\u003e\u00261 | go-junit-report \u003e test.xml\ngocov convert *.coverprofile | gocov-xml \u003e coverage.xml"
-					}
-				],
 				"exit_actions": {
 					"default": {
 						"fetch_logs": true,
@@ -108,7 +95,26 @@
 					"paths": [
 						"((gopath))"
 					]
-				}
+				},
+				"tasks": [
+					{
+						"name": "github-pool-controller",
+						"steps": [
+							{
+								"name": "Get Dependencies",
+								"definition": "Get Dependencies",
+								"command": "go get -t -d ./...",
+								"properties": null
+							},
+							{
+								"name": "Unit Tests and Coverage",
+								"definition": "Unit Tests and Coverage",
+								"command": "ginkgo -cover -r -v -skipPackage=pb,test -outputdir=./ | tee ginkgo.output \ncat ginkgo.output 2\u003e\u00261 | go-junit-report \u003e test.xml\ngocov convert *.coverprofile | gocov-xml \u003e coverage.xml",
+								"properties": null
+							}
+						]
+					}
+				]
 			}
 		],
 		"exit_actions": {
