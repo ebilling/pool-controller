@@ -60,7 +60,7 @@ func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 		Addr:    fmt.Sprintf("%s:%d", host, port),
 		Handler: s.handler,
 	}
-	s.server.ErrorLog = Logger() // Direct errors to common log
+	s.server.ErrorLog = NewLogger() // Direct errors to common log
 	return &s
 }
 
@@ -564,7 +564,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 
 	html += "<tr><td colspan=3><br></td></tr>\n"
 	html += "<tr><th align=left>Debug Settings:</th><td colspan=3></td></tr>\n"
-	html += h.configBoolRow("Debug Logging Enabled", "debug", __debug__)
+	html += h.configBoolRow("Debug Logging Enabled", "debug", _debug)
 	html += h.configBoolRow("Disable all pumps", "disabled", c.cfg.Disabled)
 	html += h.configBoolRow("Disable button", "button_disabled", c.cfg.ButtonDisabled)
 	html += h.configBoolRow("Disable solar", "solar_disabled", c.cfg.SolarDisabled)

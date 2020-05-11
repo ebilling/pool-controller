@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/brutella/hc"
 	"io/ioutil"
 	"os"
+
+	"github.com/brutella/hc"
 )
 
 func main() {

@@ -254,7 +254,6 @@ func SkipTestIfNotTestRig(t *testing.T) {
 	}
 
 	if _, err := os.Stat("TestRig"); err == nil {
-		LogTestMode()
 		TestRig = true
 		return
 	}

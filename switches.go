@@ -5,17 +5,27 @@ import (
 	"time"
 )
 
+// State refers to the current state of the system,
+// are the pumps running or is the solar system engaged.
 type State int8
 
 const (
+	// STATE_DISABLED means that the pumps are not allowed to run
 	STATE_DISABLED State = iota - 1
+	// STATE_OFF means that the pumps are OFF
 	STATE_OFF
+	// STATE_PUMP means that the main pump is running
 	STATE_PUMP
+	// STATE_SWEEP means that the main and sweep pumps are in operation
 	STATE_SWEEP
+	// STATE_SOLAR means that the main pump is running and the water is flowing to the solar panels
 	STATE_SOLAR
+	// STATE_SOLAR_MIXING means that the main and sweep pump are running with the solar panels in the flow
+	// this allows for maximum mixing of the water at depth
 	STATE_SOLAR_MIXING
 )
 
+// SolarLED is the GPIO number of the LED
 const SolarLED uint8 = 6
 
 func (s State) String() string {
@@ -37,6 +47,7 @@ func (s State) String() string {
 	}
 }
 
+// Switches controls all of the relays in the system
 type Switches struct {
 	state    State
 	pump     *Relay
@@ -137,14 +148,17 @@ func (p *Switches) bindHK() {
 
 }
 
+// GetStartTime returns the start time of the last pump run (could be still running)
 func (p *Switches) GetStartTime() time.Time {
 	return p.pump.GetStartTime()
 }
 
+// GetStopTime returns the stop time of the last pump run
 func (p *Switches) GetStopTime() time.Time {
 	return p.pump.GetStopTime()
 }
 
+// Enable re-enables the pumps after having been disabled
 func (p *Switches) Enable() {
 	if p.state == STATE_DISABLED {
 		p.state = STATE_OFF
@@ -152,6 +166,7 @@ func (p *Switches) Enable() {
 	}
 }
 
+// Disable turns the pumps off and puts them in a state that will not allow them to run
 func (p *Switches) Disable() {
 	p.StopAll(true)
 	p.state = STATE_DISABLED
@@ -184,6 +199,7 @@ func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state St
 	p.state = state
 }
 
+// StopAll turns off all pumps
 func (p *Switches) StopAll(manual bool) {
 	state := STATE_OFF
 	if p.state == STATE_DISABLED {
@@ -192,6 +208,7 @@ func (p *Switches) StopAll(manual bool) {
 	p.setSwitches(false, false, false, manual, state)
 }
 
+// SetState sets the pump pins to particular values corresponding to a State
 func (p *Switches) SetState(s State, manual bool, runtime float64) {
 	if p.state == s {
 		return // Nothing to do here
@@ -229,10 +246,13 @@ func (p *Switches) SetState(s State, manual bool, runtime float64) {
 	}
 }
 
+// State returns the current State of the system
 func (p *Switches) State() State {
 	return p.state
 }
 
+// DurationFromHours converts a given number of hours to a duration.  If hours < minHours,
+// the duration of minHours is returned
 func DurationFromHours(hours float64, minHours float64) time.Duration {
 	if hours < minHours {
 		hours = minHours
@@ -240,6 +260,7 @@ func DurationFromHours(hours float64, minHours float64) time.Duration {
 	return time.Duration(hours * float64(time.Hour))
 }
 
+// ManualState returns true if the pumps were started or stopped manually
 func (p *Switches) ManualState(runtime float64) bool {
 	if time.Now().Sub(p.manualOp) > DurationFromHours(runtime, 2.0) {
 		return false

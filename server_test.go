@@ -12,7 +12,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 }
 
 func TestStartTLS(t *testing.T) {
-	LogTestMode()
 	SetGpioProvider(NewTestPin)
 	flags := flag.NewFlagSet("ServerTest", flag.PanicOnError)
 	args := []string{}

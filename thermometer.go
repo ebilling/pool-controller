@@ -9,6 +9,7 @@ import (
 	"github.com/brutella/hc/accessory"
 )
 
+// Thermometer reads a thermal resistance thermometer using the timings of a capacitor charge/discharge cycle
 type Thermometer interface {
 	Name() string
 	Temperature() float64
@@ -17,6 +18,7 @@ type Thermometer interface {
 	Accessory() *accessory.Accessory
 }
 
+// SelectiveThermometer filters out certain data from a Thermometer to produce a better reading
 type SelectiveThermometer struct {
 	name        string
 	filter      func() bool
@@ -24,6 +26,7 @@ type SelectiveThermometer struct {
 	accessory   *accessory.Thermometer
 }
 
+// NewSelectiveThermometer creates a SelectiveThermometer
 func NewSelectiveThermometer(name string, manufacturer string, thermometer Thermometer,
 	filter func() bool) *SelectiveThermometer {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
@@ -38,18 +41,22 @@ func NewSelectiveThermometer(name string, manufacturer string, thermometer Therm
 	}
 }
 
+// Name returns the name of the SelectiveThermometer
 func (t *SelectiveThermometer) Name() string {
 	return t.name
 }
 
+// Calibrate runs a calibration operation the thermometer
 func (t *SelectiveThermometer) Calibrate(a float64) error {
 	return fmt.Errorf("Not supported")
 }
 
+// Temperature returns the current temperature
 func (t *SelectiveThermometer) Temperature() float64 {
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()
 }
 
+// Update attempts to update the thermometer temperature
 func (t *SelectiveThermometer) Update() error {
 	if t.filter() {
 		t.accessory.TempSensor.CurrentTemperature.SetValue(
@@ -58,10 +65,13 @@ func (t *SelectiveThermometer) Update() error {
 	return nil
 }
 
+// Accessory returns the Apple HomeKit accessory
 func (t *SelectiveThermometer) Accessory() *accessory.Accessory {
 	return t.accessory.Accessory
 }
 
+// GpioThermometer is used to measure the temperature of a given resistive thermometer
+// using a capacitor.
 type GpioThermometer struct {
 	name        string
 	mutex       sync.Mutex
@@ -73,12 +83,14 @@ type GpioThermometer struct {
 	accessory   *accessory.Thermometer
 }
 
+// NewGpioThermometer returns a GpioThermometer
 func NewGpioThermometer(name string, manufacturer string, gpio uint8) *GpioThermometer {
 	return newGpioThermometer(name, manufacturer,
 		NewGpio(gpio))
 }
 
-const Millisecond_f float64 = float64(time.Millisecond)
+// MillisecondFloat returns the float64 value associated with time.Millisecond time.Duration
+const MillisecondFloat float64 = float64(time.Millisecond)
 
 // Return the number of milliseconds represented by a given time.Duration
 func ms(t time.Duration) float64 {
@@ -106,14 +118,17 @@ func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermo
 	return &th
 }
 
+// SetAdjustment provides a multiplier to the teperature sensor
 func (t *GpioThermometer) SetAdjustment(a float64) {
 	t.adjust = a
 }
 
+// Name returns the name of the GpioThermometer
 func (t *GpioThermometer) Name() string {
 	return t.name
 }
 
+// Accessory returns the Apple HomeKit accessory related to the GpioThermometer
 func (t *GpioThermometer) Accessory() *accessory.Accessory {
 	return t.accessory.Accessory
 }
@@ -155,9 +170,11 @@ func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
 	return uSec / t.microfarads
 }
 
+// Calibrate asserts a specific resistance and calculates the proper setting
+// for the adjust parameter
 func (t *GpioThermometer) Calibrate(ohms float64) error {
-	calculated_ms := ohms * t.microfarads / 1000.0
-	Info("Expecting %0.3f ms", calculated_ms)
+	calculated := ohms * t.microfarads / 1000.0
+	Info("Expecting %0.3f ms", calculated)
 
 	// Take a sample of values
 	h := NewHistory(20)
@@ -168,8 +185,8 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 		}
 	}
 	dt := time.Duration(int64(h.Median()))
-	value := calculated_ms / ms(dt)
-	Info("Calculated Value (full discharge) %0.3f ms, found %0.3f ms, ratio %0.3f", calculated_ms, ms(dt), value)
+	value := calculated / ms(dt)
+	Info("Calculated Value (full discharge) %0.3f ms, found %0.3f ms, ratio %0.3f", calculated, ms(dt), value)
 	if h.Stddev() > h.Median()*0.05 || h.Len() < 10 {
 		return fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2f%%) entries(%d)",
 			value, 100.0*h.Stddev()/h.Median(), h.Len())
@@ -190,6 +207,7 @@ func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 	return true
 }
 
+// Temperature returns the current temperature of the GpioThermometer
 func (t *GpioThermometer) Temperature() float64 {
 	if time.Now().After(t.updated.Add(time.Minute)) {
 		t.Update()
@@ -197,6 +215,7 @@ func (t *GpioThermometer) Temperature() float64 {
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()
 }
 
+// Update updates the current temperature of the GpioThermometer
 func (t *GpioThermometer) Update() error {
 	var dischargeTime time.Duration
 	h := NewHistory(3)
@@ -216,18 +235,18 @@ func (t *GpioThermometer) Update() error {
 	avg := t.history.Average()
 	med := t.history.Median()
 	dev := stdd * 1.5
-	if dev < 5*Millisecond_f {
-		dev = 5 * Millisecond_f
+	if dev < 5*MillisecondFloat {
+		dev = 5 * MillisecondFloat
 	} // give some wiggle room
 
 	// Throw away bad results
 	if math.Abs(avg-h.Median()) > dev {
 		Info("%s Thermometer update failed: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
 			t.Name(),
-			h.Median()/Millisecond_f,
-			med/Millisecond_f,
-			avg/Millisecond_f,
-			stdd/Millisecond_f)
+			h.Median()/MillisecondFloat,
+			med/MillisecondFloat,
+			avg/MillisecondFloat,
+			stdd/MillisecondFloat)
 		return fmt.Errorf("Could not update temperature successfully")
 	}
 	temp := t.getTemp(t.getOhms(time.Duration(int64(h.Median()))))

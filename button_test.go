@@ -18,7 +18,6 @@ func testBoolChan(b chan bool, timeout time.Duration) bool {
 }
 
 func TestFakeButton(t *testing.T) {
-	LogTestMode()
 	Info("Running %s", t.Name())
 	timeout := 50 * time.Millisecond
 	pushed := make(chan bool)

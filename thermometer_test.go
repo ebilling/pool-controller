@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-func init() {
-	LogTestMode()
-}
-
 func TestGpioThermometer(t *testing.T) {
 	sleeptime := 1 * time.Millisecond
 	pin := TestPin{
