@@ -69,17 +69,11 @@ type PersistedConfig struct {
 	RunTime                 float64 // hours when a pump is manually engaged it will run for this many hours
 	Mtime                   time.Time
 	Ctime                   time.Time
+	Schedule                *Schedule
 }
 
 // NewConfig creates a config objects based on a given flagset and arguments.
 func NewConfig(fs *flag.FlagSet, args []string) *Config {
-	// **** TODO _ SWAP BACK ONCE FLAGS WORK IN ECLIPSE ON MACOSX
-	// if __test__ {
-	// 	defaultSslCert = "tests/test.crt"
-	// 	defaultSslKey = "tests/test.key"
-	// 	defaultDataDir = "tmp"
-	// 	Info("In Testmode for config settings")
-	// }
 	c := Config{
 		cfg: &PersistedConfig{},
 	}
