@@ -152,7 +152,7 @@ func TestSchedule(t *testing.T) {
 	assert.Nil(t, err)
 	cfg.Schedule = &Schedule{
 		Events: []*ScheduleEvent{
-			{time.Now(), 180, []time.Weekday{time.Sunday, time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday}, STATE_PUMP},
+			{time.Now(), 180, []time.Weekday{time.Sunday, time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday}, PUMP},
 		},
 	}
 	data, err = json.Marshal(cfg)

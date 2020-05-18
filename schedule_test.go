@@ -44,22 +44,22 @@ func TestIsNow(t *testing.T) {
 		expected bool
 		state    State
 	}{
-		{"MondayMidDay", "2006-01-01 15:04 -0700", twodays, false, STATE_OFF},
-		{"MidnightMonday", "2006-01-02 23:59 -0700", twodays, false, STATE_OFF},
-		{"TuesdayMidnightAM", "2006-01-03 00:00 -0700", twodays, false, STATE_OFF},
-		{"JustBeforeWindow", "2006-01-03 12:14 -0700", twodays, false, STATE_OFF},
-		{"WindowBorder", "2006-01-03 12:15 -0700", twodays, true, STATE_SWEEP},
-		{"InWindow", "2006-01-03 12:40 -0700", twodays, true, STATE_SWEEP},
-		{"EndOfWindow", "2006-01-03 13:14 -0700", twodays, true, STATE_SWEEP},
-		{"EndWindowBorder", "2006-01-03 13:15 -0700", twodays, false, STATE_OFF},
-		{"WednesdayMidnight", "2006-01-04 23:59 -0700", twodays, false, STATE_OFF},
+		{"MondayMidDay", "2006-01-01 15:04 -0700", twodays, false, OFF},
+		{"MidnightMonday", "2006-01-02 23:59 -0700", twodays, false, OFF},
+		{"TuesdayMidnightAM", "2006-01-03 00:00 -0700", twodays, false, OFF},
+		{"JustBeforeWindow", "2006-01-03 12:14 -0700", twodays, false, OFF},
+		{"WindowBorder", "2006-01-03 12:15 -0700", twodays, true, SWEEP},
+		{"InWindow", "2006-01-03 12:40 -0700", twodays, true, SWEEP},
+		{"EndOfWindow", "2006-01-03 13:14 -0700", twodays, true, SWEEP},
+		{"EndWindowBorder", "2006-01-03 13:15 -0700", twodays, false, OFF},
+		{"WednesdayMidnight", "2006-01-04 23:59 -0700", twodays, false, OFF},
 	}
 	for _, td := range testdata {
 		t.Run(td.name, func(t *testing.T) {
 			tm, err := time.Parse(tfmt, td.now)
 			assert.Nil(t, err)
 			s := &Schedule{
-				Events: []*ScheduleEvent{{Start: tm, Runtime: 60, Days: td.days, State: STATE_SWEEP}},
+				Events: []*ScheduleEvent{{Start: tm, Runtime: 60, Days: td.days, State: SWEEP}},
 			}
 			run, state := s.IsNow(clock)
 			assert.Equal(t, td.expected, run, "Expected run=%t at %s", td.expected, tm)

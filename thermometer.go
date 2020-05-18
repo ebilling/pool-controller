@@ -226,8 +226,6 @@ func (t *GpioThermometer) Update() error {
 		if t.inRange(dischargeTime) {
 			t.history.PushDuration(dischargeTime)
 			h.PushDuration(dischargeTime)
-		} else {
-			Error("Discharge time out of range %0.3f", float64(dischargeTime))
 		}
 	}
 

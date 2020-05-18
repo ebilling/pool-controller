@@ -82,7 +82,7 @@ func NewTestRunPumps() *TestRunPumps {
 func TestColdWaterHotWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 15.0, 50.0, 33.0, STATE_OFF)
+	trp.setConditions(30.0, 15.0, 50.0, 33.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -94,7 +94,7 @@ func TestColdWaterHotWeather(t *testing.T) {
 func TestWarmWaterHotWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 29.98, 50.0, 33.0, STATE_OFF)
+	trp.setConditions(30.0, 29.98, 50.0, 33.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -106,7 +106,7 @@ func TestWarmWaterHotWeather(t *testing.T) {
 func TestHotWaterHotWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 29.98, 50.0, 33.0, STATE_OFF)
+	trp.setConditions(30.0, 29.98, 50.0, 33.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -118,7 +118,7 @@ func TestHotWaterHotWeather(t *testing.T) {
 func TestColdWaterWarmWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 15.0, 40.0, 29.0, STATE_OFF)
+	trp.setConditions(30.0, 15.0, 40.0, 29.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -130,7 +130,7 @@ func TestColdWaterWarmWeather(t *testing.T) {
 func TestWarmWaterWarmWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 29.98, 40.0, 29.0, STATE_OFF)
+	trp.setConditions(30.0, 29.98, 40.0, 29.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -142,7 +142,7 @@ func TestWarmWaterWarmWeather(t *testing.T) {
 func TestHotWaterWarmWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 29.98, 40.0, 29.0, STATE_OFF)
+	trp.setConditions(30.0, 29.98, 40.0, 29.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}

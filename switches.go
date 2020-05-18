@@ -10,19 +10,19 @@ import (
 type State int8
 
 const (
-	// STATE_DISABLED means that the pumps are not allowed to run
-	STATE_DISABLED State = iota - 1
-	// STATE_OFF means that the pumps are OFF
-	STATE_OFF
-	// STATE_PUMP means that the main pump is running
-	STATE_PUMP
-	// STATE_SWEEP means that the main and sweep pumps are in operation
-	STATE_SWEEP
-	// STATE_SOLAR means that the main pump is running and the water is flowing to the solar panels
-	STATE_SOLAR
-	// STATE_SOLAR_MIXING means that the main and sweep pump are running with the solar panels in the flow
+	// DISABLED means that the pumps are not allowed to run
+	DISABLED State = iota - 1
+	// OFF means that the pumps are OFF
+	OFF
+	// PUMP means that the main pump is running
+	PUMP
+	// SWEEP means that the main and sweep pumps are in operation
+	SWEEP
+	// SOLAR means that the main pump is running and the water is flowing to the solar panels
+	SOLAR
+	// MIXING means that the main and sweep pump are running with the solar panels in the flow
 	// this allows for maximum mixing of the water at depth
-	STATE_SOLAR_MIXING
+	MIXING
 )
 
 // SolarLED is the GPIO number of the LED
@@ -30,17 +30,17 @@ const SolarLED uint8 = 6
 
 func (s State) String() string {
 	switch s {
-	case STATE_DISABLED:
+	case DISABLED:
 		return "Disabled"
-	case STATE_OFF:
+	case OFF:
 		return "Off"
-	case STATE_PUMP:
+	case PUMP:
 		return "Pump Running"
-	case STATE_SWEEP:
+	case SWEEP:
 		return "Cleaning"
-	case STATE_SOLAR:
+	case SOLAR:
 		return "Solar Running"
-	case STATE_SOLAR_MIXING:
+	case MIXING:
 		return "Solar Mixing"
 	default:
 		return "Unknown"
@@ -76,7 +76,7 @@ func NewSwitches(manufacturer string) *Switches {
 
 func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) *Switches {
 	p := Switches{
-		state:    STATE_OFF,
+		state:    OFF,
 		pump:     pump,
 		sweep:    sweep,
 		solar:    solar,
@@ -91,7 +91,7 @@ func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) *Switc
 func (p *Switches) bindHK() {
 	p.pump.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		if on == true {
-			p.SetState(STATE_PUMP, true, 1.0)
+			p.SetState(PUMP, true, 1.0)
 		} else {
 			p.StopAll(true)
 		}
@@ -100,21 +100,21 @@ func (p *Switches) bindHK() {
 	p.sweep.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		state := p.state
 		switch p.state {
-		case STATE_SOLAR:
+		case SOLAR:
 			if on {
-				state = STATE_SOLAR_MIXING
+				state = MIXING
 			}
 			break
-		case STATE_SOLAR_MIXING:
+		case MIXING:
 			if !on {
-				state = STATE_SOLAR
+				state = SOLAR
 			}
 			break
 		default:
 			if on {
-				state = STATE_SWEEP
+				state = SWEEP
 			} else {
-				state = STATE_PUMP
+				state = PUMP
 			}
 		}
 		p.SetState(state, true, 1.0)
@@ -123,24 +123,24 @@ func (p *Switches) bindHK() {
 	p.solar.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		state := p.state
 		switch p.state {
-		case STATE_SWEEP:
-		case STATE_SOLAR_MIXING:
+		case SWEEP:
+		case MIXING:
 			if on {
-				state = STATE_SOLAR_MIXING
+				state = MIXING
 			} else {
-				state = STATE_SWEEP
+				state = SWEEP
 			}
 			break
-		case STATE_SOLAR:
+		case SOLAR:
 			if !on {
-				state = STATE_PUMP
+				state = PUMP
 			}
 			break
 		default:
 			if on {
-				state = STATE_SOLAR
+				state = SOLAR
 			} else {
-				state = STATE_OFF
+				state = OFF
 			}
 		}
 		p.SetState(state, true, 1.0)
@@ -160,8 +160,8 @@ func (p *Switches) GetStopTime() time.Time {
 
 // Enable re-enables the pumps after having been disabled
 func (p *Switches) Enable() {
-	if p.state == STATE_DISABLED {
-		p.state = STATE_OFF
+	if p.state == DISABLED {
+		p.state = OFF
 		p.StopAll(true)
 	}
 }
@@ -169,7 +169,7 @@ func (p *Switches) Enable() {
 // Disable turns the pumps off and puts them in a state that will not allow them to run
 func (p *Switches) Disable() {
 	p.StopAll(true)
-	p.state = STATE_DISABLED
+	p.state = DISABLED
 }
 
 func turnOn(relay *Relay, on bool) {
@@ -201,9 +201,9 @@ func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state St
 
 // StopAll turns off all pumps
 func (p *Switches) StopAll(manual bool) {
-	state := STATE_OFF
-	if p.state == STATE_DISABLED {
-		state = STATE_DISABLED
+	state := OFF
+	if p.state == DISABLED {
+		state = DISABLED
 	}
 	p.setSwitches(false, false, false, manual, state)
 }
@@ -213,7 +213,7 @@ func (p *Switches) SetState(s State, manual bool, runtime float64) {
 	if p.state == s {
 		return // Nothing to do here
 	}
-	if p.state == STATE_DISABLED {
+	if p.state == DISABLED {
 		Info("Disabled, can't change state from %s to %s",
 			p.state, s)
 		return
@@ -225,22 +225,22 @@ func (p *Switches) SetState(s State, manual bool, runtime float64) {
 	}
 	Info("State change from %s to %s", p.state, s)
 	switch s {
-	case STATE_DISABLED:
+	case DISABLED:
 		p.Disable()
 		return
-	case STATE_OFF:
+	case OFF:
 		p.StopAll(manual)
 		return
-	case STATE_PUMP:
+	case PUMP:
 		p.setSwitches(true, false, false, manual, s)
 		return
-	case STATE_SWEEP:
+	case SWEEP:
 		p.setSwitches(true, true, false, manual, s)
 		return
-	case STATE_SOLAR:
+	case SOLAR:
 		p.setSwitches(true, false, true, manual, s)
 		return
-	case STATE_SOLAR_MIXING:
+	case MIXING:
 		p.setSwitches(true, true, true, manual, s)
 		return
 	}

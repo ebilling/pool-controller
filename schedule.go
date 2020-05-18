@@ -26,7 +26,7 @@ func (s *Schedule) IsNow(t time.Time) (bool, State) {
 			return now, state
 		}
 	}
-	return false, STATE_OFF
+	return false, OFF
 }
 
 func sameday(t time.Time, days []time.Weekday) bool {
@@ -44,12 +44,12 @@ func (se *ScheduleEvent) IsNow(t time.Time) (bool, State) {
 	schedTime := time.Date(t.Year(), t.Month(), t.Day(), se.Start.UTC().Hour(), se.Start.UTC().Minute(), 0, 0, time.UTC)
 	fmt.Println("SchedTime:", schedTime.Weekday(), schedTime, "- In:", t.UTC().Weekday(), t.UTC())
 	if !sameday(t.In(se.Start.Location()), se.Days) {
-		return false, STATE_OFF
+		return false, OFF
 	}
 	diff := schedTime.Sub(t.UTC())
 	fmt.Println("Diff:", diff, "Runtime:)", se.Runtime)
 	if diff >= 0 && diff < time.Duration(se.Runtime)*time.Minute {
 		return true, se.State
 	}
-	return false, STATE_OFF
+	return false, OFF
 }

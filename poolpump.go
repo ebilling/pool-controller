@@ -34,7 +34,7 @@ type PoolPumpController struct {
 // as the water temperature probe is near the pump, not actually in the pool.
 func RunningWaterThermometer(t Thermometer, s *Switches) *SelectiveThermometer {
 	return NewSelectiveThermometer("Pool", mftr, t, func() bool {
-		return s.State() > STATE_OFF
+		return s.State() > OFF
 	})
 }
 
@@ -98,28 +98,28 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	if ppc.switches.ManualState(ppc.config.cfg.RunTime) {
 		return
 	}
-	if state == STATE_DISABLED && !ppc.config.cfg.Disabled && !ppc.config.cfg.SolarDisabled {
-		ppc.switches.setSwitches(false, false, false, false, STATE_OFF)
+	if state == DISABLED && !ppc.config.cfg.Disabled && !ppc.config.cfg.SolarDisabled {
+		ppc.switches.setSwitches(false, false, false, false, OFF)
 		return
 	}
 	if ppc.config.cfg.Disabled {
-		if state > STATE_DISABLED {
-			ppc.switches.setSwitches(false, false, false, false, STATE_DISABLED)
+		if state > DISABLED {
+			ppc.switches.setSwitches(false, false, false, false, DISABLED)
 		}
 		return
 	}
 
 	if ppc.shouldCool() || ppc.shouldWarm() {
 		// Wide deltaT between target and temp or when it's cold, run sweep
-		if state == STATE_SOLAR_MIXING {
+		if state == MIXING {
 			return
 		}
 		if ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.DeltaT ||
 			ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance {
-			ppc.switches.SetState(STATE_SOLAR_MIXING, false, ppc.config.cfg.RunTime)
+			ppc.switches.SetState(MIXING, false, ppc.config.cfg.RunTime)
 		} else {
 			// Just push water through the panels
-			ppc.switches.SetState(STATE_SOLAR, false, ppc.config.cfg.RunTime)
+			ppc.switches.SetState(SOLAR, false, ppc.config.cfg.RunTime)
 		}
 		return
 	}
@@ -129,14 +129,14 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	runtime := DurationFromHours(ppc.config.cfg.RunTime, 1.0)
 	if time.Now().Sub(ppc.switches.GetStopTime()) > freqHours &&
 		time.Now().Hour() < 6 { // run in the early morning
-		ppc.switches.SetState(STATE_SWEEP, false, ppc.config.cfg.RunTime) // Clean pool
+		ppc.switches.SetState(SWEEP, false, ppc.config.cfg.RunTime) // Clean pool
 		if time.Now().Sub(ppc.switches.GetStartTime()) > runtime {
 			ppc.switches.StopAll(false) // End daily
 		}
 		return
 	}
 	// If there is no reason to turn on the pumps and it's not manual, turn off
-	if state > STATE_OFF && ppc.switches.GetStartTime().Add(time.Hour).Before(time.Now()) {
+	if state > OFF && ppc.switches.GetStartTime().Add(time.Hour).Before(time.Now()) {
 		ppc.switches.StopAll(false)
 	}
 }
@@ -173,15 +173,15 @@ func (ppc *PoolPumpController) runLoop() {
 func (ppc *PoolPumpController) Start() {
 	ppc.button = NewGpioButton(buttonGpio, func() {
 		switch ppc.switches.State() {
-		case STATE_OFF:
-			ppc.switches.SetState(STATE_PUMP, true, ppc.config.cfg.RunTime)
-		case STATE_PUMP:
-			ppc.switches.SetState(STATE_SWEEP, true, ppc.config.cfg.RunTime)
-		case STATE_SOLAR:
-			ppc.switches.SetState(STATE_SOLAR_MIXING, true, ppc.config.cfg.RunTime)
-		case STATE_DISABLED:
+		case OFF:
+			ppc.switches.SetState(PUMP, true, ppc.config.cfg.RunTime)
+		case PUMP:
+			ppc.switches.SetState(SWEEP, true, ppc.config.cfg.RunTime)
+		case SOLAR:
+			ppc.switches.SetState(MIXING, true, ppc.config.cfg.RunTime)
+		case DISABLED:
 		default:
-			ppc.switches.SetState(STATE_OFF, true, ppc.config.cfg.RunTime)
+			ppc.switches.SetState(OFF, true, ppc.config.cfg.RunTime)
 		}
 	})
 	// Initialize RRDs

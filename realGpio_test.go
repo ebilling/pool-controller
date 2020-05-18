@@ -26,15 +26,15 @@ const (
 	SWITCH   = 26 // Pin 37
 )
 
-var TestRig bool = false
+var TestRig = false
 var Led PiPin
 var TestRelay *Relay
 var Cap4700 PiPin
 var Cap10000 PiPin
 var Switch PiPin
 
-var r10000 float64 = 9930.0
-var r4700 float64 = 4600.0
+var r10000 = float64(9930.0)
+var r4700 = float64(4600.0)
 
 func TestInitilization(t *testing.T) {
 	SkipTestIfNotTestRig(t)
@@ -115,7 +115,7 @@ func TestDischargeStrategies(t *testing.T) {
 		for _, e := range edges {
 			h := NewHistory(10)
 			for i := 0; i < 10; i++ {
-				dt := discharge_us(therm, e, p)
+				dt := dischargeUs(therm, e, p)
 				h.Push(us(dt))
 			}
 			Info("Strategy: %s, %s, %0.3f, %0.3f, %0.4f, %0.2f",
@@ -172,7 +172,7 @@ func TestThermometer(t *testing.T) {
 	})
 }
 
-func discharge_us(t *GpioThermometer, e Edge, p Pull) time.Duration {
+func dischargeUs(t *GpioThermometer, e Edge, p Pull) time.Duration {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
