@@ -145,7 +145,6 @@ func (p *Switches) bindHK() {
 		}
 		p.SetState(state, true, 1.0)
 	})
-
 }
 
 // GetStartTime returns the start time of the last pump run (could be still running)

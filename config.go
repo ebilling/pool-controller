@@ -169,9 +169,8 @@ func (c *Config) Read() error {
 	err = json.Unmarshal(cfg, &c.cfg)
 	if err != nil {
 		Error("Unable to marshal config file: %s", err.Error())
-		return err
 	}
-	return nil
+	return err
 }
 
 // Authorized returns true if the password matches the one stored in the configuration
@@ -182,8 +181,5 @@ func (c *Config) Authorized(password string) bool {
 		Error("Could not decode password: %s", err.Error())
 	}
 	err = bcrypt.CompareHashAndPassword(out, []byte(password))
-	if err == nil {
-		return true
-	}
-	return false
+	return err == nil
 }

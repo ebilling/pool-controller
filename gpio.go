@@ -135,10 +135,8 @@ func NewGpio(gpio uint8) PiPin {
 
 // GpioInit initializes the system
 func GpioInit() error {
-	if _, err := host.Init(); err != nil {
-		return err
-	}
-	return nil
+	_, err := host.Init()
+	return err
 }
 
 // Input sets the pin to be read from.
