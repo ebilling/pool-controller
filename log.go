@@ -6,6 +6,7 @@ import (
 	"log/syslog"
 	"os"
 	"os/user"
+	"path"
 	"runtime"
 	rtdebug "runtime/debug"
 	"strings"
@@ -48,6 +49,7 @@ func DisableDebug() {
 func captureLine(format string) string {
 	depth := 2 //exclude this function and the logging function
 	_, file, line, ok := runtime.Caller(depth)
+	_, file = path.Split(file)
 	if !ok {
 		return format
 	}
