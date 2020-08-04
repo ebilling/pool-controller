@@ -90,6 +90,7 @@ func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) *Switc
 
 func (p *Switches) bindHK() {
 	p.pump.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
+		Log("HomeKit request to turn Pump on=%t", on)
 		if on == true {
 			p.SetState(PUMP, true, 1.0)
 		} else {
@@ -98,6 +99,7 @@ func (p *Switches) bindHK() {
 	})
 
 	p.sweep.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
+		Log("HomeKit request to turn Sweep on=%t", on)
 		state := p.state
 		switch p.state {
 		case SOLAR:
@@ -121,6 +123,7 @@ func (p *Switches) bindHK() {
 	})
 
 	p.solar.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
+		Log("HomeKit request to turn Solar on=%t", on)
 		state := p.state
 		switch p.state {
 		case SWEEP:

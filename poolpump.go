@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"time"
-
-	"github.com/ebilling/pool-controller/weather"
 )
 
 const (
@@ -18,7 +16,6 @@ const (
 // data from temperature probes and the weather.
 type PoolPumpController struct {
 	config      *Config
-	weather     *weather.Weather
 	switches    *Switches
 	pumpTemp    Thermometer
 	runningTemp Thermometer
@@ -42,7 +39,6 @@ func RunningWaterThermometer(t Thermometer, s *Switches) *SelectiveThermometer {
 func NewPoolPumpController(config *Config) *PoolPumpController {
 	ppc := PoolPumpController{
 		config:   config,
-		weather:  weather.NewWeather(config.cfg.WeatherUndergroundAppID, 20*time.Minute),
 		switches: NewSwitches(mftr),
 		pumpTemp: NewGpioThermometer("Pumphouse", mftr, waterGpio),
 		roofTemp: NewGpioThermometer("Poolhouse Roof", mftr, roofGpio),
@@ -114,6 +110,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		if state == MIXING {
 			return
 		}
+		Log("ShouldCool(%t) - ShouldWarm(%d)", ppc.shouldCool(), ppc.shouldWarm())
 		if ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.DeltaT ||
 			ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance {
 			ppc.switches.SetState(MIXING, false, ppc.config.cfg.RunTime)
@@ -127,8 +124,8 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	// If the pumps havent run in a day, wait til 4AM then start them
 	freqHours := DurationFromHours((ppc.config.cfg.DailyFrequency-0.25)*24.0, 12.0)
 	runtime := DurationFromHours(ppc.config.cfg.RunTime, 1.0)
-	if time.Now().Sub(ppc.switches.GetStopTime()) > freqHours &&
-		time.Now().Hour() < 6 { // run in the early morning
+	if time.Now().Sub(ppc.switches.GetStopTime()) > freqHours && time.Now().Hour() < 6 { // run in the early morning
+		Log("Daily running SWEEP: %s", freqHours.String())
 		ppc.switches.SetState(SWEEP, false, ppc.config.cfg.RunTime) // Clean pool
 		if time.Now().Sub(ppc.switches.GetStartTime()) > runtime {
 			ppc.switches.StopAll(false) // End daily
@@ -227,24 +224,14 @@ func (ppc *PoolPumpController) SyncAdjustments() {
 	}
 }
 
-// WeatherC returns the current temperature outside in degrees Celsius
-func (ppc *PoolPumpController) WeatherC() float64 {
-	wd, err := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
-	if err != nil || wd == nil {
-		Error("Error while reading weather: %v", err)
-		return 0.0
-	}
-	return wd.CurrentTempC
-}
-
 // Status prints the status of the system
 func (ppc *PoolPumpController) Status() string {
 	return fmt.Sprintf(
 		"Status(%s) Button(%s) Solar(%s) Pump(%s) Sweep(%s) Manual(%t) Target(%0.1f) "+
-			"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f) CurrentTemp(%0.1f)",
+			"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f)",
 		ppc.switches.State(), ppc.button.pin.Read(), ppc.switches.solar.Status(),
 		ppc.switches.pump.Status(), ppc.switches.sweep.Status(),
 		ppc.switches.ManualState(ppc.config.cfg.RunTime), ppc.config.cfg.Target,
 		ppc.runningTemp.Temperature(), ppc.pumpTemp.Temperature(),
-		ppc.roofTemp.Temperature(), ppc.WeatherC())
+		ppc.roofTemp.Temperature())
 }

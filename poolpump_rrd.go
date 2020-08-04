@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/ebilling/pool-controller/weather"
 )
 
 func (r *Rrd) addTemp(name, title string, colorid, which int) {
@@ -63,19 +61,10 @@ func (ppc *PoolPumpController) createRrds() {
 
 // UpdateRrd writes updates to RRD files and generates cached graphs
 func (ppc *PoolPumpController) UpdateRrd() {
-	wd, err := ppc.weather.GetWeatherByZip(ppc.config.cfg.Zip)
-	if err != nil {
-		Log("Error requesting weather: %s", err)
-		wd = &weather.Data{} // use empty data
-	}
 	update := fmt.Sprintf("N:%f:%f:%f:%f:%f:%f",
-		ppc.pumpTemp.Temperature(), ppc.WeatherC(), ppc.roofTemp.Temperature(),
-		wd.SolarRadiation, ppc.runningTemp.Temperature(), ppc.config.cfg.Target)
+		ppc.pumpTemp.Temperature(), 0.0, ppc.roofTemp.Temperature(),
+		0.0, ppc.runningTemp.Temperature(), ppc.config.cfg.Target)
 	Debug("Updating TempRrd: %s", update)
-	err = ppc.tempRrd.Updater().Update(update)
-	if err != nil {
-		Error("Update failed for TempRrd {%s}: %s", update, err.Error())
-	}
 
 	solar := 0.01
 	if ppc.switches.solar.isOn() {
@@ -87,7 +76,7 @@ func (ppc *PoolPumpController) UpdateRrd() {
 	}
 	update = fmt.Sprintf("N:%d.001:%0.3f:%0.3f", ppc.switches.State(), solar, manual)
 	Debug("Updating PumpRrd: %s", update)
-	err = ppc.pumpRrd.Updater().Update(update)
+	err := ppc.pumpRrd.Updater().Update(update)
 	if err != nil {
 		Error("Could not create PumpRrd: %s", err.Error())
 	}

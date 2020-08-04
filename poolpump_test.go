@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/brutella/hc/accessory"
-	"github.com/ebilling/pool-controller/weather"
-	fakeweather "github.com/ebilling/pool-controller/weather/fakeWeather"
 )
 
 type FakeThermometer struct {
@@ -61,7 +59,6 @@ func (t *TestRunPumps) setConditions(target, pump, roof, outside float64, state 
 	t.roofTemp.temp = roof
 	t.service.temp = outside
 	t.ppc.switches.state = state
-	t.ppc.weather = weather.NewWeatherFromService(&fakeweather.TestService{})
 }
 
 func NewTestRunPumps() *TestRunPumps {
@@ -75,7 +72,6 @@ func NewTestRunPumps() *TestRunPumps {
 	}
 	t.ppc.pumpTemp = &t.pumpTemp
 	t.ppc.roofTemp = &t.roofTemp
-	t.ppc.weather = weather.NewWeatherFromService(&fakeweather.TestService{})
 	return &t
 }
 

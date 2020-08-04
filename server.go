@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ebilling/pool-controller/weather"
 	qrcode "github.com/skip2/go-qrcode"
 )
 
@@ -274,11 +273,6 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 		modeStr = "Manual"
 	}
 
-	weatherData, err := h.ppc.weather.GetWeatherByZip(h.ppc.config.cfg.Zip)
-	if err != nil {
-		weatherData = &weather.Data{}
-	}
-
 	html := "<html><head><title>Pool Pump Controller</title></head><body><center>" +
 		"<table>\n"
 	html += indent(1) + "<tr><td colspan=2 align=center><font face=helvetica color=#444444 " +
@@ -289,8 +283,6 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	html += fmt.Sprintf("Target: %0.1f F<br>", toFarenheit(h.ppc.config.cfg.Target))
 	html += fmt.Sprintf("Pool: %0.1f F<br>", toFarenheit(h.ppc.runningTemp.Temperature()))
 	html += fmt.Sprintf("Roof: %0.1f F<br>", toFarenheit(h.ppc.roofTemp.Temperature()))
-	html += fmt.Sprintf("Weather: %0.1f F<br>", toFarenheit(weatherData.CurrentTempC))
-	html += fmt.Sprintf("Solar: %0.1f W/sqm", weatherData.SolarRadiation)
 	html += "</font></td></tr>\n"
 	html += indent(1) + "<tr><td colspan=2><br></td></tr>"
 	html += indent(1) + "<tr>"
