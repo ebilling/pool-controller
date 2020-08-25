@@ -55,20 +55,14 @@
 					}
 				],
 				"deployment_strategy": {},
-				"application_init": {
-					"command": "",
-					"arguments": null
-				},
+				"application_init": {},
 				"packages": [
 					{
 						"name": "((application.name))",
-						"dependencies": [],
 						"downloads": [],
 						"files": [
 							"((application.name))*"
-						],
-						"package_install_command": "",
-						"installed_path": ""
+						]
 					}
 				],
 				"instance_tags": [
@@ -138,10 +132,7 @@
 		},
 		"default_properties": [],
 		"deployment_files": [],
-		"application_init": {
-			"command": "",
-			"arguments": null
-		},
+		"application_init": {},
 		"process": {
 			"init": {
 				"command": "bin/start-service.sh"
