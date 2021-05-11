@@ -72,18 +72,7 @@
 					}
 				],
 				"post_deployment_actions": {
-					"instances": null,
-					"loadbalanced": false,
-					"loadbalancer": {
-						"TargetGroupName": "",
-						"TargetGroupPort": 0,
-						"TargetGroupProtocol": "",
-						"TargetType": "",
-						"VPCID": "",
-						"HealthCheckEnabled": false,
-						"HealthCheckPort": "",
-						"UnhealthyThresholdCount": 0
-					}
+					"loadbalancer": {}
 				},
 				"cache_info": {
 					"paths": [
@@ -137,8 +126,7 @@
 			"init": {
 				"command": "bin/start-service.sh"
 			}
-		},
-		"releases": []
+		}
 	},
 	"organization": {
 		"orgname": "TestOrg"
