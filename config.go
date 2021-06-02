@@ -177,11 +177,6 @@ func (c *Config) Read() error {
 
 // Authorized returns true if the password matches the one stored in the configuration
 func (c *Config) Authorized(password string) bool {
-	return true
-	if c.cfg.Auth == "" {
-
-		return true
-	}
 	var out = make([]byte, base64.StdEncoding.DecodedLen(len(c.cfg.Auth)))
 	_, err := base64.StdEncoding.Decode(out, []byte(c.cfg.Auth))
 	if err != nil {
