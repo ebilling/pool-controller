@@ -109,7 +109,7 @@ func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermo
 		name:        name,
 		mutex:       sync.Mutex{},
 		pin:         pin,
-		microfarads: 10.0,
+		microfarads: 0.1,
 		adjust:      1.8,
 		history:     *NewHistory(100),
 		updated:     time.Now().Add(-24 * time.Hour),
@@ -157,7 +157,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 func (t *GpioThermometer) getTemp(ohms float64) float64 {
 	const a = 79463.85
 	const b = 0.1453676
-	const c = 2.517178E-15
+	const c = 2.517178e-15
 	const d = -132.2399
 	if ohms == 0.0 {
 		return 0.0
