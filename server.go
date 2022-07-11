@@ -68,7 +68,7 @@ func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 func startServer(s *Server, cert, key string) {
 	err := s.server.ListenAndServeTLS(cert, key)
 	if err != nil {
-		Error("Error from Server: %s", err.Error())
+		Fatal("Error from Server: %s", err.Error())
 	}
 	s.done <- true
 	Info("Exiting HttpServer")

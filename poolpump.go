@@ -60,15 +60,25 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 
 // Update the solar configuration parameters from the config file (if changed)
 // and updates the values of the Thermometers.
-func (ppc *PoolPumpController) Update() {
-	ppc.pumpTemp.Update()
-	ppc.roofTemp.Update()
-	ppc.runningTemp.Update()
+func (ppc *PoolPumpController) Update() error {
+	err := ppc.pumpTemp.Update()
+	if err != nil {
+		return fmt.Errorf("Pump Temp Update failed: %w", err)
+	}
+	err = ppc.roofTemp.Update()
+	if err != nil {
+		return fmt.Errorf("Roof Temp Update failed: %w", err)
+	}
+	err = ppc.runningTemp.Update()
+	if err != nil {
+		return fmt.Errorf("Running Temp Update failed: %w", err)
+	}
 	if ppc.config.cfg.ButtonDisabled {
 		ppc.button.Disable()
 	} else {
 		ppc.button.Enable()
 	}
+	return nil
 }
 
 // A return value of 'True' indicates that the pool is too hot and the roof is cold
@@ -175,7 +185,7 @@ func (ppc *PoolPumpController) runLoop() {
 }
 
 // Start finishes initializing the PoolPumpController, and kicks off the control thread.
-func (ppc *PoolPumpController) Start() {
+func (ppc *PoolPumpController) Start() error {
 	ppc.button = NewGpioButton(buttonGpio, func() {
 		switch ppc.switches.State() {
 		case OFF:
@@ -190,12 +200,19 @@ func (ppc *PoolPumpController) Start() {
 		}
 	})
 	// Initialize RRDs
-	ppc.createRrds()
+	err := ppc.createRrds()
+	if err != nil {
+		return err
+	}
 
 	// Start go routines
-	ppc.Update()
+	err = ppc.Update()
+	if err != nil {
+		return err
+	}
 	ppc.button.Start()
 	go ppc.runLoop()
+	return nil
 }
 
 // Stop stops all of the pumps

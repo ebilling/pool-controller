@@ -17,7 +17,7 @@ func (r *Rrd) addTemp(name, title string, colorid, which int) {
 	r.grapher.Line(2.0, cname, colorStr(colorid), title)
 }
 
-func (ppc *PoolPumpController) createRrds() {
+func (ppc *PoolPumpController) createRrds() error {
 	ppc.tempRrd.addTemp("pump", "Pump", 8, 1)
 	ppc.tempRrd.addTemp("weather", "Weather", 1, 2)
 	ppc.tempRrd.addTemp("roof", "Roof", 2, 3)
@@ -25,7 +25,10 @@ func (ppc *PoolPumpController) createRrds() {
 	ppc.tempRrd.addTemp("pool", "Pool", 0, 5)
 	ppc.tempRrd.addTemp("target", "Target", 6, 6)
 	ppc.tempRrd.AddStandardRRAs()
-	ppc.tempRrd.Creator().Create(*ppc.config.forceRrd)
+	err := ppc.tempRrd.Creator().Create(*ppc.config.forceRrd)
+	if err != nil {
+		return err
+	}
 
 	tg := ppc.tempRrd.grapher
 	tg.SetTitle("Temperatures and Solar Radiation")
@@ -40,7 +43,10 @@ func (ppc *PoolPumpController) createRrds() {
 	pc.DS("solar", "GAUGE", "30", "-1", "10")
 	pc.DS("manual", "GAUGE", "30", "-1", "10")
 	ppc.pumpRrd.AddStandardRRAs()
-	pc.Create(*ppc.config.forceRrd) // fails if already exists
+	err = pc.Create(*ppc.config.forceRrd) // fails if already exists
+	if err != nil {
+		return err
+	}
 
 	pg := ppc.pumpRrd.grapher
 	pg.SetTitle("Pump Activity")
@@ -57,6 +63,7 @@ func (ppc *PoolPumpController) createRrds() {
 	pg.Line(2.0, "t2", colorStr(2), "Solar Status")
 	pg.Def("t3", ppc.pumpRrd.path, "manual", "AVERAGE")
 	pg.Line(2.0, "t3", colorStr(6), "Manual Operation")
+	return nil
 }
 
 // UpdateRrd writes updates to RRD files and generates cached graphs
