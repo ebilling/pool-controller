@@ -166,11 +166,11 @@ func (s *SolarValve) cleanup() {
 
 // TurnOn runs the motor for the valve forward for timeout seconds
 func (s *SolarValve) TurnOn() {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
 	if s.statusLED.Read().State() == gpio.High {
 		return
 	}
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	defer s.cleanup()
 	s.statusLED.Output(High)
 	s.revRelay.TurnOff()
@@ -179,11 +179,11 @@ func (s *SolarValve) TurnOn() {
 
 // TurnOff runs the motor for the valve in reverse for timeout seconds
 func (s *SolarValve) TurnOff() {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
 	if s.statusLED.Read().State() == gpio.Low {
 		return
 	}
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	defer s.cleanup()
 	s.statusLED.Output(Low)
 	s.fwdRelay.TurnOff()
