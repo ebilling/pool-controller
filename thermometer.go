@@ -145,7 +145,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	start := time.Now()
 	//	t.pin.InputEdge(PullDown, RisingEdge) // Original
 	t.pin.InputEdge(PullUp, RisingEdge)
-	if !t.pin.WaitForEdge(time.Second * 2) {
+	if !t.pin.WaitForEdge(time.Second) {
 		Trace("Thermometer %s, Rising read timed out", t.Name())
 		return time.Duration(0)
 	}
@@ -234,8 +234,8 @@ func (t *GpioThermometer) Update() error {
 	avg := t.history.Average()
 	med := t.history.Median()
 	dev := stdd * 1.5
-	if dev < 5*MillisecondFloat {
-		dev = 5 * MillisecondFloat
+	if dev < MillisecondFloat/5 {
+		dev = MillisecondFloat / 5
 	} // give some wiggle room
 
 	// Throw away bad results
@@ -248,7 +248,9 @@ func (t *GpioThermometer) Update() error {
 			stdd/MillisecondFloat)
 		return fmt.Errorf("Could not update temperature successfully")
 	}
-	temp := t.getTemp(t.getOhms(time.Duration(int64(h.Median()))))
+	ohms := t.getOhms(time.Duration(int64(h.Median())))
+	Info("Calculating temperature for %s: %f ohms", t.name, ohms)
+	temp := t.getTemp(ohms)
 	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
 	t.updated = time.Now()
 	return nil

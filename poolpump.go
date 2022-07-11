@@ -6,15 +6,15 @@ import (
 )
 
 const (
-	mftr       = "Bonnie Labs"
-	waterGpio  = 4
-	roofGpio   = 3
-	buttonGpio = 18
-	pumpGpio   = 24
-	sweepGpio  = 25
-	solarLED   = 21
-	solarFwd   = 22
-	solarRev   = 23
+	mftr         = "Bonnie Labs"
+	roofGpio     = 3
+	waterGpio    = 4
+	buttonGpio   = 18
+	solarLedGpio = 21
+	solarFwdGpio = 22
+	solarRevGpio = 23
+	pumpGpio     = 24
+	sweepGpio    = 25
 
 	solarMotorTime = 15 * time.Second
 )

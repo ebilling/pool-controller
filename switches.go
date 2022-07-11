@@ -65,7 +65,7 @@ func NewSwitches(manufacturer string) *Switches {
 	return newSwitches(
 		NewRelay(pumpGpio, "Pool Pump", manufacturer),
 		NewRelay(sweepGpio, "Pool Sweep", manufacturer),
-		NewSolarValve(solarFwd, solarRev, solarLED, "Solar", manufacturer, solarMotorTime))
+		NewSolarValve(solarFwdGpio, solarRevGpio, solarLedGpio, "Solar", manufacturer, solarMotorTime))
 }
 
 func newSwitches(pump *Relay, sweep *Relay, solar *SolarValve) *Switches {

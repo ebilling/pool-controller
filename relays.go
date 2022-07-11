@@ -160,23 +160,27 @@ func (s *SolarValve) String() string {
 // TurnOn runs the motor for the valve forward for timeout seconds
 func (s *SolarValve) TurnOn() {
 	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	defer s.fwdRelay.TurnOff()
 	s.statusLED.Output(High)
 	s.revRelay.TurnOff()
 	s.fwdRelay.TurnOn()
-	time.Sleep(s.timeout)
+	go func() {
+		time.Sleep(s.timeout)
+		defer s.mtx.Unlock()
+		defer s.fwdRelay.TurnOff()
+	}()
 }
 
 // TurnOff runs the motor for the valve in reverse for timeout seconds
 func (s *SolarValve) TurnOff() {
 	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	defer s.revRelay.TurnOff()
 	s.statusLED.Output(Low)
 	s.fwdRelay.TurnOff()
 	s.revRelay.TurnOn()
-	time.Sleep(s.timeout)
+	go func() {
+		time.Sleep(s.timeout)
+		defer s.mtx.Unlock()
+		defer s.revRelay.TurnOff()
+	}()
 }
 
 // Status returns "On" if at HIGH voltage or "Off" if at LOW voltage
