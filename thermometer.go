@@ -203,7 +203,6 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 }
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
-
 	// Completely bogus, ignore
 	if dischargeTime < minTime || dischargeTime > maxTime {
 		return false
@@ -221,7 +220,6 @@ func (t *GpioThermometer) Temperature() float64 {
 
 // Update updates the current temperature of the GpioThermometer
 func (t *GpioThermometer) Update() error {
-	Info("Update %s", t.name)
 	var dischargeTime time.Duration
 	h := NewHistory(3)
 	for i := 0; h.Len() < 3 && i < 10; i++ {
@@ -236,8 +234,9 @@ func (t *GpioThermometer) Update() error {
 	avg := t.history.Average()
 	med := t.history.Median()
 	dev := stdd * 1.5
-	if dev < MillisecondFloat/5 {
-		dev = MillisecondFloat / 5
+
+	if dev < float64(minTime)/2 {
+		dev = float64(minTime) / 2
 	} // give some wiggle room
 
 	// Throw away bad results
@@ -250,12 +249,6 @@ func (t *GpioThermometer) Update() error {
 			stdd/MillisecondFloat)
 		return fmt.Errorf("Could not update temperature successfully")
 	}
-	Debug("%s Thermometer update succeeded: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
-		t.Name(),
-		h.Median()/MillisecondFloat,
-		med/MillisecondFloat,
-		avg/MillisecondFloat,
-		stdd/MillisecondFloat)
 	ohms := t.getOhms(time.Duration(int64(h.Median())))
 	temp := t.getTemp(ohms)
 	Info("Calculating temperature (%f) for %s: %f ohms, median %s", temp, t.name, ohms, time.Duration(int64(h.Median())))
