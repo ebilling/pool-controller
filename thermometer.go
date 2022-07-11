@@ -145,7 +145,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	start := time.Now()
 	//	t.pin.InputEdge(PullDown, RisingEdge) // Original
 	t.pin.InputEdge(PullUp, RisingEdge)
-	if !t.pin.WaitForEdge(time.Second / 2) {
+	if !t.pin.WaitForEdge(time.Second * 2) {
 		Trace("Thermometer %s, Rising read timed out", t.Name())
 		return time.Duration(0)
 	}
@@ -180,6 +180,7 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 	h := NewHistory(20)
 	for i := 0; i < 20; i++ {
 		dt := t.getDischargeTime()
+		Info("Discharge time [%s]: %s", t.name, dt)
 		if dt != 0 {
 			h.Push(float64(dt))
 		}
