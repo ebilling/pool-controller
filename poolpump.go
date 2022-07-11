@@ -98,11 +98,15 @@ func (ppc *PoolPumpController) shouldCool() bool {
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
+	Info("shouldWarm: disabled(%t)", ppc.config.cfg.SolarDisabled)
 	if ppc.config.cfg.SolarDisabled {
 		return false
 	}
-	return ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.Tolerance &&
+	warm := ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.Tolerance &&
 		ppc.pumpTemp.Temperature() < ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT
+
+	Info("shouldWarm: %t", warm)
+	return warm
 }
 
 // RunPumpsIfNeeded - If the water is not within the tolerance limit of the target, and the roof
