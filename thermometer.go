@@ -210,7 +210,8 @@ func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 
 // Temperature returns the current temperature of the GpioThermometer
 func (t *GpioThermometer) Temperature() float64 {
-	if time.Now().After(t.updated.Add(time.Minute)) {
+	// TODO: Change back to time.Minute
+	if time.Now().After(t.updated.Add(time.Second)) {
 		t.Update()
 	}
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()
