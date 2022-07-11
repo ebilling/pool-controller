@@ -62,16 +62,25 @@ func newRelay(pin PiPin, name string, manufacturer string) *Relay {
 
 // Accessory returns the Apple HomeKit accessory associated with the relay
 func (r *Relay) Accessory() *accessory.Accessory {
+	if r == nil || r.accessory == nil {
+		return nil
+	}
 	return r.accessory.Accessory
 }
 
 // Name returns the name of the Relay
 func (r *Relay) Name() string {
+	if r == nil {
+		return ""
+	}
 	return r.name
 }
 
 // String returns the state of the Relay
 func (r *Relay) String() string {
+	if r == nil {
+		return ""
+	}
 	return fmt.Sprintf(
 		"Relay: { Name: %s, Pin: %v, StartTime: %s, StopTime: %s, Accessory: %v}",
 		r.Name(), r.pin, timeStr(r.startTime), timeStr(r.stopTime), r.accessory)
@@ -82,7 +91,9 @@ func (r *Relay) TurnOn() {
 	Trace("TurnOn %s", r.name)
 	r.pin.Output(High)
 	r.startTime = time.Now()
-	r.accessory.Switch.On.SetValue(true)
+	if r.accessory != nil {
+		r.accessory.Switch.On.SetValue(true)
+	}
 }
 
 // TurnOff flips the output to LOW voltage (<1V)
@@ -90,15 +101,21 @@ func (r *Relay) TurnOff() {
 	Trace("TurnOff %s", r.name)
 	r.pin.Output(Low)
 	r.stopTime = time.Now()
-	r.accessory.Switch.On.SetValue(false)
+	if r.accessory != nil {
+		r.accessory.Switch.On.SetValue(false)
+	}
 }
 
 func (r *Relay) isOn() bool {
 	if r.pin.Read() == High {
-		r.accessory.Switch.On.SetValue(true)
+		if r.accessory != nil {
+			r.accessory.Switch.On.SetValue(true)
+		}
 		return true
 	}
-	r.accessory.Switch.On.SetValue(false)
+	if r.accessory != nil {
+		r.accessory.Switch.On.SetValue(false)
+	}
 	return false
 }
 
