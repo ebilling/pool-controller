@@ -25,10 +25,7 @@ func (ppc *PoolPumpController) createRrds() error {
 	ppc.tempRrd.addTemp("pool", "Pool", 0, 5)
 	ppc.tempRrd.addTemp("target", "Target", 6, 6)
 	ppc.tempRrd.AddStandardRRAs()
-	err := ppc.tempRrd.Creator().Create(*ppc.config.forceRrd)
-	if err != nil {
-		return err
-	}
+	ppc.tempRrd.Creator().Create(*ppc.config.forceRrd)
 
 	tg := ppc.tempRrd.grapher
 	tg.SetTitle("Temperatures and Solar Radiation")
@@ -43,10 +40,7 @@ func (ppc *PoolPumpController) createRrds() error {
 	pc.DS("solar", "GAUGE", "30", "-1", "10")
 	pc.DS("manual", "GAUGE", "30", "-1", "10")
 	ppc.pumpRrd.AddStandardRRAs()
-	err = pc.Create(*ppc.config.forceRrd) // fails if already exists
-	if err != nil {
-		return err
-	}
+	pc.Create(*ppc.config.forceRrd) // fails if already exists
 
 	pg := ppc.pumpRrd.grapher
 	pg.SetTitle("Pump Activity")
