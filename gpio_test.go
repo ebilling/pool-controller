@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brutella/hc/accessory"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -94,7 +95,7 @@ func pumpTest(t *testing.T, pumps *Switches, state State,
 	if !checkPinState(t, "Sweep", pumps.sweep.pin, Output, sweepState) {
 		t.Errorf("")
 	}
-	if !checkPinState(t, "Solar", pumps.solar.pin, Output, solarState) {
+	if !checkPinState(t, "Solar", pumps.solar.statusLED, Output, solarState) {
 		t.Errorf("")
 	}
 	if !checkPinState(t, "SolarLED", pumps.solarLed, Output, solarState) {
@@ -128,13 +129,20 @@ func pumpTest(t *testing.T, pumps *Switches, state State,
 func TestGpioSwitchesBasic(t *testing.T) {
 	pumpPin := &TestPin{}
 	sweepPin := &TestPin{}
-	solarPin := &TestPin{}
+	solarFwdPin := &TestPin{}
+	solarRevPin := &TestPin{}
 	solarLedPin := &TestPin{}
 	pumps := newSwitches(
 		newRelay(pumpPin, "Test Pump", mftr),
 		newRelay(sweepPin, "Test Sweep", mftr),
-		newRelay(solarPin, "Test Solar", mftr),
-		solarLedPin)
+		&SolarValve{
+			fwdRelay:  newRelay(solarFwdPin, "", ""),
+			revRelay:  newRelay(solarRevPin, "", ""),
+			statusLED: solarLedPin,
+			timeout:   time.Microsecond,
+			accessory: accessory.NewSwitch(AccessoryInfo("Test Solar Valve", mftr)),
+		},
+	)
 
 	startTime := pumps.GetStartTime()
 	stopTime := pumps.GetStopTime()

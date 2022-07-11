@@ -2,20 +2,10 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/brutella/hc/accessory"
-)
-
-const (
-	// Relay1 corresponds to GPIO 17
-	Relay1 uint8 = 17
-	// Relay2 corresponds to GPIO 27
-	Relay2 uint8 = 27
-	// Relay3 corresponds to GPIO 22
-	Relay3 uint8 = 22
-	// Relay4 corresponds to GPIO 23
-	Relay4 uint8 = 23
 )
 
 // Relay controls the behavior of a particular relay in the system.
@@ -26,6 +16,17 @@ type Relay struct {
 	stopTime  time.Time
 	accessory *accessory.Switch
 	enabled   bool
+}
+
+// SolarValve controls two relays at the same time.
+// Only one can be engaged at any one time, and will shut off after a given timeout
+type SolarValve struct {
+	fwdRelay  *Relay
+	revRelay  *Relay
+	statusLED PiPin
+	accessory *accessory.Switch
+	mtx       sync.Mutex
+	timeout   time.Duration
 }
 
 // AccessoryInfo tells Apple HomeKit about the device
@@ -50,8 +51,10 @@ func newRelay(pin PiPin, name string, manufacturer string) *Relay {
 		pin:       pin,
 		startTime: time.Now(),
 		stopTime:  time.Now(),
-		accessory: accessory.NewSwitch(AccessoryInfo(name, manufacturer)),
 		enabled:   true,
+	}
+	if name != "" {
+		relay.accessory = accessory.NewSwitch(AccessoryInfo(name, manufacturer))
 	}
 	relay.TurnOff()
 	return &relay
@@ -115,4 +118,73 @@ func (r *Relay) GetStartTime() time.Time {
 // GetStopTime returns the time the relay was last set to LOW voltage
 func (r *Relay) GetStopTime() time.Time {
 	return r.stopTime
+}
+
+// NewSolarValve creates a special controller for the Solar Valve operation
+// When set to ON, it runs the motor forward for 15 seconds
+// When set to OFF, it runs the motor in reverse for 15 seconds
+func NewSolarValve(forward uint8, reverse uint8, ledPin uint8, name string, manufacturer string, timeout time.Duration) *SolarValve {
+	r := &SolarValve{
+		fwdRelay:  newRelay(NewGpio(forward), "", ""),
+		revRelay:  newRelay(NewGpio(reverse), "", ""),
+		statusLED: NewGpio(ledPin),
+		accessory: accessory.NewSwitch(AccessoryInfo(name, manufacturer)),
+		timeout:   timeout,
+	}
+	r.TurnOff()
+	return r
+}
+
+// String returns a string that describes the current state of the Solar Valve
+func (s *SolarValve) String() string {
+	return fmt.Sprintf("Forward: %s, Reverse: %s, Status: %s", s.fwdRelay.String(), s.revRelay.String(), s.Status())
+}
+
+// TurnOn runs the motor for the valve forward for timeout seconds
+func (s *SolarValve) TurnOn() {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	defer s.fwdRelay.TurnOff()
+	s.statusLED.Output(High)
+	s.revRelay.TurnOff()
+	s.fwdRelay.TurnOn()
+	time.Sleep(s.timeout)
+}
+
+// TurnOff runs the motor for the valve in reverse for timeout seconds
+func (s *SolarValve) TurnOff() {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	defer s.revRelay.TurnOff()
+	s.statusLED.Output(Low)
+	s.fwdRelay.TurnOff()
+	s.revRelay.TurnOn()
+	time.Sleep(s.timeout)
+}
+
+// Status returns "On" if at HIGH voltage or "Off" if at LOW voltage
+func (s *SolarValve) Status() string {
+	if s.statusLED.Read() == High {
+		return "On"
+	}
+	return "Off"
+}
+
+// Accessory returns the accessory of the SolarValve
+func (s *SolarValve) Accessory() *accessory.Accessory {
+	return s.accessory.Accessory
+}
+
+func (s *SolarValve) isOn() bool {
+	return s.statusLED.Read() == High
+}
+
+// GetStartTime returns the time the relay was last set to HIGH voltage
+func (s *SolarValve) GetStartTime() time.Time {
+	return s.fwdRelay.startTime
+}
+
+// GetStopTime returns the time the relay was last set to LOW voltage
+func (s *SolarValve) GetStopTime() time.Time {
+	return s.revRelay.stopTime
 }

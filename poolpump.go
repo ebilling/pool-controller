@@ -7,9 +7,16 @@ import (
 
 const (
 	mftr       = "Bonnie Labs"
-	waterGpio  = 25
-	roofGpio   = 24
+	waterGpio  = 4
+	roofGpio   = 3
 	buttonGpio = 18
+	pumpGpio   = 24
+	sweepGpio  = 25
+	solarLED   = 21
+	solarFwd   = 22
+	solarRev   = 23
+
+	solarMotorTime = 15 * time.Second
 )
 
 // The PoolPumpController manages the relays that control the pumps based on
