@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/brutella/hc/accessory"
+	"periph.io/x/conn/v3/gpio"
 )
 
 // Relay controls the behavior of a particular relay in the system.
@@ -157,30 +158,36 @@ func (s *SolarValve) String() string {
 	return fmt.Sprintf("Forward: %s, Reverse: %s, Status: %s", s.fwdRelay.String(), s.revRelay.String(), s.Status())
 }
 
+func (s *SolarValve) cleanup() {
+	time.Sleep(s.timeout)
+	s.fwdRelay.TurnOff()
+	s.revRelay.TurnOff()
+}
+
 // TurnOn runs the motor for the valve forward for timeout seconds
 func (s *SolarValve) TurnOn() {
 	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	if s.statusLED.Read().State() == gpio.High {
+		return
+	}
+	defer s.cleanup()
 	s.statusLED.Output(High)
 	s.revRelay.TurnOff()
 	s.fwdRelay.TurnOn()
-	go func() {
-		time.Sleep(s.timeout)
-		defer s.mtx.Unlock()
-		defer s.fwdRelay.TurnOff()
-	}()
 }
 
 // TurnOff runs the motor for the valve in reverse for timeout seconds
 func (s *SolarValve) TurnOff() {
 	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	if s.statusLED.Read().State() == gpio.Low {
+		return
+	}
+	defer s.cleanup()
 	s.statusLED.Output(Low)
 	s.fwdRelay.TurnOff()
 	s.revRelay.TurnOn()
-	go func() {
-		time.Sleep(s.timeout)
-		defer s.mtx.Unlock()
-		defer s.revRelay.TurnOff()
-	}()
 }
 
 // Status returns "On" if at HIGH voltage or "Off" if at LOW voltage
