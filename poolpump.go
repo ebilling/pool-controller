@@ -47,8 +47,8 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 	ppc := PoolPumpController{
 		config:   config,
 		switches: NewSwitches(mftr),
-		pumpTemp: NewGpioThermometer("Pumphouse", mftr, waterGpio),
-		roofTemp: NewGpioThermometer("Poolhouse Roof", mftr, roofGpio),
+		pumpTemp: NewGpioThermometer("Pump", mftr, waterGpio),
+		roofTemp: NewGpioThermometer("Roof", mftr, roofGpio),
 		tempRrd:  NewRrd(*config.dataDirectory + "/temperature.rrd"),
 		pumpRrd:  NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
 		done:     make(chan bool),
