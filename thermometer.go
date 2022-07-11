@@ -92,8 +92,7 @@ type GpioThermometer struct {
 
 // NewGpioThermometer returns a GpioThermometer
 func NewGpioThermometer(name string, manufacturer string, gpio uint8) *GpioThermometer {
-	return newGpioThermometer(name, manufacturer,
-		NewGpio(gpio))
+	return newGpioThermometer(name, manufacturer, NewGpio(gpio))
 }
 
 // MillisecondFloat returns the float64 value associated with time.Millisecond time.Duration
