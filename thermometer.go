@@ -110,7 +110,7 @@ func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermo
 		mutex:       sync.Mutex{},
 		pin:         pin,
 		microfarads: 0.1,
-		adjust:      1.8,
+		adjust:      2.5,
 		history:     *NewHistory(100),
 		updated:     time.Now().Add(-24 * time.Hour),
 		accessory:   acc,
@@ -136,7 +136,7 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 func (t *GpioThermometer) getDischargeTime() time.Duration {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-
+	Info("getDischargeTime:%s", t.name)
 	//Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
 	time.Sleep(3 * time.Millisecond)
@@ -219,11 +219,10 @@ func (t *GpioThermometer) Temperature() float64 {
 
 // Update updates the current temperature of the GpioThermometer
 func (t *GpioThermometer) Update() error {
+	Info("Update %s", t.name)
 	var dischargeTime time.Duration
 	h := NewHistory(3)
-	tries := 0
-	for i := 0; h.Len() < 3 && tries < 10; i++ {
-		tries++
+	for i := 0; h.Len() < 3 && i < 10; i++ {
 		dischargeTime = t.getDischargeTime()
 		if t.inRange(dischargeTime) {
 			t.history.PushDuration(dischargeTime)
