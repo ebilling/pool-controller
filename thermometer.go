@@ -139,7 +139,7 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 }
 
 func (t *GpioThermometer) getDischargeTime() time.Duration {
-	pull := PullUp
+	pull := Float
 	edge := RisingEdge
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -233,8 +233,6 @@ func (t *GpioThermometer) Update() error {
 			h.PushDuration(dischargeTime)
 		}
 	}
-	Info("h[%s]: %+v", t.name, h)
-	Info("t.history[%s]: %+v", t.name, t.history)
 
 	stdd := t.history.Stddev()
 	avg := t.history.Average()
@@ -254,7 +252,7 @@ func (t *GpioThermometer) Update() error {
 			stdd/MillisecondFloat)
 		return fmt.Errorf("Could not update temperature successfully")
 	}
-	Info("%s Thermometer update succeeded: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
+	Debug("%s Thermometer update succeeded: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
 		t.Name(),
 		h.Median()/MillisecondFloat,
 		med/MillisecondFloat,
