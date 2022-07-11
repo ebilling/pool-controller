@@ -98,9 +98,6 @@ func pumpTest(t *testing.T, pumps *Switches, state State,
 	if !checkPinState(t, "Solar", pumps.solar.statusLED, Output, solarState) {
 		t.Errorf("")
 	}
-	if !checkPinState(t, "SolarLED", pumps.solarLed, Output, solarState) {
-		t.Errorf("")
-	}
 	if !pumps.pump.GetStartTime().Equal(pumps.GetStartTime()) {
 		t.Errorf("Start time should be same as pump")
 	}

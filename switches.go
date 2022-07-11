@@ -50,7 +50,6 @@ type Switches struct {
 	pump     *Relay
 	sweep    *Relay
 	solar    *SolarValve
-	solarLed PiPin
 	manualOp time.Time
 }
 
@@ -182,11 +181,6 @@ func turnOn(relay OnOff, on bool) {
 }
 
 func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state State) {
-	if solarOn {
-		p.solarLed.Output(High)
-	} else {
-		p.solarLed.Output(Low)
-	}
 	turnOn(p.solar, solarOn)
 	turnOn(p.pump, pumpOn)
 	turnOn(p.sweep, sweepOn)
