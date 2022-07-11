@@ -230,6 +230,8 @@ func (t *GpioThermometer) Update() error {
 			h.PushDuration(dischargeTime)
 		}
 	}
+	Info("h[%s]: %+v", t.name, h)
+	Info("t.history[%s]: %+v", t.name, t.history)
 
 	stdd := t.history.Stddev()
 	avg := t.history.Average()
