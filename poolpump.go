@@ -6,7 +6,10 @@ import (
 )
 
 const (
-	mftr         = "Bonnie Labs"
+	mftr = "Bonnie Labs"
+
+	// Do not use GPIO4 for thermistors
+
 	roofGpio     = 14
 	waterGpio    = 15
 	buttonGpio   = 18

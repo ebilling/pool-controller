@@ -143,21 +143,20 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	edge := RisingEdge
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	Info("getDischargeTime:%s", t.name)
-	//Discharge the capacitor (low temps could make this really long)
+	// Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
-	time.Sleep(time.Second)
+	time.Sleep(2 * maxTime)
 	// Start polling
 	start := time.Now()
-	//t.pin.InputEdge(PullDown, RisingEdge) // Original
-	t.pin.InputEdge(pull, edge) // new
+	// Set to input
+	t.pin.InputEdge(pull, edge)
 	if !t.pin.WaitForEdge(maxTime) {
 		Info("Thermometer %s, WaitForEdge(%s, %s) timed out", t.name, pull, edge)
 		return time.Duration(0)
 	}
 	dt := time.Now().Sub(start)
 	t.pin.Output(Low)
-	Info("Discharge time for %s: %s", t.name, dt)
+	Debug("Discharge time for %s: %s", t.name, dt)
 	return dt
 }
 
@@ -214,8 +213,7 @@ func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 
 // Temperature returns the current temperature of the GpioThermometer
 func (t *GpioThermometer) Temperature() float64 {
-	// TODO: Change back to time.Minute
-	if time.Now().After(t.updated.Add(time.Second)) {
+	if time.Now().After(t.updated.Add(time.Minute)) {
 		t.Update()
 	}
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()
