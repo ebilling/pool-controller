@@ -7,8 +7,8 @@ import (
 
 const (
 	mftr         = "Bonnie Labs"
-	roofGpio     = 3
-	waterGpio    = 4
+	roofGpio     = 14
+	waterGpio    = 15
 	buttonGpio   = 18
 	solarLedGpio = 21
 	solarFwdGpio = 22
