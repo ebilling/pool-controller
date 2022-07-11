@@ -55,8 +55,10 @@ func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 		},
 		done: make(chan bool),
 	}
+	addr := fmt.Sprintf("%s:%d", host, port)
+	Info("Creating server on %s", addr)
 	s.server = http.Server{
-		Addr:    fmt.Sprintf("%s:%d", host, port),
+		Addr:    addr,
 		Handler: s.handler,
 	}
 	s.server.ErrorLog = NewLogger() // Direct errors to common log

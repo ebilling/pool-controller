@@ -37,7 +37,7 @@ func main() {
 	ppc := NewPoolPumpController(config)
 	ppc.Start()
 
-	server := NewServer(AnyHost, 9443, ppc)
+	server := NewServer(AnyHost, 443, ppc)
 	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
 	hcConfig := hc.Config{
