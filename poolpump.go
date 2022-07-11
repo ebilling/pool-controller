@@ -200,13 +200,10 @@ func (ppc *PoolPumpController) Start() error {
 		}
 	})
 	// Initialize RRDs
-	err := ppc.createRrds()
-	if err != nil {
-		return err
-	}
+	ppc.createRrds()
 
 	// Start go routines
-	err = ppc.Update()
+	err := ppc.Update()
 	if err != nil {
 		return err
 	}
