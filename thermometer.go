@@ -249,6 +249,12 @@ func (t *GpioThermometer) Update() error {
 			stdd/MillisecondFloat)
 		return fmt.Errorf("Could not update temperature successfully")
 	}
+	Info("%s Thermometer update succeeded: Cur(%0.1f) Med(%0.1f) Avg(%0.1f) Stdd(%0.1f)",
+		t.Name(),
+		h.Median()/MillisecondFloat,
+		med/MillisecondFloat,
+		avg/MillisecondFloat,
+		stdd/MillisecondFloat)
 	ohms := t.getOhms(time.Duration(int64(h.Median())))
 	temp := t.getTemp(ohms)
 	Info("Calculating temperature (%f) for %s: %f ohms, median %s", temp, t.name, ohms, time.Duration(int64(h.Median())))
