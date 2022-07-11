@@ -199,8 +199,8 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 }
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
-	const minTime = 1 * time.Millisecond
-	const maxTime = time.Second
+	const minTime = 100 * time.Microsecond
+	const maxTime = 10 * time.Millisecond
 
 	// Completely bogus, ignore
 	if dischargeTime < minTime || dischargeTime > maxTime {
