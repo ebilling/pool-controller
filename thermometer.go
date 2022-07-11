@@ -143,8 +143,8 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 
 	// Start polling
 	start := time.Now()
-	//	t.pin.InputEdge(PullDown, RisingEdge) // Original
-	t.pin.InputEdge(PullUp, RisingEdge)
+	t.pin.InputEdge(PullDown, RisingEdge) // Original
+	//t.pin.InputEdge(PullUp, RisingEdge) // new
 	if !t.pin.WaitForEdge(5 * time.Second) {
 		Info("Thermometer %s, Rising read timed out", t.name)
 		return time.Duration(0)
