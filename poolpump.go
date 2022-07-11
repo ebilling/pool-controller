@@ -168,6 +168,7 @@ func (ppc *PoolPumpController) runLoop() {
 			ppc.Update()
 			ppc.RunPumpsIfNeeded()
 			ppc.UpdateRrd()
+			Info(ppc.Status())
 		}
 	}
 	Alert("Exiting Controller")
