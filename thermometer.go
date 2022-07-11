@@ -9,6 +9,14 @@ import (
 	"github.com/brutella/hc/accessory"
 )
 
+const (
+	// nanoFarads is the value of capacitor used for measuring the thermistor
+	nanoFarads = 100
+	// minTime and maxTime are the expectations for how long it should take for the capacitor to discharge
+	minTime = time.Duration(nanoFarads) * time.Microsecond
+	maxTime = time.Duration(nanoFarads) / 10 * time.Millisecond
+)
+
 // Thermometer reads a thermal resistance thermometer using the timings of a capacitor charge/discharge cycle
 type Thermometer interface {
 	Name() string
@@ -29,8 +37,7 @@ type SelectiveThermometer struct {
 // NewSelectiveThermometer creates a SelectiveThermometer
 func NewSelectiveThermometer(name string, manufacturer string, thermometer Thermometer,
 	filter func() bool) *SelectiveThermometer {
-	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
-		0.0, -20.0, 100.0, 1.0)
+	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), 0.0, -20.0, 100.0, 1.0)
 	thermometer.Update()
 	acc.TempSensor.CurrentTemperature.SetValue(thermometer.Temperature())
 	return &SelectiveThermometer{
@@ -103,13 +110,12 @@ func us(t time.Duration) float64 {
 }
 
 func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermometer {
-	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer),
-		0.0, -20.0, 100.0, 1.0)
+	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), 0.0, -20.0, 100.0, 1.0)
 	th := GpioThermometer{
 		name:        name,
 		mutex:       sync.Mutex{},
 		pin:         pin,
-		microfarads: 0.1,
+		microfarads: float64(nanoFarads) / 1000.0,
 		adjust:      2.5,
 		history:     *NewHistory(100),
 		updated:     time.Now().Add(-24 * time.Hour),
@@ -146,7 +152,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	start := time.Now()
 	//t.pin.InputEdge(PullDown, RisingEdge) // Original
 	t.pin.InputEdge(pull, edge) // new
-	if !t.pin.WaitForEdge(5 * time.Second) {
+	if !t.pin.WaitForEdge(maxTime) {
 		Info("Thermometer %s, WaitForEdge(%s, %s) timed out", t.name, pull, edge)
 		return time.Duration(0)
 	}
@@ -199,8 +205,6 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 }
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
-	const minTime = 100 * time.Microsecond
-	const maxTime = 10 * time.Millisecond
 
 	// Completely bogus, ignore
 	if dischargeTime < minTime || dischargeTime > maxTime {
