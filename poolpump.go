@@ -91,8 +91,8 @@ func (ppc *PoolPumpController) shouldCool() bool {
 	if ppc.config.cfg.SolarDisabled {
 		return false
 	}
-	return ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance &&
-		ppc.pumpTemp.Temperature() > ppc.roofTemp.Temperature()+ppc.config.cfg.DeltaT
+	return ppc.pumpTemp.Temperature() > (ppc.config.cfg.Target+ppc.config.cfg.Tolerance) &&
+		ppc.pumpTemp.Temperature() > (ppc.roofTemp.Temperature()+ppc.config.cfg.DeltaT)
 }
 
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
@@ -106,13 +106,13 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 	waterCold := ppc.pumpTemp.Temperature() < (ppc.config.cfg.Target - ppc.config.cfg.Tolerance)
 	roofHot := ppc.pumpTemp.Temperature() < (ppc.roofTemp.Temperature() - ppc.config.cfg.DeltaT)
 
-	Info("Temp(%0.3f) < %0.3f {Target(%0.3f) - Tolerance(%0.3f)} : WaterCold(%t)",
+	Debug("Temp(%0.3f) < %0.3f {Target(%0.3f) - Tolerance(%0.3f)} : WaterCold(%t)",
 		ppc.pumpTemp.Temperature(),
 		ppc.config.cfg.Target-ppc.config.cfg.Tolerance,
 		ppc.config.cfg.Target,
 		ppc.config.cfg.Tolerance,
 		waterCold)
-	Info("Temp(%0.3f) < %0.3f {Roof(%0.3f) - DeltaT(%0.3f)} : RoofHot(%t)",
+	Debug("Temp(%0.3f) < %0.3f {Roof(%0.3f) - DeltaT(%0.3f)} : RoofHot(%t)",
 		ppc.pumpTemp.Temperature(),
 		ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT,
 		ppc.roofTemp.Temperature(),
