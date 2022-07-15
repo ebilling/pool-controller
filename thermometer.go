@@ -251,7 +251,7 @@ func (t *GpioThermometer) Update() error {
 	}
 	ohms := t.getOhms(time.Duration(int64(h.Median())))
 	temp := t.getTemp(ohms)
-	Info("Calculating temperature (%f) for %s: %f ohms, median %s", temp, t.name, ohms, time.Duration(int64(h.Median())))
+	Debug("Calculating temperature (%f) for %s: %f ohms, median %s", temp, t.name, ohms, time.Duration(int64(h.Median())))
 	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
 	t.updated = time.Now()
 	return nil
