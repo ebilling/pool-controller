@@ -98,14 +98,14 @@ func (ppc *PoolPumpController) shouldCool() bool {
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
-	Info("shouldWarm: disabled(%t)", ppc.config.cfg.SolarDisabled)
 	if ppc.config.cfg.SolarDisabled {
+		Debug("shouldWarm: disabled(%t)", ppc.config.cfg.SolarDisabled)
 		return false
 	}
 	warm := ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.Tolerance &&
 		ppc.pumpTemp.Temperature() < ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT
 
-	Info("shouldWarm: %t", warm)
+	Debug("shouldWarm: %t", warm)
 	return warm
 }
 
@@ -134,7 +134,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		if state == MIXING {
 			return
 		}
-		Log("ShouldCool(%t) - ShouldWarm(%d)", ppc.shouldCool(), ppc.shouldWarm())
+		Log("ShouldCool(%t) - ShouldWarm(%t)", ppc.shouldCool(), ppc.shouldWarm())
 		if ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.DeltaT ||
 			ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance {
 			ppc.switches.SetState(MIXING, false, ppc.config.cfg.RunTime)
@@ -185,7 +185,7 @@ func (ppc *PoolPumpController) runLoop() {
 			ppc.Update()
 			ppc.RunPumpsIfNeeded()
 			ppc.UpdateRrd()
-			Info(ppc.Status())
+			Debug(ppc.Status())
 		}
 	}
 	Alert("Exiting Controller")

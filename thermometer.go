@@ -151,7 +151,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	// Set to input
 	t.pin.InputEdge(pull, edge)
 	if !t.pin.WaitForEdge(maxTime) {
-		Info("Thermometer %s, WaitForEdge(%s, %s) timed out", t.name, pull, edge)
+		Debug("Thermometer %s, WaitForEdge(%s, %s) timed out", t.name, pull, edge)
 		return time.Duration(0)
 	}
 	dt := time.Now().Sub(start)
