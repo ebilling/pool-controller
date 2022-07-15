@@ -134,7 +134,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		if state == MIXING {
 			return
 		}
-		Debug("ShouldCool(%t) - ShouldWarm(%t)", ppc.shouldCool(), ppc.shouldWarm())
+		Info("ShouldCool(%t) - ShouldWarm(%t)", ppc.shouldCool(), ppc.shouldWarm())
 		if ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.DeltaT ||
 			ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance {
 			ppc.switches.SetState(MIXING, false, ppc.config.cfg.RunTime)

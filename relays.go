@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/brutella/hc/accessory"
-	"periph.io/x/conn/v3/gpio"
 )
 
 // Relay controls the behavior of a particular relay in the system.
@@ -24,6 +23,7 @@ type Relay struct {
 type SolarValve struct {
 	fwdRelay  *Relay
 	revRelay  *Relay
+	status    bool // true==ON
 	statusLED PiPin
 	accessory *accessory.Switch
 	mtx       sync.Mutex
@@ -166,33 +166,29 @@ func (s *SolarValve) cleanup() {
 
 // TurnOn runs the motor for the valve forward for timeout seconds
 func (s *SolarValve) TurnOn() {
-	if s.statusLED.Read().State() == gpio.High {
-		return
-	}
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	defer s.cleanup()
 	s.statusLED.Output(High)
 	s.revRelay.TurnOff()
 	s.fwdRelay.TurnOn()
+	s.status = true
 }
 
 // TurnOff runs the motor for the valve in reverse for timeout seconds
 func (s *SolarValve) TurnOff() {
-	if s.statusLED.Read().State() == gpio.Low {
-		return
-	}
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	defer s.cleanup()
 	s.statusLED.Output(Low)
 	s.fwdRelay.TurnOff()
 	s.revRelay.TurnOn()
+	s.status = false
 }
 
 // Status returns "On" if at HIGH voltage or "Off" if at LOW voltage
 func (s *SolarValve) Status() string {
-	if s.statusLED.Read() == High {
+	if s.status {
 		return "On"
 	}
 	return "Off"
@@ -204,7 +200,7 @@ func (s *SolarValve) Accessory() *accessory.Accessory {
 }
 
 func (s *SolarValve) isOn() bool {
-	return s.statusLED.Read() == High
+	return s.status
 }
 
 // GetStartTime returns the time the relay was last set to HIGH voltage
