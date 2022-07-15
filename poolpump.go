@@ -102,6 +102,8 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 		Debug("shouldWarm: disabled(%t)", ppc.config.cfg.SolarDisabled)
 		return false
 	}
+	Infof("Temp(%0.3f) < Target(%0.3f) - Tolerance(%0.3f)", ppc.pumpTemp.Temperature(), ppc.config.cfg.Target, ppc.config.cfg.Tolerance)
+	Infof("Temp(%0.3f) < Target(%0.3f) - DeltaT(%0.3f)", ppc.pumpTemp.Temperature(), ppc.config.cfg.Target, ppc.config.cfg.DeltaT)
 	warm := ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.Tolerance &&
 		ppc.pumpTemp.Temperature() < ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT
 
