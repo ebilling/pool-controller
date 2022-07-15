@@ -221,8 +221,8 @@ func (t *GpioThermometer) Temperature() float64 {
 // Update updates the current temperature of the GpioThermometer
 func (t *GpioThermometer) Update() error {
 	var dischargeTime time.Duration
-	h := NewHistory(3)
-	for i := 0; h.Len() < 3 && i < 10; i++ {
+	h := NewHistory(5)
+	for i := 0; h.Len() < 5 && i < 20; i++ {
 		dischargeTime = t.getDischargeTime()
 		if t.inRange(dischargeTime) {
 			t.history.PushDuration(dischargeTime)
@@ -235,8 +235,8 @@ func (t *GpioThermometer) Update() error {
 	med := t.history.Median()
 	dev := stdd * 1.5
 
-	if dev < float64(minTime)/4 {
-		dev = float64(minTime) / 4
+	if dev < float64(minTime)/2 {
+		dev = float64(minTime) / 2
 	} // give some wiggle room
 
 	// Throw away bad results
