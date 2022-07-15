@@ -19,7 +19,7 @@ const (
 	pumpGpio     = 24
 	sweepGpio    = 25
 
-	solarMotorTime = 15 * time.Second
+	solarMotorTime = 30 * time.Second
 )
 
 // The PoolPumpController manages the relays that control the pumps based on
