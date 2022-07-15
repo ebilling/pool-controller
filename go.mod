@@ -13,14 +13,17 @@ require (
 )
 
 require (
-	github.com/brutella/dnssd v1.2.1 // indirect
+	github.com/brutella/dnssd v1.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/miekg/dns v1.1.4 // indirect
+	github.com/miekg/dns v1.1.50 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/tadglines/go-pkgs v0.0.0-20140924210655-1f86682992f1 // indirect
-	github.com/xiam/to v0.0.0-20191116183551-8328998fc0ed // indirect
-	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
-	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
-	golang.org/x/text v0.3.6 // indirect
+	github.com/tadglines/go-pkgs v0.0.0-20210623144937-b983b20f54f9 // indirect
+	github.com/xiam/to v0.0.0-20200126224905-d60d31e03561 // indirect
+	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
+	golang.org/x/net v0.0.0-20220708220712-1185a9018129 // indirect
+	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
+	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/tools v0.1.11 // indirect
+	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

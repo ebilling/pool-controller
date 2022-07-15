@@ -235,8 +235,8 @@ func (t *GpioThermometer) Update() error {
 	med := t.history.Median()
 	dev := stdd * 1.5
 
-	if dev < float64(minTime)/2 {
-		dev = float64(minTime) / 2
+	if dev < float64(minTime)/4 {
+		dev = float64(minTime) / 4
 	} // give some wiggle room
 
 	// Throw away bad results
