@@ -169,28 +169,32 @@ func (s *SolarValve) cleanup() {
 	}
 }
 
-// TurnOn runs the motor for the valve forward for timeout seconds
-func (s *SolarValve) TurnOn() {
+func (s *SolarValve) setState(fwd bool) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	s.cid++
-	s.statusLED.Output(High)
-	s.revRelay.TurnOff()
-	s.fwdRelay.TurnOn()
-	s.status = true
 	go s.cleanup()
+	s.statusLED.Output(GpioState(fwd))
+	if fwd {
+		s.revRelay.TurnOff()
+		time.Sleep(time.Millisecond)
+		s.fwdRelay.TurnOn()
+	} else {
+		s.fwdRelay.TurnOff()
+		time.Sleep(time.Millisecond)
+		s.revRelay.TurnOn()
+	}
+	s.status = fwd
+}
+
+// TurnOn runs the motor for the valve forward for timeout seconds
+func (s *SolarValve) TurnOn() {
+	s.setState(true)
 }
 
 // TurnOff runs the motor for the valve in reverse for timeout seconds
 func (s *SolarValve) TurnOff() {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	s.cid++
-	s.statusLED.Output(Low)
-	s.fwdRelay.TurnOff()
-	s.revRelay.TurnOn()
-	s.status = false
-	go s.cleanup()
+	s.setState(false)
 }
 
 // Status returns "On" if at HIGH voltage or "Off" if at LOW voltage
@@ -207,6 +211,11 @@ func (s *SolarValve) Accessory() *accessory.Accessory {
 }
 
 func (s *SolarValve) isOn() bool {
+	if s.status {
+		s.accessory.Switch.On.SetValue(true)
+	} else {
+		s.accessory.Switch.On.SetValue(false)
+	}
 	return s.status
 }
 

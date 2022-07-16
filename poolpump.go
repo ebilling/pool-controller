@@ -105,22 +105,22 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 
 	waterCold := ppc.pumpTemp.Temperature() < (ppc.config.cfg.Target - ppc.config.cfg.Tolerance)
 	roofHot := ppc.pumpTemp.Temperature() < (ppc.roofTemp.Temperature() - ppc.config.cfg.DeltaT)
-
-	Debug("Temp(%0.3f) < %0.3f {Target(%0.3f) - Tolerance(%0.3f)} : WaterCold(%t)",
-		ppc.pumpTemp.Temperature(),
-		ppc.config.cfg.Target-ppc.config.cfg.Tolerance,
-		ppc.config.cfg.Target,
-		ppc.config.cfg.Tolerance,
-		waterCold)
-	Debug("Temp(%0.3f) < %0.3f {Roof(%0.3f) - DeltaT(%0.3f)} : RoofHot(%t)",
-		ppc.pumpTemp.Temperature(),
-		ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT,
-		ppc.roofTemp.Temperature(),
-		ppc.config.cfg.DeltaT,
-		roofHot)
 	warm := waterCold && roofHot
-
-	Debug("shouldWarm: %t", warm)
+	if warm {
+		Info("ShouldWarm: %t waterCold(%t) roofHot(%t)", warm, waterCold, roofHot)
+		Info("Temp(%0.3f) < %0.3f {Target(%0.3f) - Tolerance(%0.3f)} : WaterCold(%t)",
+			ppc.pumpTemp.Temperature(),
+			ppc.config.cfg.Target-ppc.config.cfg.Tolerance,
+			ppc.config.cfg.Target,
+			ppc.config.cfg.Tolerance,
+			waterCold)
+		Info("Temp(%0.3f) < %0.3f {Roof(%0.3f) - DeltaT(%0.3f)} : RoofHot(%t)",
+			ppc.pumpTemp.Temperature(),
+			ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT,
+			ppc.roofTemp.Temperature(),
+			ppc.config.cfg.DeltaT,
+			roofHot)
+	}
 	return warm
 }
 
