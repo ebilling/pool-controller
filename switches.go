@@ -181,9 +181,9 @@ func turnOn(relay OnOff, on bool) {
 }
 
 func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state State) {
-	turnOn(p.solar, solarOn)
 	turnOn(p.pump, pumpOn)
 	turnOn(p.sweep, sweepOn)
+	turnOn(p.solar, solarOn) // deal with solar valve last because it takes time
 	if isManual {
 		if p.GetStartTime().After(p.GetStopTime()) {
 			p.manualOp = p.GetStartTime()
@@ -214,8 +214,7 @@ func (p *Switches) SetState(s State, manual bool, runtime float64) {
 		return
 	}
 	if p.ManualState(runtime) && !manual {
-		Debug("Manual override, can't change state from %s to %s",
-			p.state, s)
+		Debug("Manual override, can't change state from %s to %s", p.state, s)
 		return // Don't override a manual operation
 	}
 	Info("State change from %s to %s", p.state, s)

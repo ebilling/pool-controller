@@ -28,6 +28,7 @@ type SolarValve struct {
 	accessory *accessory.Switch
 	mtx       sync.Mutex
 	timeout   time.Duration
+	cid       int // command id, distinguishes the calls to cleanup
 }
 
 // AccessoryInfo tells Apple HomeKit about the device
@@ -159,31 +160,37 @@ func (s *SolarValve) String() string {
 }
 
 func (s *SolarValve) cleanup() {
+	cid := s.cid // capture the cid before sleep
 	time.Sleep(s.timeout)
-	s.fwdRelay.TurnOff()
-	s.revRelay.TurnOff()
+	if s.cid == cid {
+		// there isn't another one running
+		s.fwdRelay.TurnOff()
+		s.revRelay.TurnOff()
+	}
 }
 
 // TurnOn runs the motor for the valve forward for timeout seconds
 func (s *SolarValve) TurnOn() {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-	defer s.cleanup()
+	s.cid++
 	s.statusLED.Output(High)
 	s.revRelay.TurnOff()
 	s.fwdRelay.TurnOn()
 	s.status = true
+	go s.cleanup()
 }
 
 // TurnOff runs the motor for the valve in reverse for timeout seconds
 func (s *SolarValve) TurnOff() {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-	defer s.cleanup()
+	s.cid++
 	s.statusLED.Output(Low)
 	s.fwdRelay.TurnOff()
 	s.revRelay.TurnOn()
 	s.status = false
+	go s.cleanup()
 }
 
 // Status returns "On" if at HIGH voltage or "Off" if at LOW voltage
