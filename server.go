@@ -442,11 +442,10 @@ func processFloatUpdate(r *http.Request, formname string, ptr *float64) bool {
 
 func (h *Handler) configBoolRow(name, inputName string, value bool) string {
 	checkbox := "type=checkbox value=true"
-	checked := ""
 	if value {
-		checked = " checked"
+		checkbox += " checked"
 	}
-	return h.configRow(name, inputName, "", checkbox+checked)
+	return h.configRow(name, inputName, "", checkbox)
 }
 
 func (h *Handler) configRow(name, inputName, configValue, extraArgs string) string {
@@ -464,6 +463,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	foundone := false
 	c := h.ppc.config
+	Info("Config: %+v", c.cfg)
 
 	pw := getFormValue(r, "passcode", "")
 	if pw1 := getFormValue(r, "passcode2", ""); pw != "" && pw1 != "" && pw == pw1 {
