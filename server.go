@@ -454,17 +454,8 @@ func (h *Handler) configRow(name, inputName, configValue, extraArgs string) stri
 		name, inputName, extraArgs, configValue)
 }
 
-func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: move this to a form on the page.
-	w.Header().Set("WWW-Authenticate", "Basic") //  realm=\"Bonnie Labs\"
-	if !h.Authenticate(r) {
-		http.Error(w, "Unauthorized", 401)
-		return
-	}
-	foundone := false
-	c := h.ppc.config
-	Info("Config: %+v", c.cfg)
-
+func (h *Handler) processForm(r *http.Request, c *Config) {
+	var foundone bool
 	pw := getFormValue(r, "passcode", "")
 	if pw1 := getFormValue(r, "passcode2", ""); pw != "" && pw1 != "" && pw == pw1 {
 		c.SetAuth(pw1)
@@ -523,6 +514,22 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 			Debug("Disabling Debug: value(%s) posted(%s)", value, posted)
 			DisableDebug()
 		}
+	}
+}
+
+func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: move this to a form on the page.
+	w.Header().Set("WWW-Authenticate", "Basic") //  realm=\"Bonnie Labs\"
+	if !h.Authenticate(r) {
+		http.Error(w, "Unauthorized", 401)
+		return
+	}
+	c := h.ppc.config
+	Info("Config: %+v", c.cfg)
+
+	posted := getFormValue(r, "posted", "")
+	if posted == "true" {
+		h.processForm(r, c)
 	}
 
 	passArgs := " type=\"password\" autocomplete=\"new-password\""
