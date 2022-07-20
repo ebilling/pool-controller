@@ -412,7 +412,7 @@ func processStringUpdate(r *http.Request, formname string, ptr *string) bool {
 func processBoolUpdate(r *http.Request, formname string, ptr *bool) bool {
 	value := false
 	strvalue := getFormValue(r, formname, "false")
-	Log("Update to boolean: %q = %q", formname, strvalue)
+	Log("Update to boolean: %q = %q, was %t", formname, strvalue, *ptr)
 	if strvalue == "true" {
 		value = true
 	}
