@@ -525,7 +525,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := h.ppc.config
-	Info("Config: %+v", c.cfg)
+	Debug("Config: %+v", c.cfg)
 
 	posted := getFormValue(r, "posted", "")
 	if posted == "true" {
