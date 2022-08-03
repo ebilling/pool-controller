@@ -55,8 +55,10 @@ func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 		},
 		done: make(chan bool),
 	}
+	addr := fmt.Sprintf("%s:%d", host, port)
+	Info("Creating server on %s", addr)
 	s.server = http.Server{
-		Addr:    fmt.Sprintf("%s:%d", host, port),
+		Addr:    addr,
 		Handler: s.handler,
 	}
 	s.server.ErrorLog = NewLogger() // Direct errors to common log
@@ -66,7 +68,7 @@ func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 func startServer(s *Server, cert, key string) {
 	err := s.server.ListenAndServeTLS(cert, key)
 	if err != nil {
-		Error("Error from Server: %s", err.Error())
+		Fatal("Error from Server: %s", err.Error())
 	}
 	s.done <- true
 	Info("Exiting HttpServer")
@@ -410,7 +412,7 @@ func processStringUpdate(r *http.Request, formname string, ptr *string) bool {
 func processBoolUpdate(r *http.Request, formname string, ptr *bool) bool {
 	value := false
 	strvalue := getFormValue(r, formname, "false")
-	Log("Update to boolean: %q = %q", formname, strvalue)
+	Log("Update to boolean: %q = %q, was %t", formname, strvalue, *ptr)
 	if strvalue == "true" {
 		value = true
 	}
@@ -440,11 +442,10 @@ func processFloatUpdate(r *http.Request, formname string, ptr *float64) bool {
 
 func (h *Handler) configBoolRow(name, inputName string, value bool) string {
 	checkbox := "type=checkbox value=true"
-	checked := ""
 	if value {
-		checked = " checked"
+		checkbox += " checked"
 	}
-	return h.configRow(name, inputName, "", checkbox+checked)
+	return h.configRow(name, inputName, "", checkbox)
 }
 
 func (h *Handler) configRow(name, inputName, configValue, extraArgs string) string {
@@ -453,16 +454,8 @@ func (h *Handler) configRow(name, inputName, configValue, extraArgs string) stri
 		name, inputName, extraArgs, configValue)
 }
 
-func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: move this to a form on the page.
-	w.Header().Set("WWW-Authenticate", "Basic") //  realm=\"Bonnie Labs\"
-	if !h.Authenticate(r) {
-		http.Error(w, "Unauthorized", 401)
-		return
-	}
-	foundone := false
-	c := h.ppc.config
-
+func (h *Handler) processForm(r *http.Request, c *Config) {
+	var foundone bool
 	pw := getFormValue(r, "passcode", "")
 	if pw1 := getFormValue(r, "passcode2", ""); pw != "" && pw1 != "" && pw == pw1 {
 		c.SetAuth(pw1)
@@ -521,6 +514,22 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 			Debug("Disabling Debug: value(%s) posted(%s)", value, posted)
 			DisableDebug()
 		}
+	}
+}
+
+func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: move this to a form on the page.
+	w.Header().Set("WWW-Authenticate", "Basic") //  realm=\"Bonnie Labs\"
+	if !h.Authenticate(r) {
+		http.Error(w, "Unauthorized", 401)
+		return
+	}
+	c := h.ppc.config
+	Debug("Config: %+v", c.cfg)
+
+	posted := getFormValue(r, "posted", "")
+	if posted == "true" {
+		h.processForm(r, c)
 	}
 
 	passArgs := " type=\"password\" autocomplete=\"new-password\""

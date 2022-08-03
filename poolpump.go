@@ -6,10 +6,20 @@ import (
 )
 
 const (
-	mftr       = "Bonnie Labs"
-	waterGpio  = 25
-	roofGpio   = 24
-	buttonGpio = 18
+	mftr = "Bonnie Labs"
+
+	// Do not use GPIO4 for thermistors
+
+	roofGpio     = 14
+	waterGpio    = 15
+	buttonGpio   = 18
+	solarLedGpio = 21
+	solarFwdGpio = 22
+	solarRevGpio = 23
+	pumpGpio     = 24
+	sweepGpio    = 25
+
+	solarMotorTime = 30 * time.Second
 )
 
 // The PoolPumpController manages the relays that control the pumps based on
@@ -40,8 +50,8 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 	ppc := PoolPumpController{
 		config:   config,
 		switches: NewSwitches(mftr),
-		pumpTemp: NewGpioThermometer("Pumphouse", mftr, waterGpio),
-		roofTemp: NewGpioThermometer("Poolhouse Roof", mftr, roofGpio),
+		pumpTemp: NewGpioThermometer("Pump", mftr, waterGpio),
+		roofTemp: NewGpioThermometer("Roof", mftr, roofGpio),
 		tempRrd:  NewRrd(*config.dataDirectory + "/temperature.rrd"),
 		pumpRrd:  NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
 		done:     make(chan bool),
@@ -53,36 +63,66 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 
 // Update the solar configuration parameters from the config file (if changed)
 // and updates the values of the Thermometers.
-func (ppc *PoolPumpController) Update() {
-	ppc.pumpTemp.Update()
-	ppc.roofTemp.Update()
-	ppc.runningTemp.Update()
+func (ppc *PoolPumpController) Update() error {
+	err := ppc.pumpTemp.Update()
+	if err != nil {
+		return fmt.Errorf("Pump Temp Update failed: %w", err)
+	}
+	err = ppc.roofTemp.Update()
+	if err != nil {
+		return fmt.Errorf("Roof Temp Update failed: %w", err)
+	}
+	err = ppc.runningTemp.Update()
+	if err != nil {
+		return fmt.Errorf("Running Temp Update failed: %w", err)
+	}
 	if ppc.config.cfg.ButtonDisabled {
 		ppc.button.Disable()
 	} else {
 		ppc.button.Enable()
 	}
+	return nil
 }
 
 // A return value of 'True' indicates that the pool is too hot and the roof is cold
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
+	return false // TODO: fix this once config is persisted correctly
 	if ppc.config.cfg.SolarDisabled {
 		return false
 	}
-	return ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance &&
-		ppc.pumpTemp.Temperature() > ppc.roofTemp.Temperature()+ppc.config.cfg.DeltaT
+	return ppc.pumpTemp.Temperature() > (ppc.config.cfg.Target+ppc.config.cfg.Tolerance) &&
+		ppc.pumpTemp.Temperature() > (ppc.roofTemp.Temperature()+ppc.config.cfg.DeltaT)
 }
 
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
 	if ppc.config.cfg.SolarDisabled {
+		Debug("shouldWarm: disabled(%t)", ppc.config.cfg.SolarDisabled)
 		return false
 	}
-	return ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.Tolerance &&
-		ppc.pumpTemp.Temperature() < ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT
+
+	waterCold := ppc.pumpTemp.Temperature() < (ppc.config.cfg.Target - ppc.config.cfg.Tolerance)
+	roofHot := ppc.pumpTemp.Temperature() < (ppc.roofTemp.Temperature() - ppc.config.cfg.DeltaT)
+	warm := waterCold && roofHot
+	if warm {
+		Info("ShouldWarm: %t waterCold(%t) roofHot(%t)", warm, waterCold, roofHot)
+		Info("Temp(%0.3f) < %0.3f {Target(%0.3f) - Tolerance(%0.3f)} : WaterCold(%t)",
+			ppc.pumpTemp.Temperature(),
+			ppc.config.cfg.Target-ppc.config.cfg.Tolerance,
+			ppc.config.cfg.Target,
+			ppc.config.cfg.Tolerance,
+			waterCold)
+		Info("Temp(%0.3f) < %0.3f {Roof(%0.3f) - DeltaT(%0.3f)} : RoofHot(%t)",
+			ppc.pumpTemp.Temperature(),
+			ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT,
+			ppc.roofTemp.Temperature(),
+			ppc.config.cfg.DeltaT,
+			roofHot)
+	}
+	return warm
 }
 
 // RunPumpsIfNeeded - If the water is not within the tolerance limit of the target, and the roof
@@ -110,7 +150,7 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		if state == MIXING {
 			return
 		}
-		Log("ShouldCool(%t) - ShouldWarm(%d)", ppc.shouldCool(), ppc.shouldWarm())
+		Info("ShouldCool(%t) - ShouldWarm(%t)", ppc.shouldCool(), ppc.shouldWarm())
 		if ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.DeltaT ||
 			ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance {
 			ppc.switches.SetState(MIXING, false, ppc.config.cfg.RunTime)
@@ -161,13 +201,14 @@ func (ppc *PoolPumpController) runLoop() {
 			ppc.Update()
 			ppc.RunPumpsIfNeeded()
 			ppc.UpdateRrd()
+			Debug(ppc.Status())
 		}
 	}
 	Alert("Exiting Controller")
 }
 
 // Start finishes initializing the PoolPumpController, and kicks off the control thread.
-func (ppc *PoolPumpController) Start() {
+func (ppc *PoolPumpController) Start() error {
 	ppc.button = NewGpioButton(buttonGpio, func() {
 		switch ppc.switches.State() {
 		case OFF:
@@ -185,9 +226,13 @@ func (ppc *PoolPumpController) Start() {
 	ppc.createRrds()
 
 	// Start go routines
-	ppc.Update()
+	err := ppc.Update()
+	if err != nil {
+		return err
+	}
 	ppc.button.Start()
 	go ppc.runLoop()
+	return nil
 }
 
 // Stop stops all of the pumps

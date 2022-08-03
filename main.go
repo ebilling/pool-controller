@@ -26,7 +26,10 @@ func main() {
 	Info("Args: %s", os.Args[1:])
 
 	// Write PID
-	ioutil.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
+	err := ioutil.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
+	if err != nil {
+		Fatal("Could not write pid file: %s", err.Error())
+	}
 
 	if err := GpioInit(); err != nil {
 		Fatal("Could not initialize GPIO: %s", err.Error())
@@ -35,9 +38,12 @@ func main() {
 	PowerLed := NewGpio(5)
 	PowerLed.Output(High)
 	ppc := NewPoolPumpController(config)
-	ppc.Start()
+	err = ppc.Start()
+	if err != nil {
+		Fatal("Could not start pool controller: %s", err.Error())
+	}
 
-	server := NewServer(AnyHost, 9443, ppc)
+	server := NewServer(AnyHost, 443, ppc)
 	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
 	hcConfig := hc.Config{

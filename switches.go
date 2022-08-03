@@ -25,9 +25,6 @@ const (
 	MIXING
 )
 
-// SolarLED is the GPIO number of the LED
-const SolarLED uint8 = 6
-
 func (s State) String() string {
 	switch s {
 	case DISABLED:
@@ -52,8 +49,7 @@ type Switches struct {
 	state    State
 	pump     *Relay
 	sweep    *Relay
-	solar    *Relay
-	solarLed PiPin
+	solar    *SolarValve
 	manualOp time.Time
 }
 
@@ -66,24 +62,20 @@ func (p *Switches) String() string {
 
 // NewSwitches sets up the switches that are configured
 func NewSwitches(manufacturer string) *Switches {
-	NewRelay(Relay4, "Unused", manufacturer)
 	return newSwitches(
-		NewRelay(Relay1, "Pool Pump", manufacturer),
-		NewRelay(Relay2, "Pool Sweep", manufacturer),
-		NewRelay(Relay3, "Solar", manufacturer),
-		NewGpio(SolarLED))
+		NewRelay(pumpGpio, "Pool Pump", manufacturer),
+		NewRelay(sweepGpio, "Pool Sweep", manufacturer),
+		NewSolarValve(solarFwdGpio, solarRevGpio, solarLedGpio, "Solar", manufacturer, solarMotorTime))
 }
 
-func newSwitches(pump *Relay, sweep *Relay, solar *Relay, solarLed PiPin) *Switches {
+func newSwitches(pump *Relay, sweep *Relay, solar *SolarValve) *Switches {
 	p := Switches{
 		state:    OFF,
 		pump:     pump,
 		sweep:    sweep,
 		solar:    solar,
-		solarLed: solarLed,
 		manualOp: time.Now().Add(time.Hour * -24),
 	}
-	solarLed.Output(Low)
 	p.bindHK()
 	return &p
 }
@@ -174,7 +166,13 @@ func (p *Switches) Disable() {
 	p.state = DISABLED
 }
 
-func turnOn(relay *Relay, on bool) {
+//OnOff is something that can be turned off and on
+type OnOff interface {
+	TurnOn()
+	TurnOff()
+}
+
+func turnOn(relay OnOff, on bool) {
 	if on {
 		relay.TurnOn()
 	} else {
@@ -183,14 +181,9 @@ func turnOn(relay *Relay, on bool) {
 }
 
 func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state State) {
-	if solarOn {
-		p.solarLed.Output(High)
-	} else {
-		p.solarLed.Output(Low)
-	}
-	turnOn(p.solar, solarOn)
 	turnOn(p.pump, pumpOn)
 	turnOn(p.sweep, sweepOn)
+	turnOn(p.solar, solarOn) // deal with solar valve last because it takes time
 	if isManual {
 		if p.GetStartTime().After(p.GetStopTime()) {
 			p.manualOp = p.GetStartTime()
@@ -221,8 +214,7 @@ func (p *Switches) SetState(s State, manual bool, runtime float64) {
 		return
 	}
 	if p.ManualState(runtime) && !manual {
-		Debug("Manual override, can't change state from %s to %s",
-			p.state, s)
+		Debug("Manual override, can't change state from %s to %s", p.state, s)
 		return // Don't override a manual operation
 	}
 	Info("State change from %s to %s", p.state, s)

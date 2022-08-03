@@ -17,7 +17,7 @@ func (r *Rrd) addTemp(name, title string, colorid, which int) {
 	r.grapher.Line(2.0, cname, colorStr(colorid), title)
 }
 
-func (ppc *PoolPumpController) createRrds() {
+func (ppc *PoolPumpController) createRrds() error {
 	ppc.tempRrd.addTemp("pump", "Pump", 8, 1)
 	ppc.tempRrd.addTemp("weather", "Weather", 1, 2)
 	ppc.tempRrd.addTemp("roof", "Roof", 2, 3)
@@ -57,6 +57,7 @@ func (ppc *PoolPumpController) createRrds() {
 	pg.Line(2.0, "t2", colorStr(2), "Solar Status")
 	pg.Def("t3", ppc.pumpRrd.path, "manual", "AVERAGE")
 	pg.Line(2.0, "t3", colorStr(6), "Manual Operation")
+	return nil
 }
 
 // UpdateRrd writes updates to RRD files and generates cached graphs
