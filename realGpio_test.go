@@ -196,7 +196,7 @@ func doStop(button *Button, b *bool, t time.Time) {
 	*b = false
 	button.Stop()
 	*b = true
-	Info("doStop - Stopped after %d ms", time.Now().Sub(t)/time.Millisecond)
+	Info("doStop - Stopped after %d ms", time.Since(t)/time.Millisecond)
 }
 
 func runRelayTestOn(t *testing.T, relay *Relay) {

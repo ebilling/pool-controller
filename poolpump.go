@@ -66,15 +66,15 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 func (ppc *PoolPumpController) Update() error {
 	err := ppc.pumpTemp.Update()
 	if err != nil {
-		return fmt.Errorf("Pump Temp Update failed: %w", err)
+		return fmt.Errorf("pump temp update failed: %w", err)
 	}
 	err = ppc.roofTemp.Update()
 	if err != nil {
-		return fmt.Errorf("Roof Temp Update failed: %w", err)
+		return fmt.Errorf("roof temp update failed: %w", err)
 	}
 	err = ppc.runningTemp.Update()
 	if err != nil {
-		return fmt.Errorf("Running Temp Update failed: %w", err)
+		return fmt.Errorf("running temp update failed: %w", err)
 	}
 	if ppc.config.cfg.ButtonDisabled {
 		ppc.button.Disable()
@@ -88,7 +88,6 @@ func (ppc *PoolPumpController) Update() error {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
-	return false // TODO: fix this once config is persisted correctly
 	if ppc.config.cfg.SolarDisabled {
 		return false
 	}
@@ -164,10 +163,10 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	// If the pumps havent run in a day, wait til 4AM then start them
 	freqHours := DurationFromHours((ppc.config.cfg.DailyFrequency-0.25)*24.0, 12.0)
 	runtime := DurationFromHours(ppc.config.cfg.RunTime, 1.0)
-	if time.Now().Sub(ppc.switches.GetStopTime()) > freqHours && time.Now().Hour() < 6 { // run in the early morning
+	if time.Since(ppc.switches.GetStopTime()) > freqHours && time.Now().Hour() < 6 { // run in the early morning
 		Log("Daily running SWEEP: %s", freqHours.String())
 		ppc.switches.SetState(SWEEP, false, ppc.config.cfg.RunTime) // Clean pool
-		if time.Now().Sub(ppc.switches.GetStartTime()) > runtime {
+		if time.Since(ppc.switches.GetStartTime()) > runtime {
 			ppc.switches.StopAll(false) // End daily
 		}
 		return
@@ -196,7 +195,6 @@ func (ppc *PoolPumpController) runLoop() {
 			// Turn off the pumps, and don't let them turn back on
 			ppc.switches.Disable()
 			keepRunning = false
-			break
 		case <-time.After(interval):
 			ppc.Update()
 			ppc.RunPumpsIfNeeded()

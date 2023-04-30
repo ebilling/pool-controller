@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"testing"
 
 	"github.com/brutella/hc/accessory"
@@ -36,20 +35,9 @@ func (t *FakeThermometer) Accessory() *accessory.Accessory {
 	return t.acc.Accessory
 }
 
-type FakeWeatherService struct {
-	temp      float64
-	radiation float64
-}
-
-func (t *FakeWeatherService) Read(ignoredURL string) string {
-	return fmt.Sprintf("{\"current_observation\":{\"temp_c\":%0.1f, \"solarradiation\":\"%0.1f\"}}	",
-		t.temp, t.radiation)
-}
-
 type TestRunPumps struct {
 	pumpTemp FakeThermometer
 	roofTemp FakeThermometer
-	service  FakeWeatherService
 	ppc      *PoolPumpController
 }
 
@@ -57,7 +45,6 @@ func (t *TestRunPumps) setConditions(target, pump, roof, outside float64, state 
 	t.ppc.config.cfg.Target = target
 	t.pumpTemp.temp = pump
 	t.roofTemp.temp = roof
-	t.service.temp = outside
 	t.ppc.switches.state = state
 }
 
@@ -67,7 +54,6 @@ func NewTestRunPumps() *TestRunPumps {
 	t := TestRunPumps{
 		pumpTemp: FakeThermometer{name: "pool", temp: 0.0},
 		roofTemp: FakeThermometer{name: "roof", temp: 0.0},
-		service:  FakeWeatherService{temp: 0.0, radiation: 0.0},
 		ppc:      NewPoolPumpController(config),
 	}
 	t.ppc.pumpTemp = &t.pumpTemp

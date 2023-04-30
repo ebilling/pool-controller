@@ -398,17 +398,6 @@ func (h *Handler) Authenticate(r *http.Request) bool {
 	return false
 }
 
-func processStringUpdate(r *http.Request, formname string, ptr *string) bool {
-	value := getFormValue(r, formname, *ptr)
-	if value != *ptr {
-		Debug("Updating value for %s from %s to %s", formname, *ptr, value)
-		*ptr = value
-		return true
-	}
-	Debug("No update to %s, value(%s) orig(%s)", formname, value, *ptr)
-	return false
-}
-
 func processBoolUpdate(r *http.Request, formname string, ptr *bool) bool {
 	value := false
 	strvalue := getFormValue(r, formname, "false")
@@ -515,7 +504,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	// TODO: move this to a form on the page.
 	w.Header().Set("WWW-Authenticate", "Basic") //  realm=\"Bonnie Labs\"
 	if !h.Authenticate(r) {
-		http.Error(w, "Unauthorized", 401)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	c := h.ppc.config
@@ -538,11 +527,6 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += h.configRow("Confirm Password", "passcode2", "", passArgs)
 	html += "<tr><td colspan=3><br></td></tr>\n"
 
-	html += "<tr><th align=left>Weather:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Zipcode", "zipcode", c.cfg.Zip, "")
-	html += h.configRow("WeatherUnderground ID", "appid", c.cfg.WeatherUndergroundAppID, "")
-	html += "<tr><td colspan=3><br></td></tr>\n"
-
 	html += "<tr><th align=left>Temperature Sensor Adjustment:</th><td colspan=3></td></tr>\n"
 	html += h.configRow("Pump Tuning", "adj_pump", fmt.Sprintf("%0.2f", c.cfg.PumpAdjustment), "")
 	html += h.configRow("Roof Tuning", "adj_roof", fmt.Sprintf("%0.2f", c.cfg.RoofAdjustment), "")
@@ -559,7 +543,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 
 	html += "<tr><td colspan=3><br></td></tr>\n"
 	html += "<tr><th align=left>Debug Settings:</th><td colspan=3></td></tr>\n"
-	html += h.configBoolRow("Debug Logging Enabled", "debug", _debug)
+	html += h.configBoolRow("Debug Logging Enabled", "debug", doDebug)
 	html += h.configBoolRow("Disable all pumps", "disabled", c.cfg.Disabled)
 	html += h.configBoolRow("Disable button", "button_disabled", c.cfg.ButtonDisabled)
 	html += h.configBoolRow("Disable solar", "solar_disabled", c.cfg.SolarDisabled)

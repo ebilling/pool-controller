@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -55,7 +56,7 @@ func (t *SelectiveThermometer) Name() string {
 
 // Calibrate runs a calibration operation the thermometer
 func (t *SelectiveThermometer) Calibrate(a float64) error {
-	return fmt.Errorf("Not supported")
+	return errors.New("not supported")
 }
 
 // Temperature returns the current temperature
@@ -154,7 +155,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 		Debug("Thermometer %s, WaitForEdge(%s, %s) timed out", t.name, pull, edge)
 		return time.Duration(0)
 	}
-	dt := time.Now().Sub(start)
+	dt := time.Since(start)
 	t.pin.Output(Low)
 	Debug("Discharge time for %s: %s", t.name, dt)
 	return dt
@@ -194,7 +195,7 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 	value := calculated / ms(dt)
 	Info("Calculated Value (full discharge) %0.3f ms, found %0.3f ms, ratio %0.3f", calculated, ms(dt), value)
 	if h.Stddev() > h.Median()*0.05 || h.Len() < 10 {
-		return fmt.Errorf("Returned inconsistent data value(%0.4f) Variance(%0.2f%%) entries(%d)",
+		return fmt.Errorf("returned inconsistent data value(%0.4f) variance(%0.2f%%) entries(%d)",
 			value, 100.0*h.Stddev()/h.Median(), h.Len())
 	}
 	Debug("Setting adjustment to %0.3f", value)
@@ -244,7 +245,7 @@ func (t *GpioThermometer) Update() error {
 			avg/MillisecondFloat,
 			stdd/MillisecondFloat,
 			dev/MillisecondFloat)
-		return fmt.Errorf("Could not update temperature successfully")
+		return fmt.Errorf("could not update temperature successfully")
 	}
 	ohms := t.getOhms(time.Duration(int64(h.Median())))
 	temp := t.getTemp(ohms)
@@ -257,9 +258,4 @@ func (t *GpioThermometer) Update() error {
 // Converts a temperature in Celsius to Farenheit
 func toFarenheit(celsius float64) float64 {
 	return (celsius * 9.0 / 5.0) + 32.0
-}
-
-// Converts a temperature in Farenheit to Celsius
-func toCelsius(farenheit float64) float64 {
-	return farenheit - 32.0*5.0/9.0
 }

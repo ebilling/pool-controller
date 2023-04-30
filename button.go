@@ -43,7 +43,7 @@ func (b *Button) runLoop(started *chan bool) {
 	b.pin.Output(Low)
 	b.pin.InputEdge(PullUp, RisingEdge)
 	*started <- true
-	for true {
+	for {
 		if b.pin.WaitForEdge(time.Second) {
 			if b.IsDisabled() {
 				time.Sleep(time.Second)
@@ -68,7 +68,6 @@ func (b *Button) runLoop(started *chan bool) {
 		case <-b.done:
 			return
 		default: // Required to not block
-			break
 		}
 	}
 }

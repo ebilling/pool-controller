@@ -315,7 +315,7 @@ func (p *TestPin) Read() GpioState {
 }
 
 func (p *TestPin) WaitForEdge(interval time.Duration) bool {
-	for true {
+	for {
 		select {
 		case <-p.wake:
 			return true
@@ -325,7 +325,6 @@ func (p *TestPin) WaitForEdge(interval time.Duration) bool {
 			return false
 		}
 	}
-	return true
 }
 
 func (p *TestPin) Pin() uint8 {

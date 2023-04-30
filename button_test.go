@@ -6,7 +6,7 @@ import (
 )
 
 func testBoolChan(b chan bool, timeout time.Duration) bool {
-	for true {
+	for {
 		select {
 		case val := <-b:
 			return val
@@ -14,7 +14,6 @@ func testBoolChan(b chan bool, timeout time.Duration) bool {
 			return false
 		}
 	}
-	return false
 }
 
 func TestFakeButton(t *testing.T) {

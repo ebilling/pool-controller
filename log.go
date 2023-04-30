@@ -13,18 +13,18 @@ import (
 )
 
 var (
-	_syslog  *syslog.Writer
-	_debug   bool
-	priority = syslog.LOG_USER
+	syslogWriter *syslog.Writer
+	doDebug      bool
+	priority     = syslog.LOG_USER
 )
 
 func init() {
-	if _syslog == nil {
+	if syslogWriter == nil {
 		u, _ := user.Current()
 		if u.Username == "root" {
-			_syslog, _ = syslog.New(syslog.LOG_DAEMON, "pool-controller")
+			syslogWriter, _ = syslog.New(syslog.LOG_DAEMON, "pool-controller")
 		} else {
-			_syslog, _ = syslog.New(syslog.LOG_USER, "pool-controller")
+			syslogWriter, _ = syslog.New(syslog.LOG_USER, "pool-controller")
 		}
 
 	}
@@ -38,12 +38,12 @@ func NewLogger() *log.Logger {
 
 // EnableDebug - enables all calls to {#Debug()} that follow to go to syslog.
 func EnableDebug() {
-	_debug = true
+	doDebug = true
 }
 
 // DisableDebug - disables all calls to {#Debug()} that follow.  No output will go syslog.
 func DisableDebug() {
-	_debug = false
+	doDebug = false
 }
 
 func captureLine(format string) string {
@@ -59,13 +59,13 @@ func captureLine(format string) string {
 // Alert sends a syslog message at the Alert level
 func Alert(format string, a ...interface{}) error {
 	format = captureLine(format)
-	return _syslog.Alert(fmt.Sprintf(format, a...))
+	return syslogWriter.Alert(fmt.Sprintf(format, a...))
 }
 
 // Crit sends a syslog message at the Crit level
 func Crit(format string, a ...interface{}) error {
 	format = captureLine(format)
-	return _syslog.Crit(fmt.Sprintf(format, a...))
+	return syslogWriter.Crit(fmt.Sprintf(format, a...))
 }
 
 // Fatal sends a syslog message at the Fatal level
@@ -78,50 +78,46 @@ func Fatal(format string, a ...interface{}) {
 // Emerg sends a syslog message at the Emerg level
 func Emerg(format string, a ...interface{}) error {
 	format = captureLine(format)
-	return _syslog.Emerg(fmt.Sprintf(format, a...))
+	return syslogWriter.Emerg(fmt.Sprintf(format, a...))
 }
 
 // Error sends a syslog message at the Error level
 func Error(format string, a ...interface{}) error {
 	format = captureLine(format)
-	return _syslog.Err(fmt.Sprintf(format, a...))
+	return syslogWriter.Err(fmt.Sprintf(format, a...))
 }
 
 // Notice sends a syslog message at the Notice level
 func Notice(format string, a ...interface{}) error {
 	format = captureLine(format)
-	return _syslog.Notice(fmt.Sprintf(format, a...))
+	return syslogWriter.Notice(fmt.Sprintf(format, a...))
 }
 
 // Warn sends a syslog message at the Warn level
 func Warn(format string, a ...interface{}) error {
 	format = captureLine(format)
-	return _syslog.Warning(fmt.Sprintf(format, a...))
+	return syslogWriter.Warning(fmt.Sprintf(format, a...))
 }
 
 // Info sends a syslog message at the Info level
 func Info(format string, a ...interface{}) error {
 	format = captureLine(format)
-	return _syslog.Info(fmt.Sprintf(format, a...))
+	return syslogWriter.Info(fmt.Sprintf(format, a...))
 }
 
 // Debug sends a syslog message at the Debug level
 func Debug(format string, a ...interface{}) error {
-	if _debug == false {
-		return nil
+	if doDebug {
+		format = captureLine(format)
+		return syslogWriter.Debug(fmt.Sprintf(format, a...))
 	}
-	format = captureLine(format)
-	return _syslog.Debug(fmt.Sprintf(format, a...))
+	return nil
 }
 
 // Log sends a syslog message at the Info level
 func Log(format string, a ...interface{}) error {
 	format = captureLine(format)
 	return Info(fmt.Sprintf(format, a...))
-}
-
-func traceback() string {
-	return string(rtdebug.Stack())
 }
 
 func callerTraceback() string {

@@ -18,9 +18,6 @@ var (
 	defaultDataDir        = "/var/cache/homekit"
 	defaultPidFile        = "/tmp/pool-controller.pid"
 	defaultPin            = "74023718"
-	defaultWUAppID        = ""
-	defaultZipcode        = ""
-	defaultAuth           []byte
 	defaultTarget         = 30.0
 	defaultDeltaT         = 12.0
 	defaultTolerance      = 0.5
@@ -29,9 +26,6 @@ var (
 	defaultFrequency      = 2
 	defaultRunTime        = 6
 	serverConfiguration   = "/server.conf"
-	defaultCfg            = PersistedConfig{
-		Disabled: false,
-	}
 )
 
 // Config holds various configuration entries for the system.
@@ -53,23 +47,21 @@ type Config struct {
 // PersistedConfig is the portion of the configuration that can be altered and saved from the UI
 type PersistedConfig struct {
 	// Updatable
-	Disabled                bool
-	ButtonDisabled          bool
-	SolarDisabled           bool
-	Auth                    string
-	WeatherUndergroundAppID string
-	Zip                     string
-	Pin                     string
-	Target                  float64
-	DeltaT                  float64
-	Tolerance               float64
-	PumpAdjustment          float64
-	RoofAdjustment          float64
-	DailyFrequency          float64 // days between automated runs
-	RunTime                 float64 // hours when a pump is manually engaged it will run for this many hours
-	Mtime                   time.Time
-	Ctime                   time.Time
-	Schedule                *Schedule
+	Disabled       bool
+	ButtonDisabled bool
+	SolarDisabled  bool
+	Auth           string
+	Pin            string
+	Target         float64
+	DeltaT         float64
+	Tolerance      float64
+	PumpAdjustment float64
+	RoofAdjustment float64
+	DailyFrequency float64 // days between automated runs
+	RunTime        float64 // hours when a pump is manually engaged it will run for this many hours
+	Mtime          time.Time
+	Ctime          time.Time
+	Schedule       *Schedule
 }
 
 // NewConfig creates a config objects based on a given flagset and arguments.
@@ -103,7 +95,6 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		c.cfg.RoofAdjustment = defaultRoofAdjustment
 		c.cfg.Target = defaultTarget
 		c.cfg.Tolerance = defaultTolerance
-		c.cfg.Zip = defaultZipcode
 		c.cfg.DailyFrequency = float64(defaultFrequency)
 		c.cfg.RunTime = float64(defaultRunTime)
 		c.Save()
