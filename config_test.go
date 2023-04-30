@@ -1,16 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
-	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func flagTestSetup(args []string) *Config {
@@ -142,21 +137,4 @@ func TestConfigSave(t *testing.T) {
 			t.Error("Should have returned a PathError")
 		}
 	})
-}
-
-func TestSchedule(t *testing.T) {
-	data, err := ioutil.ReadFile("/Users/eric/server.json")
-	assert.Nil(t, err)
-	cfg := &PersistedConfig{}
-	err = json.Unmarshal(data, cfg)
-	assert.Nil(t, err)
-	cfg.Schedule = &Schedule{
-		Events: []*ScheduleEvent{
-			{time.Now(), 180, []time.Weekday{time.Sunday, time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday}, PUMP},
-		},
-	}
-	data, err = json.Marshal(cfg)
-	assert.Nil(t, err)
-	err = ioutil.WriteFile("/Users/eric/server.conf", data, 0600)
-	assert.Nil(t, err)
 }

@@ -129,16 +129,18 @@ func TestGpioSwitchesBasic(t *testing.T) {
 	solarFwdPin := &TestPin{}
 	solarRevPin := &TestPin{}
 	solarLedPin := &TestPin{}
+	solarValve := &SolarValve{
+		fwdRelay:  newRelay(solarFwdPin, "", ""),
+		revRelay:  newRelay(solarRevPin, "", ""),
+		statusLED: solarLedPin,
+		timeout:   time.Microsecond,
+		accessory: accessory.NewSwitch(AccessoryInfo("Test Solar Valve", mftr)),
+	}
+	solarValve.TurnOff() // set to off so we can test it
 	pumps := newSwitches(
 		newRelay(pumpPin, "Test Pump", mftr),
 		newRelay(sweepPin, "Test Sweep", mftr),
-		&SolarValve{
-			fwdRelay:  newRelay(solarFwdPin, "", ""),
-			revRelay:  newRelay(solarRevPin, "", ""),
-			statusLED: solarLedPin,
-			timeout:   time.Microsecond,
-			accessory: accessory.NewSwitch(AccessoryInfo("Test Solar Valve", mftr)),
-		},
+		solarValve,
 	)
 
 	startTime := pumps.GetStartTime()

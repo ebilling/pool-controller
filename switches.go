@@ -76,6 +76,7 @@ func newSwitches(pump *Relay, sweep *Relay, solar *SolarValve) *Switches {
 		solar:    solar,
 		manualOp: time.Now().Add(time.Hour * -24),
 	}
+	p.StopAll(false)
 	p.bindHK()
 	return &p
 }
@@ -83,7 +84,7 @@ func newSwitches(pump *Relay, sweep *Relay, solar *SolarValve) *Switches {
 func (p *Switches) bindHK() {
 	p.pump.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		Log("HomeKit request to turn Pump on=%t", on)
-		if on == true {
+		if on {
 			p.SetState(PUMP, true, 1.0)
 		} else {
 			p.StopAll(true)
@@ -98,12 +99,10 @@ func (p *Switches) bindHK() {
 			if on {
 				state = MIXING
 			}
-			break
 		case MIXING:
 			if !on {
 				state = SOLAR
 			}
-			break
 		default:
 			if on {
 				state = SWEEP
@@ -125,12 +124,10 @@ func (p *Switches) bindHK() {
 			} else {
 				state = SWEEP
 			}
-			break
 		case SOLAR:
 			if !on {
 				state = PUMP
 			}
-			break
 		default:
 			if on {
 				state = SOLAR
@@ -166,7 +163,7 @@ func (p *Switches) Disable() {
 	p.state = DISABLED
 }
 
-//OnOff is something that can be turned off and on
+// OnOff is something that can be turned off and on
 type OnOff interface {
 	TurnOn()
 	TurnOff()
@@ -256,7 +253,7 @@ func DurationFromHours(hours float64, minHours float64) time.Duration {
 
 // ManualState returns true if the pumps were started or stopped manually
 func (p *Switches) ManualState(runtime float64) bool {
-	if time.Now().Sub(p.manualOp) > DurationFromHours(runtime, 2.0) {
+	if time.Since(p.manualOp) > DurationFromHours(runtime, 2.0) {
 		return false
 	}
 	if p.manualOp.Equal(p.GetStartTime()) && p.GetStartTime().After(p.GetStopTime()) {

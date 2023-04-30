@@ -461,12 +461,6 @@ func (h *Handler) processForm(r *http.Request, c *Config) {
 		c.SetAuth(pw1)
 		foundone = true
 	}
-	if processStringUpdate(r, "appid", &c.cfg.WeatherUndergroundAppID) {
-		foundone = true
-	}
-	if processStringUpdate(r, "zipcode", &c.cfg.Zip) {
-		foundone = true
-	}
 	if processFloatUpdate(r, "adj_pump", &c.cfg.PumpAdjustment) {
 		h.ppc.SyncAdjustments()
 		foundone = true
