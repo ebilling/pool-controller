@@ -19,9 +19,7 @@ func (r *Rrd) addTemp(name, title string, colorid, which int) {
 
 func (ppc *PoolPumpController) createRrds() error {
 	ppc.tempRrd.addTemp("pump", "Pump", 8, 1)
-	ppc.tempRrd.addTemp("weather", "Weather", 1, 2)
 	ppc.tempRrd.addTemp("roof", "Roof", 2, 3)
-	ppc.tempRrd.addTemp("solar", "SolRad w/sqm", 4, 4)
 	ppc.tempRrd.addTemp("pool", "Pool", 0, 5)
 	ppc.tempRrd.addTemp("target", "Target", 6, 6)
 	ppc.tempRrd.AddStandardRRAs()
@@ -62,9 +60,9 @@ func (ppc *PoolPumpController) createRrds() error {
 
 // UpdateRrd writes updates to RRD files and generates cached graphs
 func (ppc *PoolPumpController) UpdateRrd() {
-	update := fmt.Sprintf("N:%f:%f:%f:%f:%f:%f",
-		ppc.pumpTemp.Temperature(), 0.0, ppc.roofTemp.Temperature(),
-		0.0, ppc.runningTemp.Temperature(), ppc.config.cfg.Target)
+	update := fmt.Sprintf("N:%f:%f:%f:%f",
+		ppc.pumpTemp.Temperature(), ppc.roofTemp.Temperature(),
+		ppc.runningTemp.Temperature(), ppc.config.cfg.Target)
 	Debug("Updating TempRrd: %s", update)
 	err := ppc.tempRrd.Updater().Update(update)
 	if err != nil {

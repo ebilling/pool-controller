@@ -6,7 +6,7 @@ import (
 )
 
 func TestGpioThermometer(t *testing.T) {
-	sleeptime := 1 * time.Millisecond
+	sleeptime := time.Millisecond
 	pin := TestPin{
 		state:     Low,
 		direction: Input,
@@ -16,16 +16,17 @@ func TestGpioThermometer(t *testing.T) {
 	therm := newGpioThermometer("Test Thermometer", mftr, &pin)
 
 	t.Run("getDischargeTime", func(t *testing.T) {
-		d := therm.getDischargeTime() / time.Millisecond
-		s := sleeptime / time.Millisecond // Two checks, so 2x
-		if d < s-5 || d > s+5 {
-			t.Errorf("Expected ~%dms got %dms", s, d)
+		d := therm.getDischargeTime()
+		s := sleeptime
+		slop := s / 10
+		if d < s-slop || d > s+slop {
+			t.Errorf("Expected ~%s got %s", s, d)
 		}
 	})
 
 	t.Run("getOhms", func(t *testing.T) {
-		expected := 10000 * therm.adjust
-		o := therm.getOhms(100 * time.Millisecond)
+		expected := 1000 * therm.adjust
+		o := therm.getOhms(100 * time.Microsecond)
 		if int(o) != int(expected) {
 			t.Errorf("Expected %0.3f k-ohms found %0.3f k-ohms",
 				float64(expected)/1000.0, o/1000.0)
@@ -34,7 +35,7 @@ func TestGpioThermometer(t *testing.T) {
 }
 
 func TestCalibration(t *testing.T) {
-	sleeptime := 50 * time.Millisecond
+	sleeptime := 50 * time.Microsecond
 	pin := TestPin{
 		state:     Low,
 		direction: Input,
