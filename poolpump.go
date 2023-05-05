@@ -95,7 +95,9 @@ func (ppc *PoolPumpController) shouldCool() bool {
 	}
 	waterHot := ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance
 	roofCold := ppc.roofTemp.Temperature() < COLDROOF
-	return waterHot && roofCold
+	cool := waterHot && roofCold
+	Info("ShouldCool: %t waterCold(%t) roofHot(%t)", cool, waterHot, roofCold)
+	return cool
 }
 
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
