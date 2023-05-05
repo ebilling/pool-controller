@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"time"
 )
 
@@ -94,8 +93,9 @@ func (ppc *PoolPumpController) shouldCool() bool {
 	if ppc.config.cfg.SolarDisabled {
 		return false
 	}
-	return math.Abs(ppc.pumpTemp.Temperature()-ppc.config.cfg.Target) > ppc.config.cfg.Tolerance &&
-		ppc.roofTemp.Temperature() < COLDROOF // minimum temperature for the roof to be considered hot
+	waterHot := ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance
+	roofCold := ppc.roofTemp.Temperature() < COLDROOF
+	return waterHot && roofCold
 }
 
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
@@ -106,7 +106,7 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 		return false
 	}
 
-	waterCold := math.Abs(ppc.pumpTemp.Temperature()-ppc.config.cfg.Target) > ppc.config.cfg.Tolerance
+	waterCold := ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.Tolerance
 	roofHot := ppc.roofTemp.Temperature() > HOTROOF
 	warm := waterCold && roofHot
 	if warm {
