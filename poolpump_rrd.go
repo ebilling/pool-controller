@@ -26,10 +26,8 @@ func (ppc *PoolPumpController) createRrds() error {
 	ppc.tempRrd.Creator().Create(*ppc.config.forceRrd)
 
 	tg := ppc.tempRrd.grapher
-	tg.SetTitle("Temperatures and Solar Radiation")
+	tg.SetTitle("Temperatures")
 	tg.SetVLabel("Degrees Farenheit")
-	tg.SetRightAxis(1, 0.0)
-	tg.SetRightAxisLabel("dekawatts/sqm")
 	tg.SetSize(640, 300) // Config?
 	tg.SetImageFormat("PNG")
 
