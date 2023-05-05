@@ -147,15 +147,13 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	// Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
 	time.Sleep(2 * maxTime)
-	// Start polling
-	start := time.Now()
 	// Set to input
 	t.pin.InputEdge(pull, edge)
-	if !t.pin.WaitForEdge(maxTime) {
+	dt, state := t.pin.WaitForEdge(maxTime)
+	if !state {
 		Debug("Thermometer %s, WaitForEdge(%s, %s) timed out", t.name, pull, edge)
 		return time.Duration(0)
 	}
-	dt := time.Since(start)
 	t.pin.Output(Low)
 	Debug("Discharge time for %s: %s", t.name, dt)
 	return dt
