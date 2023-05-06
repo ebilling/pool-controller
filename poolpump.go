@@ -91,12 +91,15 @@ func (ppc *PoolPumpController) Update() error {
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
 	if ppc.config.cfg.SolarDisabled {
+		Debug("shouldCool: disabled(%t)", ppc.config.cfg.SolarDisabled)
 		return false
 	}
 	waterHot := ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance
 	roofCold := ppc.roofTemp.Temperature() < COLDROOF
 	cool := waterHot && roofCold
-	Info("ShouldCool: %t waterCold(%t) roofHot(%t)", cool, waterHot, roofCold)
+	if cool {
+		Info("ShouldCool: %t waterHot(%t) roofCold(%t)", cool, waterHot, roofCold)
+	}
 	return cool
 }
 
@@ -113,16 +116,6 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 	warm := waterCold && roofHot
 	if warm {
 		Info("ShouldWarm: %t waterCold(%t) roofHot(%t)", warm, waterCold, roofHot)
-		Info("Temp(%0.3f) < %0.3f {Target(%0.3f) - Tolerance(%0.3f)} : WaterCold(%t)",
-			ppc.pumpTemp.Temperature(),
-			ppc.config.cfg.Target-ppc.config.cfg.Tolerance,
-			ppc.config.cfg.Target,
-			ppc.config.cfg.Tolerance,
-			waterCold)
-		Info("Temp(%0.3f) Roof(%0.3f) : RoofHot(%t)",
-			ppc.pumpTemp.Temperature(),
-			ppc.roofTemp.Temperature(),
-			roofHot)
 	}
 	return warm
 }
