@@ -159,8 +159,8 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	// If the pumps havent run in a day, wait til 4AM then start them
 	freqHours := DurationFromHours((ppc.config.cfg.DailyFrequency-0.25)*24.0, 12.0)
 	runtime := DurationFromHours(ppc.config.cfg.RunTime, 1.0)
-	if time.Since(ppc.switches.GetStopTime()) > freqHours && time.Now().Hour() > 4 {
-		Log("Daily running SWEEP: %s", freqHours.String())
+	if time.Since(ppc.switches.GetStopTime()) > freqHours {
+		Log("Daily SWEEP running for %s every %s - %s remaining", runtime, freqHours.String(), runtime-time.Since(ppc.switches.GetStartTime()))
 		ppc.switches.SetState(SWEEP, false, ppc.config.cfg.RunTime) // Clean pool
 		if time.Since(ppc.switches.GetStartTime()) > runtime {
 			ppc.switches.StopAll(false) // End daily
