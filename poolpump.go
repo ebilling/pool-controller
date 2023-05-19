@@ -120,6 +120,11 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 	return warm
 }
 
+func adjustedRunTime(runTime float64, sinceTime time.Time) float64 {
+	runSeconds := runTime * 3600
+	return (runSeconds - float64(time.Since(sinceTime).Seconds())) / 3600
+}
+
 // RunPumpsIfNeeded - If the water is not within the tolerance limit of the target, and the roof
 // temperature would help get the temperature to be closer to the target, the pumps will be
 // turned on.  If the outdoor temperature is low or the pool is very cold, the sweep will also be
@@ -127,6 +132,10 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	state := ppc.switches.State()
 	if ppc.switches.ManualState(ppc.config.cfg.RunTime) {
+		// Don't warm past the target
+		if state == SOLAR && !ppc.shouldWarm() {
+			ppc.switches.SetState(PUMP, true, adjustedRunTime(ppc.config.cfg.RunTime, ppc.switches.GetStartTime()))
+		}
 		return
 	}
 	if state == DISABLED && !ppc.config.cfg.Disabled && !ppc.config.cfg.SolarDisabled {
