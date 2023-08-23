@@ -90,7 +90,10 @@ func (ppc *PoolPumpController) Update() error {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
-	if ppc.config.cfg.SolarDisabled && !ppc.config.cfg.SolarCoolingDisabled {
+	if ppc.config.cfg.SolarCoolingDisabled {
+		return false
+	}
+	if ppc.config.cfg.SolarDisabled {
 		Debug("shouldCool: disabled(%t)", ppc.config.cfg.SolarDisabled)
 		return false
 	}

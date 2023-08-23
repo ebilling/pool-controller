@@ -550,7 +550,7 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	html += h.configBoolRow("Disable all pumps", "disabled", c.cfg.Disabled)
 	html += h.configBoolRow("Disable button", "button_disabled", c.cfg.ButtonDisabled)
 	html += h.configBoolRow("Disable solar", "solar_disabled", c.cfg.SolarDisabled)
-	html += h.configBoolRow("Disable solar", "cooling_disabled", c.cfg.SolarCoolingDisabled)
+	html += h.configBoolRow("Disable cooling", "cooling_disabled", c.cfg.SolarCoolingDisabled)
 
 	html += "<input type=hidden name=posted value=true>\n"
 	html += "</table><input type=submit value=Save></font></font></form>\n"
