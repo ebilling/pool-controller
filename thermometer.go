@@ -141,7 +141,7 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 
 func (t *GpioThermometer) getDischargeTime() time.Duration {
 	pull := Float
-	edge := RisingEdge
+	edge := BothEdges
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	// Discharge the capacitor (low temps could make this really long)
