@@ -172,7 +172,7 @@ func (g *Gpio) Read() GpioState {
 func (g *Gpio) WaitForEdge(timeout time.Duration) (time.Duration, bool) {
 	state := g.pin.WaitForEdge(timeout)
 	out := time.Since(g.inputTime)
-	Info("WaitForEdge(%d) returned %s after %s", g.gpio, state, out)
+	Info("WaitForEdge(%d) returned %t after %s", g.gpio, state, out)
 	return out, state
 }
 
