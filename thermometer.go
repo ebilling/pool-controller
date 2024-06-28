@@ -225,9 +225,10 @@ func (t *GpioThermometer) Temperature() float64 {
 func (t *GpioThermometer) Update() error {
 	var dischargeTime time.Duration
 	h := NewHistory(5)
-	for i := 0; h.Len() < 5 && i < 20; i++ {
+	// TODO, allow for more bites at the apple
+	for i := 0; h.Len() < 5 && i < 5; i++ {
 		dischargeTime = t.getDischargeTime()
-		if t.inRange(dischargeTime) {
+		if dischargeTime > 0 && t.inRange(dischargeTime) {
 			t.history.PushDuration(dischargeTime)
 			h.PushDuration(dischargeTime)
 		}
