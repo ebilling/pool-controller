@@ -41,7 +41,7 @@ type TestRunPumps struct {
 	ppc      *PoolPumpController
 }
 
-func (t *TestRunPumps) setConditions(target, pump, roof, outside float64, state State) {
+func (t *TestRunPumps) setConditions(target, pump, roof float64, state State) {
 	t.ppc.config.cfg.Target = target
 	t.pumpTemp.temp = pump
 	t.roofTemp.temp = roof
@@ -64,7 +64,7 @@ func NewTestRunPumps() *TestRunPumps {
 func TestColdWaterHotWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 15.0, 50.0, 33.0, OFF)
+	trp.setConditions(30.0, 15.0, 50.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -76,7 +76,7 @@ func TestColdWaterHotWeather(t *testing.T) {
 func TestWarmWaterHotWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 29.98, 50.0, 33.0, OFF)
+	trp.setConditions(30.0, 29.98, 50.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -88,7 +88,7 @@ func TestWarmWaterHotWeather(t *testing.T) {
 func TestHotWaterHotWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 29.98, 50.0, 33.0, OFF)
+	trp.setConditions(30.0, 29.98, 50.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -100,7 +100,7 @@ func TestHotWaterHotWeather(t *testing.T) {
 func TestColdWaterWarmWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 15.0, HOTROOF+0.001, 29.0, OFF)
+	trp.setConditions(30.0, 15.0, 40.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -112,7 +112,7 @@ func TestColdWaterWarmWeather(t *testing.T) {
 func TestWarmWaterWarmWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 29.98, 40.0, 29.0, OFF)
+	trp.setConditions(30.0, 29.98, 40.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -124,7 +124,7 @@ func TestWarmWaterWarmWeather(t *testing.T) {
 func TestHotWaterWarmWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 29.98, 40.0, 29.0, OFF)
+	trp.setConditions(30.0, 29.98, 40.0, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}
@@ -135,9 +135,30 @@ func TestHotWaterWarmWeather(t *testing.T) {
 
 func TestRunPumpsIfNeeded(t *testing.T) {
 	SetGpioProvider(NewTestPin)
-	//trp := NewTestRunPumps()
+	trp := NewTestRunPumps()
 
-	t.Run("", func(t *testing.T) {
-	})
+	testdata := []struct {
+		name   string
+		target float64
+		pump   float64
+		roof   float64
+		state  State
+	}{
+		{"", 30.0, 15.0, 50.0, MIXING},
+		{"", 30.0, 27.0, 50.0, SOLAR},
+		{"", 30.0, 29.98, 50.0, OFF},
+		{"", 30.0, 15.0, 40.0, MIXING},
+		{"", 30.0, 29.98, 30.0, OFF},
+		{"", 30.0, 29.98, 20.0, OFF},
+	}
 
+	for _, td := range testdata {
+		t.Run(td.name, func(t *testing.T) {
+			trp.setConditions(td.target, td.pump, td.roof, td.state)
+			trp.ppc.RunPumpsIfNeeded()
+			if trp.ppc.switches.state != td.state {
+				t.Errorf("Expected state %v, got %v", td.state, trp.ppc.switches.state)
+			}
+		})
+	}
 }
