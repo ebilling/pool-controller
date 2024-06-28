@@ -149,7 +149,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	time.Sleep(time.Millisecond)
 	// Set to input
 	t.pin.InputEdge(pull, edge)
-	time.Sleep(20 * time.Microsecond)
+	time.Sleep(80 * time.Microsecond)
 	dt, state := t.pin.WaitForEdge(maxTime)
 	if !state {
 		dt, state = t.pin.WaitForEdge(maxTime) // try again
