@@ -152,6 +152,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	time.Sleep(20 * time.Microsecond)
 	dt, state := t.pin.WaitForEdge(maxTime)
 	if !state {
+		dt, state = t.pin.WaitForEdge(maxTime) // try again
 		Info("TIMED_OUT Thermometer %s (%s, %s) %s max(%s): %s %0.1fF", t.name, pull, edge, dt, maxTime, t.pin.Read(), toFarenheit(t.getTemp(t.getOhms(dt))))
 		return time.Duration(0)
 	}

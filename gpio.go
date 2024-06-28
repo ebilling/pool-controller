@@ -24,10 +24,7 @@ const (
 
 // State returns whether the pin is in a High or Low voltage state
 func (s GpioState) State() gpio.Level {
-	if s == Low {
-		return gpio.Low
-	}
-	return gpio.High
+	return gpio.Level(s)
 }
 
 func (s GpioState) String() string {
@@ -83,17 +80,7 @@ const (
 
 // Pull returns the current state of the pin's pull configuration
 func (p Pull) Pull() gpio.Pull {
-	switch p {
-	case Float:
-		return gpio.Float
-	case PullDown:
-		return gpio.PullDown
-	case PullUp:
-		return gpio.PullUp
-	case PullNoChange:
-		return gpio.PullNoChange
-	}
-	return gpio.PullNoChange
+	return gpio.Pull(p)
 }
 
 func (p Pull) String() string { return p.Pull().String() }
@@ -142,9 +129,7 @@ func GpioInit() error {
 
 // Input sets the pin to be read from.
 func (g *Gpio) Input() {
-	Debug("Setting gpio(%d) to Input(%s, %s)", g.gpio, Float, NoEdge)
-	g.inputTime = time.Now()
-	g.pin.In(gpio.Float, gpio.NoEdge)
+	g.InputEdge(Float, NoEdge)
 }
 
 // InputEdge sets the pin to be read from and to alert WaitForEdge when the given Edge is found.
@@ -162,10 +147,7 @@ func (g *Gpio) Output(s GpioState) {
 
 // Read returns the current state of the pin
 func (g *Gpio) Read() GpioState {
-	if g.pin.Read() == gpio.High {
-		return High
-	}
-	return Low
+	return GpioState(g.pin.Read())
 }
 
 // WaitForEdge blocks while waiting for a voltage change on the pin.
