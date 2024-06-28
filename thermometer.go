@@ -15,7 +15,7 @@ const (
 	nanoFarads = 100
 	// minTime and maxTime are the expectations for how long it should take for the capacitor to discharge
 	minTime = time.Duration(nanoFarads) * time.Microsecond
-	maxTime = time.Duration(nanoFarads) * time.Millisecond / 10
+	maxTime = time.Duration(nanoFarads) * time.Millisecond
 )
 
 // Thermometer reads a thermal resistance thermometer using the timings of a capacitor charge/discharge cycle
