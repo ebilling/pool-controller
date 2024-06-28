@@ -154,7 +154,9 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	// poll for the change
 	for time.Now().Before(end) {
 		if t.pin.Read() {
-			return time.Since(start)
+			dt := time.Since(start)
+			Info("Thermometer %s (%s, %s) %s: %s %0.1fF", t.name, pull, edge, dt, t.pin.Read(), toFarenheit(t.getTemp(t.getOhms(dt))))
+			return dt
 		}
 		time.Sleep(10 * time.Microsecond)
 	}
