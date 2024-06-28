@@ -69,13 +69,13 @@ type Pull int
 
 const (
 	// Float lets the input flow directly, resistance is handled elswhere.
-	Float Pull = 0
+	Float Pull = 1
 	// PullDown applies pull-down resistance to the pin
-	PullDown Pull = 1
+	PullDown Pull = 2
 	// PullUp applies pull-up resistance to the pin
-	PullUp Pull = 2
+	PullUp Pull = 3
 	// PullNoChange does not change the previous pull resistor setting
-	PullNoChange Pull = 3
+	PullNoChange Pull = 0
 )
 
 // Pull returns the current state of the pin's pull configuration
