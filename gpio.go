@@ -41,7 +41,7 @@ const (
 	RisingEdge Edge = 1
 	// FallingEdge means that the voltage is moving from a high to a low voltage state.
 	FallingEdge Edge = 2
-	// BothEdges means taht a change is occuring in either direction.
+	// BothEdges means that a change is occuring in either direction.
 	BothEdges Edge = 3
 )
 
@@ -68,14 +68,14 @@ func (e Edge) String() string {
 type Pull int
 
 const (
+	// PullNoChange does not change the previous pull resistor setting
+	PullNoChange Pull = 0
 	// Float lets the input flow directly, resistance is handled elswhere.
 	Float Pull = 1
 	// PullDown applies pull-down resistance to the pin
 	PullDown Pull = 2
 	// PullUp applies pull-up resistance to the pin
 	PullUp Pull = 3
-	// PullNoChange does not change the previous pull resistor setting
-	PullNoChange Pull = 0
 )
 
 // Pull returns the current state of the pin's pull configuration
