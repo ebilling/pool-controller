@@ -144,9 +144,11 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	edge := FallingEdge
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
+
 	// Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
-	time.Sleep(time.Millisecond * 2)
+	time.Sleep(300 * time.Millisecond)
+
 	// Set to input
 	t.pin.InputEdge(pull, edge)
 	dt, state := t.pin.WaitForEdge(-1)
