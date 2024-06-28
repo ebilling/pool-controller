@@ -15,7 +15,7 @@ const (
 	nanoFarads = 100
 	// minTime and maxTime are the expectations for how long it should take for the capacitor to discharge
 	minTime = time.Duration(nanoFarads) * time.Microsecond
-	maxTime = time.Duration(nanoFarads) * time.Millisecond / 10
+	maxTime = time.Duration(nanoFarads) * time.Millisecond / 10 // 100ms
 )
 
 // Thermometer reads a thermal resistance thermometer using the timings of a capacitor charge/discharge cycle
@@ -141,15 +141,16 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 
 func (t *GpioThermometer) getDischargeTime() time.Duration {
 	pull := Float
-	edge := RisingEdge
+	edge := FallingEdge
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	// Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
 	time.Sleep(2 * maxTime)
 	// Set to input
+	Info("Discharge time for %s: %s", t.name, t.pin.Pin())
 	t.pin.InputEdge(pull, edge)
-	dt, state := t.pin.WaitForEdge(-1)
+	dt, state := t.pin.WaitForEdge(maxTime)
 	if !state {
 		ohms := t.getOhms(time.Duration(int64(dt)))
 		temp := t.getTemp(ohms)
