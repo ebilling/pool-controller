@@ -43,7 +43,8 @@ func (b *Button) runLoop(started *chan bool) {
 	b.pin.Output(Low)
 	*started <- true
 	for {
-		b.pin.InputEdge(PullUp, RisingEdge)
+		//b.pin.InputEdge(PullUp, RisingEdge)
+		b.pin.Input()
 		_, state := b.pin.WaitForEdge(time.Second)
 		if state {
 			if b.IsDisabled() {
