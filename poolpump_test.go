@@ -100,7 +100,7 @@ func TestHotWaterHotWeather(t *testing.T) {
 func TestColdWaterWarmWeather(t *testing.T) {
 	SetGpioProvider(NewTestPin)
 	trp := NewTestRunPumps()
-	trp.setConditions(30.0, 15.0, 40.0, OFF)
+	trp.setConditions(30.0, 15.0, HOTROOF+0.01, OFF)
 	if trp.ppc.shouldCool() {
 		t.Error("Should not be cooling")
 	}

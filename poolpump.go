@@ -19,8 +19,12 @@ const (
 	pumpGpio     = 24
 	sweepGpio    = 25
 
-	HOTROOF        = 47.5
-	COLDROOF       = 18.5
+	// HOTROOF is the temperature at which the roof is considered hot enough
+	// to run the pumps if heating is needed
+	HOTROOF = 47.5 // 117F
+	// COLDROOF is the temperature at which the roof is considered cold enough
+	// to run the pumps if cooling is needed
+	COLDROOF       = 18.5 // 65F
 	solarMotorTime = 30 * time.Second
 )
 
@@ -117,7 +121,7 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 	waterCold := ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.Tolerance
 	roofHot := ppc.roofTemp.Temperature() > HOTROOF
 	warm := waterCold && roofHot
-	if warm {
+	if warm || doDebug {
 		Info("ShouldWarm: %t waterCold(%t) roofHot(%t)", warm, waterCold, roofHot)
 	}
 	return warm
