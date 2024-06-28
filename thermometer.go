@@ -55,7 +55,7 @@ func (t *SelectiveThermometer) Name() string {
 }
 
 // Calibrate runs a calibration operation the thermometer
-func (t *SelectiveThermometer) Calibrate(a float64) error {
+func (t *SelectiveThermometer) Calibrate(_ float64) error {
 	return errors.New("not supported")
 }
 
@@ -146,14 +146,14 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	defer t.mutex.Unlock()
 	// Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
-	time.Sleep(2 * maxTime)
+	time.Sleep(10 * time.Millisecond)
 	// Set to input
 	t.pin.InputEdge(pull, edge)
 	dt, state := t.pin.WaitForEdge(maxTime)
 	if !state {
 		ohms := t.getOhms(time.Duration(int64(dt)))
 		temp := t.getTemp(ohms)
-		Info("TIMED_OUT: %s %s, %s after %s maxtime %s Temp %0.2f", t.name, pull, edge, dt, maxTime, temp)
+		Info("TIMED_OUT: %s %s, %s after %s maxtime %s Temp %0.2f %s", t.name, pull, edge, dt, maxTime, temp, t.pin.Read())
 		return time.Duration(0)
 	}
 	t.pin.Output(Low)

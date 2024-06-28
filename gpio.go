@@ -171,9 +171,7 @@ func (g *Gpio) Read() GpioState {
 // WaitForEdge blocks while waiting for a voltage change on the pin.
 func (g *Gpio) WaitForEdge(timeout time.Duration) (time.Duration, bool) {
 	state := g.pin.WaitForEdge(timeout)
-	out := time.Since(g.inputTime)
-	Info("WaitForEdge(%d) returned %t after %s", g.gpio, state, out)
-	return out, state
+	return time.Since(g.inputTime), state
 }
 
 // Pin returns the GPIO number of the pin.
