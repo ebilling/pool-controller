@@ -68,7 +68,7 @@ func (b *Button) runLoop(started *chan bool) {
 		select {
 		case <-b.done:
 			return
-		default: // Required to not block
+		case <-time.After(1 * time.Second): // Required to not block
 		}
 	}
 }
