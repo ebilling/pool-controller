@@ -181,15 +181,14 @@ func dischargeUs(t *GpioThermometer, e Edge, p Pull) time.Duration {
 	time.Sleep(300 * time.Millisecond)
 
 	// Start polling
-	start := time.Now()
 	t.pin.InputEdge(p, e)
-	if !t.pin.WaitForEdge(time.Second / 2) {
+	dt, state := t.pin.WaitForEdge(time.Second / 2)
+	if !state {
 		Trace("Thermometer %s, Rising read timed out", t.Name())
 		return 0.0
 	}
-	stop := time.Now()
 	t.pin.Output(Low)
-	return stop.Sub(start)
+	return dt
 }
 
 func doStop(button *Button, b *bool, t time.Time) {

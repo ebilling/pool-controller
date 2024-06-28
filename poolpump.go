@@ -19,11 +19,13 @@ const (
 	pumpGpio     = 24
 	sweepGpio    = 25
 
+	HOTROOF        = 47.5
+	COLDROOF       = 18.5
 	solarMotorTime = 30 * time.Second
 )
 
 // The PoolPumpController manages the relays that control the pumps based on
-// data from temperature probes and the weather.
+// data from temperature probes.
 type PoolPumpController struct {
 	config      *Config
 	switches    *Switches
@@ -88,11 +90,20 @@ func (ppc *PoolPumpController) Update() error {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
-	if ppc.config.cfg.SolarDisabled {
+	if ppc.config.cfg.SolarCoolingDisabled {
 		return false
 	}
-	return ppc.pumpTemp.Temperature() > (ppc.config.cfg.Target+ppc.config.cfg.Tolerance) &&
-		ppc.pumpTemp.Temperature() > (ppc.roofTemp.Temperature()+ppc.config.cfg.DeltaT)
+	if ppc.config.cfg.SolarDisabled {
+		Debug("shouldCool: disabled(%t)", ppc.config.cfg.SolarDisabled)
+		return false
+	}
+	waterHot := ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance
+	roofCold := ppc.roofTemp.Temperature() < COLDROOF
+	cool := waterHot && roofCold
+	if cool {
+		Info("ShouldCool: %t waterHot(%t) roofCold(%t)", cool, waterHot, roofCold)
+	}
+	return cool
 }
 
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
@@ -103,25 +114,18 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 		return false
 	}
 
-	waterCold := ppc.pumpTemp.Temperature() < (ppc.config.cfg.Target - ppc.config.cfg.Tolerance)
-	roofHot := ppc.pumpTemp.Temperature() < (ppc.roofTemp.Temperature() - ppc.config.cfg.DeltaT)
+	waterCold := ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.Tolerance
+	roofHot := ppc.roofTemp.Temperature() > HOTROOF
 	warm := waterCold && roofHot
 	if warm {
 		Info("ShouldWarm: %t waterCold(%t) roofHot(%t)", warm, waterCold, roofHot)
-		Info("Temp(%0.3f) < %0.3f {Target(%0.3f) - Tolerance(%0.3f)} : WaterCold(%t)",
-			ppc.pumpTemp.Temperature(),
-			ppc.config.cfg.Target-ppc.config.cfg.Tolerance,
-			ppc.config.cfg.Target,
-			ppc.config.cfg.Tolerance,
-			waterCold)
-		Info("Temp(%0.3f) < %0.3f {Roof(%0.3f) - DeltaT(%0.3f)} : RoofHot(%t)",
-			ppc.pumpTemp.Temperature(),
-			ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT,
-			ppc.roofTemp.Temperature(),
-			ppc.config.cfg.DeltaT,
-			roofHot)
 	}
 	return warm
+}
+
+func adjustedRunTime(runTime float64, sinceTime time.Time) float64 {
+	runSeconds := runTime * 3600
+	return (runSeconds - float64(time.Since(sinceTime).Seconds())) / 3600
 }
 
 // RunPumpsIfNeeded - If the water is not within the tolerance limit of the target, and the roof
@@ -131,6 +135,10 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	state := ppc.switches.State()
 	if ppc.switches.ManualState(ppc.config.cfg.RunTime) {
+		// Don't warm past the target
+		if state == SOLAR && !ppc.shouldWarm() {
+			ppc.switches.SetState(PUMP, true, adjustedRunTime(ppc.config.cfg.RunTime, ppc.switches.GetStartTime()))
+		}
 		return
 	}
 	if state == DISABLED && !ppc.config.cfg.Disabled && !ppc.config.cfg.SolarDisabled {
@@ -163,16 +171,16 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	// If the pumps havent run in a day, wait til 4AM then start them
 	freqHours := DurationFromHours((ppc.config.cfg.DailyFrequency-0.25)*24.0, 12.0)
 	runtime := DurationFromHours(ppc.config.cfg.RunTime, 1.0)
-	if time.Since(ppc.switches.GetStopTime()) > freqHours && time.Now().Hour() < 6 { // run in the early morning
-		Log("Daily running SWEEP: %s", freqHours.String())
+	if time.Since(ppc.switches.GetStopTime()) > freqHours {
+		Log("Daily SWEEP running for %s every %s - %s remaining", runtime, freqHours.String(), runtime-time.Since(ppc.switches.GetStartTime()))
 		ppc.switches.SetState(SWEEP, false, ppc.config.cfg.RunTime) // Clean pool
 		if time.Since(ppc.switches.GetStartTime()) > runtime {
 			ppc.switches.StopAll(false) // End daily
 		}
 		return
 	}
-	// If there is no reason to turn on the pumps and it's not manual, turn off
-	if state > OFF && ppc.switches.GetStartTime().Add(time.Hour).Before(time.Now()) {
+	// If there is no reason to turn on the pumps and it's not manual, turn off after 2 hours
+	if state > OFF && time.Since(ppc.switches.GetStartTime()) > 2*time.Hour {
 		ppc.switches.StopAll(false)
 	}
 }

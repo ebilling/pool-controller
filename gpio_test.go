@@ -276,14 +276,15 @@ func NewTestPin(gpio uint8) PiPin {
 }
 
 type TestPin struct {
-	state     GpioState
-	pull      Pull
-	edge      Edge
-	direction Direction
-	sleepTime time.Duration
-	inputTime time.Time
-	wake      chan bool
-	pin       uint8
+	state       GpioState
+	pull        Pull
+	edge        Edge
+	direction   Direction
+	sleepTime   time.Duration
+	inputTime   time.Time
+	wake        chan bool
+	pin         uint8
+	waitForWake bool
 }
 
 func (p *TestPin) Input() {
@@ -314,17 +315,15 @@ func (p *TestPin) Read() GpioState {
 	return p.state
 }
 
-func (p *TestPin) WaitForEdge(interval time.Duration) bool {
-	for {
-		select {
-		case <-p.wake:
-			return true
-		case <-time.After(p.sleepTime):
-			return true
-		case <-time.After(interval):
-			return false
-		}
+func (p *TestPin) WaitForEdge(interval time.Duration) (time.Duration, bool) {
+	if p.waitForWake {
+		state := <-p.wake
+		return time.Since(p.inputTime), state
 	}
+	if p.sleepTime > interval {
+		return interval, false
+	}
+	return p.sleepTime, true
 }
 
 func (p *TestPin) Pin() uint8 {

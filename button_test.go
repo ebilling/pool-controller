@@ -6,13 +6,13 @@ import (
 )
 
 func testBoolChan(b chan bool, timeout time.Duration) bool {
-	for {
-		select {
-		case val := <-b:
-			return val
-		case <-time.After(timeout):
-			return false
-		}
+	timeoutTimer := time.NewTimer(timeout)
+	defer timeoutTimer.Stop()
+	select {
+	case val := <-b:
+		return val
+	case <-timeoutTimer.C:
+		return false
 	}
 }
 
@@ -21,6 +21,7 @@ func TestFakeButton(t *testing.T) {
 	timeout := 50 * time.Millisecond
 	pushed := make(chan bool)
 	pin, _ := NewTestPin(99).(*TestPin)
+	pin.waitForWake = true
 	pin.sleepTime = time.Second * 20 // Don't accidentally wake up and send a signal
 
 	button := newButton(pin, func() {
@@ -58,5 +59,9 @@ func TestFakeButton(t *testing.T) {
 		}
 	})
 
+	// exit WaitForEdge
+	go func() {
+		pin.wake <- true
+	}()
 	button.Stop()
 }

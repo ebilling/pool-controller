@@ -104,14 +104,15 @@ type PiPin interface {
 	InputEdge(Pull, Edge)
 	Output(GpioState)
 	Read() GpioState
-	WaitForEdge(time.Duration) bool
+	WaitForEdge(time.Duration) (time.Duration, bool)
 	Pin() uint8
 }
 
 // Gpio implements a PiPin interface for a Raspberry Pi system.
 type Gpio struct {
-	gpio uint8
-	pin  gpio.PinIO
+	gpio      uint8
+	pin       gpio.PinIO
+	inputTime time.Time
 }
 
 // SetGpioProvider allows you to change the type of GPIO for the system (useful for testing)
@@ -142,12 +143,14 @@ func GpioInit() error {
 // Input sets the pin to be read from.
 func (g *Gpio) Input() {
 	Debug("Setting gpio(%d) to Input(%s, %s)", g.gpio, Float, NoEdge)
+	g.inputTime = time.Now()
 	g.pin.In(gpio.Float, gpio.NoEdge)
 }
 
 // InputEdge sets the pin to be read from and to alert WaitForEdge when the given Edge is found.
 func (g *Gpio) InputEdge(p Pull, e Edge) {
 	Debug("Setting gpio(%d) to Input(%s, %s)", g.gpio, p, e)
+	g.inputTime = time.Now()
 	g.pin.In(p.Pull(), e.Edge())
 }
 
@@ -166,8 +169,9 @@ func (g *Gpio) Read() GpioState {
 }
 
 // WaitForEdge blocks while waiting for a voltage change on the pin.
-func (g *Gpio) WaitForEdge(timeout time.Duration) bool {
-	return g.pin.WaitForEdge(timeout)
+func (g *Gpio) WaitForEdge(timeout time.Duration) (time.Duration, bool) {
+	state := g.pin.WaitForEdge(timeout)
+	return time.Since(g.inputTime), state
 }
 
 // Pin returns the GPIO number of the pin.

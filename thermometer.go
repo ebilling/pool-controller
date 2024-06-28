@@ -15,7 +15,7 @@ const (
 	nanoFarads = 100
 	// minTime and maxTime are the expectations for how long it should take for the capacitor to discharge
 	minTime = time.Duration(nanoFarads) * time.Microsecond
-	maxTime = time.Duration(nanoFarads) / 10 * time.Millisecond
+	maxTime = time.Duration(nanoFarads) * time.Millisecond / 10
 )
 
 // Thermometer reads a thermal resistance thermometer using the timings of a capacitor charge/discharge cycle
@@ -147,20 +147,20 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	// Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
 	time.Sleep(2 * maxTime)
-	// Start polling
-	start := time.Now()
 	// Set to input
 	t.pin.InputEdge(pull, edge)
-	if !t.pin.WaitForEdge(maxTime) {
+	dt, state := t.pin.WaitForEdge(maxTime)
+	if !state {
 		Debug("Thermometer %s, WaitForEdge(%s, %s) timed out", t.name, pull, edge)
 		return time.Duration(0)
 	}
-	dt := time.Since(start)
 	t.pin.Output(Low)
 	Debug("Discharge time for %s: %s", t.name, dt)
 	return dt
 }
 
+// getTemp uses the Steinhart-Hart equation to calculate the temperature based on the
+// resistance of the thermistor
 func (t *GpioThermometer) getTemp(ohms float64) float64 {
 	const a = 79463.85
 	const b = 0.1453676
@@ -195,8 +195,8 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 	value := calculated / ms(dt)
 	Info("Calculated Value (full discharge) %0.3f ms, found %0.3f ms, ratio %0.3f", calculated, ms(dt), value)
 	if h.Stddev() > h.Median()*0.05 || h.Len() < 10 {
-		return fmt.Errorf("returned inconsistent data value(%0.4f) variance(%0.2f%%) entries(%d)",
-			value, 100.0*h.Stddev()/h.Median(), h.Len())
+		return fmt.Errorf("returned inconsistent data value(%0.4f) variance(%0.2f%%) entries(%d) - %+v",
+			value, 100.0*h.Stddev()/h.Median(), h.Len(), h.data)
 	}
 	Debug("Setting adjustment to %0.3f", value)
 	t.adjust = value
@@ -213,7 +213,7 @@ func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 
 // Temperature returns the current temperature of the GpioThermometer
 func (t *GpioThermometer) Temperature() float64 {
-	if time.Now().After(t.updated.Add(time.Minute)) {
+	if time.Since(t.updated) > time.Minute {
 		t.Update()
 	}
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()

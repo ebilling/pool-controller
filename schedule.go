@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -42,12 +41,12 @@ func sameday(t time.Time, days []time.Weekday) bool {
 // IsNow returns true if the event is active now, and the State requested by they event
 func (se *ScheduleEvent) IsNow(t time.Time) (bool, State) {
 	schedTime := time.Date(t.Year(), t.Month(), t.Day(), se.Start.UTC().Hour(), se.Start.UTC().Minute(), 0, 0, time.UTC)
-	fmt.Println("SchedTime:", schedTime.Weekday(), schedTime, "- In:", t.UTC().Weekday(), t.UTC())
+	Debug("SchedTime:", schedTime.Weekday(), schedTime, "- In:", t.UTC().Weekday(), t.UTC())
 	if !sameday(t.In(se.Start.Location()), se.Days) {
 		return false, OFF
 	}
 	diff := schedTime.Sub(t.UTC())
-	fmt.Println("Diff:", diff, "Runtime:)", se.Runtime)
+	Debug("Diff:", diff, "Runtime:)", se.Runtime)
 	if diff >= 0 && diff < time.Duration(se.Runtime)*time.Minute {
 		return true, se.State
 	}

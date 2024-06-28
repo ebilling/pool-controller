@@ -6,7 +6,7 @@ import (
 )
 
 func TestGpioThermometer(t *testing.T) {
-	sleeptime := 1 * time.Millisecond
+	sleeptime := time.Millisecond
 	pin := TestPin{
 		state:     Low,
 		direction: Input,
@@ -16,16 +16,17 @@ func TestGpioThermometer(t *testing.T) {
 	therm := newGpioThermometer("Test Thermometer", mftr, &pin)
 
 	t.Run("getDischargeTime", func(t *testing.T) {
-		d := therm.getDischargeTime() / time.Millisecond
-		s := sleeptime / time.Millisecond // Two checks, so 2x
-		if d < s-5 || d > s+5 {
-			t.Errorf("Expected ~%dms got %dms", s, d)
+		d := therm.getDischargeTime()
+		s := sleeptime
+		slop := s / 20
+		if d < s-slop || d > s+slop {
+			t.Errorf("Expected ~%s got %s", s, d)
 		}
 	})
 
 	t.Run("getOhms", func(t *testing.T) {
-		expected := 10000 * therm.adjust
-		o := therm.getOhms(100 * time.Millisecond)
+		expected := 1000 * therm.adjust
+		o := therm.getOhms(100 * time.Microsecond)
 		if int(o) != int(expected) {
 			t.Errorf("Expected %0.3f k-ohms found %0.3f k-ohms",
 				float64(expected)/1000.0, o/1000.0)
@@ -34,7 +35,7 @@ func TestGpioThermometer(t *testing.T) {
 }
 
 func TestCalibration(t *testing.T) {
-	sleeptime := 50 * time.Millisecond
+	sleeptime := time.Millisecond / 2
 	pin := TestPin{
 		state:     Low,
 		direction: Input,
@@ -44,9 +45,6 @@ func TestCalibration(t *testing.T) {
 	therm := newGpioThermometer("Test Thermometer", mftr, &pin)
 
 	t.Run("Calibrate", func(t *testing.T) {
-		if testing.Short() {
-			t.Skip("Skipping calibrate test")
-		}
 		orig := therm.adjust
 		err := therm.Calibrate(10000)
 		if err != nil {
@@ -87,34 +85,42 @@ func TestCalibration(t *testing.T) {
 	})
 
 	t.Run("Filters Bad Updates", func(t *testing.T) {
+		doDebug = true
+		therm = newGpioThermometer("Test Thermometer", mftr, &pin)
 		if testing.Short() {
 			t.Skip("Skipping calibrate test")
 		}
-		ms := time.Millisecond
-		base := 60 * ms
-		testTimes := []time.Duration{base, base - ms/10, base + ms/10, base, 2 * base,
-			base, base + ms, base - ms, base + ms/5, base / 3}
-		expected := []bool{true, true, true, true, false,
-			true, true, true, true, false}
+		slop := time.Millisecond / 25
+		base := time.Millisecond
+
 		// Seed the data
-		for _, val := range testTimes {
-			pin.sleepTime = val
-			therm.Update()
-		}
-		// Try again, and big variances should be spotted
-		for i, val := range testTimes {
-			pin.sleepTime = val
-			old := therm.updated
-			therm.Update()
-			if (therm.updated == old) == expected[i] {
-				t.Errorf("Error: i(%d) temp(%0.1f) old(%s) expected(%t) "+
-					"Current(%0.1f) med(%0.1f) avg(%0.1f) stdd(%0.1f)",
-					i, therm.Temperature(), timeStr(old), expected[i],
-					float64(pin.sleepTime)/float64(time.Millisecond),
-					therm.history.Median()/float64(time.Millisecond),
-					therm.history.Average()/float64(time.Millisecond),
-					therm.history.Stddev()/float64(time.Millisecond))
+		for i := 0; i < 20; i++ {
+			if i%2 == 0 {
+				pin.sleepTime = base + slop
+			} else {
+				pin.sleepTime = base - slop
 			}
+			therm.Update()
 		}
+		// we have a skew in the data now, so we should get an error on larger swings
+		t.Run("small swing", func(t *testing.T) {
+			pin.sleepTime = base + slop
+			updateTest(t, therm, true)
+		})
+		t.Run("large swing", func(t *testing.T) {
+			pin.sleepTime = base + base/5
+			updateTest(t, therm, false)
+		})
 	})
+}
+
+func updateTest(t *testing.T, therm *GpioThermometer, success bool) {
+	err := therm.Update()
+	if (err == nil) != success {
+		t.Errorf("Error:  temp(%0.6f) expected(%t) med(%0.1f) avg(%0.1f) stdd(%0.1f)",
+			therm.Temperature(), success,
+			therm.history.Median()/float64(time.Millisecond),
+			therm.history.Average()/float64(time.Millisecond),
+			therm.history.Stddev()/float64(time.Millisecond))
+	}
 }

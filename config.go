@@ -47,21 +47,22 @@ type Config struct {
 // PersistedConfig is the portion of the configuration that can be altered and saved from the UI
 type PersistedConfig struct {
 	// Updatable
-	Disabled       bool
-	ButtonDisabled bool
-	SolarDisabled  bool
-	Auth           string
-	Pin            string
-	Target         float64
-	DeltaT         float64
-	Tolerance      float64
-	PumpAdjustment float64
-	RoofAdjustment float64
-	DailyFrequency float64 // days between automated runs
-	RunTime        float64 // hours when a pump is manually engaged it will run for this many hours
-	Mtime          time.Time
-	Ctime          time.Time
-	Schedule       *Schedule
+	Disabled             bool
+	ButtonDisabled       bool
+	SolarDisabled        bool
+	SolarCoolingDisabled bool
+	Auth                 string
+	Pin                  string
+	Target               float64
+	DeltaT               float64
+	Tolerance            float64
+	PumpAdjustment       float64
+	RoofAdjustment       float64
+	DailyFrequency       float64 // days between automated runs
+	RunTime              float64 // hours when a pump is manually engaged it will run for this many hours
+	Mtime                time.Time
+	Ctime                time.Time
+	Schedule             *Schedule
 }
 
 // NewConfig creates a config objects based on a given flagset and arguments.
