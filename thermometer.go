@@ -140,7 +140,7 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 }
 
 func (t *GpioThermometer) getDischargeTime() time.Duration {
-	pull := Float
+	pull := PullDown
 	edge := FallingEdge
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
