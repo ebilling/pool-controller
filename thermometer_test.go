@@ -124,3 +124,15 @@ func updateTest(t *testing.T, therm *GpioThermometer, success bool) {
 			therm.history.Stddev()/float64(time.Millisecond))
 	}
 }
+
+func TestTemps(t *testing.T) {
+	therm := newGpioThermometer("Test Thermometer", mftr, nil)
+	therm.adjust = 1.7
+	for i := time.Microsecond; i < 100*time.Millisecond; i = i * 5 / 4 {
+		therm.updated = time.Now()
+		ohms := therm.getOhms(i)
+		temp := therm.getTemp(ohms)
+		t.Logf("Duration %s Ohms: %0.3f Temp: %0.1f", i, ohms, toFarenheit(temp))
+	}
+	t.Error("Done")
+}

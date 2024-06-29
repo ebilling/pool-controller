@@ -146,8 +146,8 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 	defer t.mutex.Unlock()
 	// Discharge the capacitor (low temps could make this really long)
 	t.pin.Output(Low)
-	time.Sleep(300 * time.Millisecond)
-	end := time.Now().Add(1 * time.Second)
+	time.Sleep(time.Millisecond / 2)
+	end := time.Now().Add(10 * time.Millisecond)
 	// Set to input
 	t.pin.InputEdge(pull, edge)
 	start := time.Now()
@@ -158,7 +158,7 @@ func (t *GpioThermometer) getDischargeTime() time.Duration {
 			Info("Thermometer %s (%s, %s) %s: %s %0.1fF", t.name, pull, edge, dt, t.pin.Read(), toFarenheit(t.getTemp(t.getOhms(dt))))
 			return dt
 		}
-		time.Sleep(10 * time.Microsecond)
+		time.Sleep(time.Microsecond)
 	}
 	dt := time.Since(start)
 	Info("TIMED_OUT Thermometer %s (%s, %s) %s max(%s): %s %0.1fF", t.name, pull, edge, dt, maxTime, t.pin.Read(), toFarenheit(t.getTemp(t.getOhms(dt))))
