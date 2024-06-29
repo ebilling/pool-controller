@@ -277,7 +277,6 @@ func NewTestPin(gpio uint8) PiPin {
 
 type TestPin struct {
 	state       GpioState
-	pull        Pull
 	edge        Edge
 	direction   Direction
 	sleepTime   time.Duration
@@ -287,17 +286,18 @@ type TestPin struct {
 	waitForWake bool
 }
 
+func (p *TestPin) Close() {
+}
+
 func (p *TestPin) Input() {
 	p.direction = Input
 	p.inputTime = time.Now()
-	p.pull = Float
 	p.edge = NoEdge
 }
 
 func (p *TestPin) InputEdge(pull Pull, e Edge) {
 	p.direction = Input
 	p.inputTime = time.Now()
-	p.pull = pull
 	p.edge = e
 }
 

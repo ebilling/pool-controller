@@ -136,3 +136,14 @@ func TestTemps(t *testing.T) {
 	}
 	t.Error("Done")
 }
+
+func TestSleepGranularity(t *testing.T) {
+	total := time.Duration(0)
+	for i := 0; i < 100; i++ {
+		start := time.Now()
+		time.Sleep(time.Microsecond)
+		total += time.Since(start)
+	}
+	t.Logf("Total time: %s", total)
+	t.Errorf("average: %s", total/100)
+}

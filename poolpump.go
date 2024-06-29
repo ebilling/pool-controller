@@ -70,18 +70,6 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 // Update the solar configuration parameters from the config file (if changed)
 // and updates the values of the Thermometers.
 func (ppc *PoolPumpController) Update() error {
-	err := ppc.pumpTemp.Update()
-	if err != nil {
-		return fmt.Errorf("pump temp update failed: %w", err)
-	}
-	err = ppc.roofTemp.Update()
-	if err != nil {
-		return fmt.Errorf("roof temp update failed: %w", err)
-	}
-	err = ppc.runningTemp.Update()
-	if err != nil {
-		return fmt.Errorf("running temp update failed: %w", err)
-	}
 	if ppc.config.cfg.ButtonDisabled {
 		ppc.button.Disable()
 	} else {
@@ -281,12 +269,13 @@ func (ppc *PoolPumpController) SyncAdjustments() {
 
 // Status prints the status of the system
 func (ppc *PoolPumpController) Status() string {
+	buttonStatus, err := ppc.button.pin.Read()
 	return fmt.Sprintf(
 		"Status(%s) Button(%s) Solar(%s) Pump(%s) Sweep(%s) Manual(%t) Target(%0.1f) "+
-			"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f)",
-		ppc.switches.State(), ppc.button.pin.Read(), ppc.switches.solar.Status(),
+			"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f) %v",
+		ppc.switches.State(), buttonStatus, ppc.switches.solar.Status(),
 		ppc.switches.pump.Status(), ppc.switches.sweep.Status(),
 		ppc.switches.ManualState(ppc.config.cfg.RunTime), ppc.config.cfg.Target,
 		ppc.runningTemp.Temperature(), ppc.pumpTemp.Temperature(),
-		ppc.roofTemp.Temperature())
+		ppc.roofTemp.Temperature(), err)
 }

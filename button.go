@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"time"
 )
 
@@ -23,7 +24,7 @@ func newButton(pin PiPin, callback func()) *Button {
 	b := Button{
 		pin:        pin,
 		callback:   callback,
-		bouncetime: 150 * time.Millisecond,
+		bouncetime: time.Second / 2,
 		pushed:     time.Now().Add(-1 * time.Second),
 		done:       make(chan bool),
 	}
@@ -32,45 +33,30 @@ func newButton(pin PiPin, callback func()) *Button {
 
 // Start runs a thread in the background that monitors the button activity.
 func (b *Button) Start() {
-	started := make(chan bool)
-	go b.runLoop(&started)
-	if <-started { // Wait for loop to start
-		Debug("Button loop started")
-	}
+	b.pin.Watch(b.buttonHandler, FallingEdge, High)
 }
 
-func (b *Button) runLoop(started *chan bool) {
-	b.pin.Output(Low)
-	b.pin.InputEdge(PullUp, RisingEdge)
-	*started <- true
-	for {
-		_, state := b.pin.WaitForEdge(time.Second)
-		if state {
-			if b.IsDisabled() {
-				time.Sleep(time.Second)
-				continue
-			}
-			now := time.Now() // Here for debugging purposes
-			state := b.pin.Read()
-			if b.pushed.Add(b.bouncetime).Before(now) {
-				if state == Low {
-					b.pushed = now // filter noise of up/down
-					Debug("Button Pushed: Running Callback")
-					b.callback()
-				} else {
-					Debug("State is High, no callback")
-				}
-			} else {
-				Debug("Bouncetime not encountered")
-			}
-			Debug("Edge Detected: %s", state)
-		}
-		select {
-		case <-b.done:
-			return
-		case <-time.After(1 * time.Second): // Required to not block
+func (b *Button) buttonHandler(n Notification) error {
+	Debug("Button Handler")
+	if b.IsDisabled() {
+		return nil
+	}
+	now := time.Now() // Here for debugging purposes
+	if b.pushed.Add(b.bouncetime).Before(now) {
+		if n.Value == Low {
+			b.pushed = now // filter noise of up/down
+			Debug("Button Pushed: Running Callback")
+			b.callback()
+		} else {
+			Debug("State is High, no callback")
 		}
 	}
+	select {
+	case <-b.done:
+		return errors.New("Button stopped")
+	case <-time.After(time.Second): // Required to not block
+	}
+	return nil
 }
 
 // Disable allows you to disable the button, ignoring any pushes that come.

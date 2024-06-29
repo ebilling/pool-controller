@@ -22,7 +22,6 @@ const (
 type Thermometer interface {
 	Name() string
 	Temperature() float64
-	Update() error
 	Calibrate(float64) error
 	Accessory() *accessory.Accessory
 }
@@ -39,7 +38,6 @@ type SelectiveThermometer struct {
 func NewSelectiveThermometer(name string, manufacturer string, thermometer Thermometer,
 	filter func() bool) *SelectiveThermometer {
 	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), 0.0, -20.0, 100.0, 1.0)
-	thermometer.Update()
 	acc.TempSensor.CurrentTemperature.SetValue(thermometer.Temperature())
 	return &SelectiveThermometer{
 		name:        name,
@@ -55,7 +53,7 @@ func (t *SelectiveThermometer) Name() string {
 }
 
 // Calibrate runs a calibration operation the thermometer
-func (t *SelectiveThermometer) Calibrate(a float64) error {
+func (t *SelectiveThermometer) Calibrate(_ float64) error {
 	return errors.New("not supported")
 }
 
@@ -87,7 +85,9 @@ type GpioThermometer struct {
 	microfarads float64
 	adjust      float64
 	updated     time.Time
-	history     History
+	history     *History
+	last        Notification
+	calibrating bool
 	accessory   *accessory.Thermometer
 }
 
@@ -117,10 +117,11 @@ func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermo
 		pin:         pin,
 		microfarads: float64(nanoFarads) / 1000.0,
 		adjust:      2.5,
-		history:     *NewHistory(100),
+		history:     NewHistory(100),
 		updated:     time.Now().Add(-24 * time.Hour),
 		accessory:   acc,
 	}
+	th.startWatcher()
 	return &th
 }
 
@@ -139,52 +140,26 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 	return t.accessory.Accessory
 }
 
-func (t *GpioThermometer) getDischargeTime() time.Duration {
-	pull := Float
-	edge := FallingEdge
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-	// Discharge the capacitor (low temps could make this really long)
-	t.pin.Output(Low)
-	time.Sleep(time.Millisecond / 2)
-	end := time.Now().Add(10 * time.Millisecond)
-	// Set to input
-	t.pin.InputEdge(pull, edge)
-	start := time.Now()
-	// poll for the change
-	for time.Now().Before(end) {
-		if t.pin.Read() {
-			dt := time.Since(start)
-			Info("Thermometer %s (%s, %s) %s: %s %0.1fF", t.name, pull, edge, dt, t.pin.Read(), toFarenheit(t.getTemp(t.getOhms(dt))))
-			return dt
-		}
-		time.Sleep(time.Microsecond)
-	}
-	dt := time.Since(start)
-	Info("TIMED_OUT Thermometer %s (%s, %s) %s max(%s): %s %0.1fF", t.name, pull, edge, dt, maxTime, t.pin.Read(), toFarenheit(t.getTemp(t.getOhms(dt))))
-	return time.Duration(0)
+func (t *GpioThermometer) startWatcher() {
+	t.pin.Watch(t.handler, RisingEdge, Low)
 }
 
-func (t *GpioThermometer) oldGetDischargeTime() time.Duration {
-	pull := PullDown
-	edge := FallingEdge
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	// Discharge the capacitor (low temps could make this really long)
-	t.pin.Output(Low)
-	time.Sleep(300 * time.Millisecond)
-
-	// Set to input
-	t.pin.InputEdge(pull, edge)
-	dt, state := t.pin.WaitForEdge(-1)
-	t.pin.Output(Low)
-	if !state {
-		Info("TIMED_OUT Thermometer %s (%s, %s) %s max(%s): %s %0.1fF", t.name, pull, edge, dt, maxTime, t.pin.Read(), toFarenheit(t.getTemp(t.getOhms(dt))))
-		return time.Duration(0)
+func (t *GpioThermometer) handler(n Notification) error {
+	duration := n.Time.Sub(t.last.Time)
+	t.last = n
+	if duration < 10*time.Millisecond && duration > time.Microsecond*50 {
+		t.history.PushDuration(duration)
 	}
-	Info("Discharge time for %s: %s", t.name, dt)
-	return dt
+	median := t.history.Duration(t.history.Median())
+	ohms := t.getOhms(median)
+	temp := t.getTemp(ohms)
+	Debug("Temperature (%fC / %fF) for %s: %f ohms, median %s", temp, toFarenheit(temp), t.name, ohms, median)
+	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
+	t.updated = time.Now()
+	if t.calibrating {
+		return errors.New("calibrating - exiting early")
+	}
+	return nil
 }
 
 // getTemp uses the Steinhart-Hart equation to calculate the temperature based on the
@@ -205,19 +180,29 @@ func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
 	return uSec / t.microfarads
 }
 
+func (t *GpioThermometer) calibrationHandler(n Notification) error {
+	duration := n.Time.Sub(t.last.Time)
+	t.last = n
+	if duration < 10*time.Millisecond && duration > time.Microsecond*50 {
+		t.history.PushDuration(duration)
+	}
+	if t.history.ttl >= 20 {
+		return errors.New("done calibrating")
+	}
+	return nil
+}
+
 // Calibrate asserts a specific resistance and calculates the proper setting
 // for the adjust parameter
 func (t *GpioThermometer) Calibrate(ohms float64) error {
+	t.calibrating = true
 	calculated := ohms * t.microfarads / 1000.0
 	Info("Expecting %0.3f ms", calculated)
-
-	// Take a sample of values
 	h := NewHistory(20)
-	for i := 0; i < 20; i++ {
-		dt := t.getDischargeTime()
-		if dt != 0 {
-			h.Push(float64(dt))
-		}
+	t.history = h
+	t.pin.Watch(t.calibrationHandler, RisingEdge, Low)
+	for t.history.ttl < 20 {
+		time.Sleep(10 * time.Millisecond)
 	}
 	dt := time.Duration(int64(h.Median()))
 	value := calculated / ms(dt)
@@ -228,6 +213,8 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 	}
 	Debug("Setting adjustment to %0.3f", value)
 	t.adjust = value
+	t.calibrating = false
+	t.startWatcher()
 	return nil
 }
 
@@ -242,46 +229,11 @@ func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 // Temperature returns the current temperature of the GpioThermometer
 func (t *GpioThermometer) Temperature() float64 {
 	if time.Since(t.updated) > time.Minute {
-		t.Update()
+		// thread must have exited, restart it
+		t.startWatcher()
 	}
+
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()
-}
-
-// Update updates the current temperature of the GpioThermometer
-func (t *GpioThermometer) Update() error {
-	var dischargeTime time.Duration
-	h := NewHistory(5)
-	// TODO, allow for more bites at the apple
-	for i := 0; h.Len() < 5 && i < 5; i++ {
-		dischargeTime = t.getDischargeTime()
-		if dischargeTime > 0 && t.inRange(dischargeTime) {
-			t.history.PushDuration(dischargeTime)
-			h.PushDuration(dischargeTime)
-		}
-	}
-
-	stdd := t.history.Stddev()
-	avg := t.history.Average()
-	med := t.history.Median()
-	dev := stdd * 3
-
-	// Throw away bad results
-	if math.Abs(avg-h.Median()) > dev {
-		Info("%s Thermometer update failed: Cur(%0.3f) Med(%0.3f) Avg(%0.3f) Stdd(%0.3f) Dev(%0.3f)",
-			t.Name(),
-			h.Median()/MillisecondFloat,
-			med/MillisecondFloat,
-			avg/MillisecondFloat,
-			stdd/MillisecondFloat,
-			dev/MillisecondFloat)
-		return fmt.Errorf("could not update temperature successfully")
-	}
-	ohms := t.getOhms(time.Duration(int64(h.Median())))
-	temp := t.getTemp(ohms)
-	Debug("Calculating temperature (%f) for %s: %f ohms, median %s", temp, t.name, ohms, time.Duration(int64(h.Median())))
-	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
-	t.updated = time.Now()
-	return nil
 }
 
 // Converts a temperature in Celsius to Farenheit

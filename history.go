@@ -54,9 +54,19 @@ func (h *History) Push(f float64) {
 	h.ttl++
 }
 
+// Last returns the last value in the history
+func (h *History) Last() float64 {
+	return h.data[(h.ttl-1)%h.sz]
+}
+
 // PushDuration adds a value to the history
 func (h *History) PushDuration(d time.Duration) {
-	h.Push(float64(d))
+	h.Push(float64(d / 1000))
+}
+
+// Duration converts a float from the history to a time.Duration
+func (h *History) Duration(f float64) time.Duration {
+	return time.Duration(f * 1000)
 }
 
 // Len returns the size of the History

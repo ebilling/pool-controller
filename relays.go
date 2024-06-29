@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -109,7 +110,12 @@ func (r *Relay) TurnOff() {
 }
 
 func (r *Relay) isOn() bool {
-	if r.pin.Read() == High {
+	val, err := r.pin.Read()
+	if err != nil {
+		Info("Relay %s read error: %v", r.name, err)
+		os.Exit(1)
+	}
+	if val == High {
 		if r.accessory != nil {
 			r.accessory.Switch.On.SetValue(true)
 		}
@@ -123,7 +129,12 @@ func (r *Relay) isOn() bool {
 
 // Status returns "On" if at HIGH voltage or "Off" if at LOW voltage
 func (r *Relay) Status() string {
-	if r.pin.Read() == High {
+	val, err := r.pin.Read()
+	if err != nil {
+		Info("Relay %s read error: %v", r.name, err)
+		os.Exit(1)
+	}
+	if val == High {
 		return "On"
 	}
 	return "Off"

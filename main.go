@@ -31,10 +31,6 @@ func main() {
 		Fatal("Could not write pid file: %s", err.Error())
 	}
 
-	if err := GpioInit(); err != nil {
-		Fatal("Could not initialize GPIO: %s", err.Error())
-	}
-
 	PowerLed := NewGpio(5)
 	PowerLed.Output(High)
 	ppc := NewPoolPumpController(config)
