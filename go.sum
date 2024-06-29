@@ -6,8 +6,8 @@ github.com/brutella/hc v1.2.5/go.mod h1:kluioDmG4z8OweN0boeTf08696sH8odlhPDdq3gw
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/ebilling/gpio v0.0.0-20240629175536-93c224463fee h1:EBDVC4VQ98h1Bh3CexPFuF6bYtfsdFL1jr3iWxqA3ic=
-github.com/ebilling/gpio v0.0.0-20240629175536-93c224463fee/go.mod h1:zaKphYrn/Lhiw3SvE5vUSJZ2tMC8sqVKomjsD5jZ224=
+github.com/ebilling/gpio v0.0.0-20240629175848-5aacb8b7558c h1:ZYGkB/48OqQDcQ7gZSeQnf6GRwSCDLA0l/K0JynbJiA=
+github.com/ebilling/gpio v0.0.0-20240629175848-5aacb8b7558c/go.mod h1:zaKphYrn/Lhiw3SvE5vUSJZ2tMC8sqVKomjsD5jZ224=
 github.com/miekg/dns v1.1.1/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
 github.com/miekg/dns v1.1.4/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
 github.com/miekg/dns v1.1.61 h1:nLxbwF3XxhwVSm8g9Dghm9MHPaUZuqhPiGL+675ZmEs=

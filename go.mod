@@ -4,7 +4,7 @@ go 1.22.4
 
 require (
 	github.com/brutella/hc v1.2.5
-	github.com/ebilling/gpio v0.0.0-20240629175536-93c224463fee
+	github.com/ebilling/gpio v0.0.0-20240629175848-5aacb8b7558c
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/stretchr/testify v1.8.0
 	github.com/ziutek/rrd v0.0.3
