@@ -45,7 +45,9 @@ func timeStr(t time.Time) string {
 
 // NewRelay creates a relay for a given GPIO
 func NewRelay(pin uint8, name string, manufacturer string) *Relay {
-	return newRelay(NewGpio(pin), name, manufacturer)
+	gpin := NewGpio(pin)
+	gpin.Output(Low) // start in off position
+	return newRelay(gpin, name, manufacturer)
 }
 
 func newRelay(pin PiPin, name string, manufacturer string) *Relay {
@@ -92,7 +94,7 @@ func (r *Relay) String() string {
 // TurnOn flips the output to HIGH voltage (>1V)
 func (r *Relay) TurnOn() {
 	Trace("TurnOn %s", r.name)
-	r.pin.Output(High)
+	r.pin.Write(High)
 	r.startTime = time.Now()
 	if r.accessory != nil {
 		r.accessory.Switch.On.SetValue(true)
@@ -102,7 +104,7 @@ func (r *Relay) TurnOn() {
 // TurnOff flips the output to LOW voltage (<1V)
 func (r *Relay) TurnOff() {
 	Trace("TurnOff %s", r.name)
-	r.pin.Output(Low)
+	r.pin.Write(Low)
 	r.stopTime = time.Now()
 	if r.accessory != nil {
 		r.accessory.Switch.On.SetValue(false)

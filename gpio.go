@@ -174,6 +174,7 @@ func (g *Gpio) Output(s GpioState) {
 		g.Close()
 	}
 	g.gpioPin = gpio.NewOutput(uint(g.pin), bool(s))
+	Info("Setting pin %d to %s", g.pin, s)
 }
 
 // Read returns the current state of the pin
