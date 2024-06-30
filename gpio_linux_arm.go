@@ -159,6 +159,8 @@ func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
 					Info("Handler Error: watcher exited after %s: pin(%d) d(%d/%d) %v", time.Since(start), g.gpio, detections.lows, detections.highs, err)
 					break
 				}
+				g.Output(s)
+				g.Input()
 				g.pin.Detect(rEdge(e))
 			}
 		}
