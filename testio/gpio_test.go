@@ -1,6 +1,7 @@
 package test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -76,6 +77,7 @@ func TestValues(t *testing.T) {
 			}
 		}
 	}
-	data := fmt.Sprintf("%+v", out)
+	data, err := json.MarshalIndent(out, "", "  ")
+	require.NoError(t, err)
 	os.WriteFile("testValues.txt", []byte(data), 0644)
 }
