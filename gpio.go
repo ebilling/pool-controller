@@ -105,7 +105,7 @@ type PiPin interface {
 	// Write sets the state of the pin
 	Write(GpioState) error
 	// Pin returns the GPIO number of the pin.
-	Pin() uint8
+	Pin() uint
 	// Close releases the resources related to the pin.
 	Close()
 	// Notifications returns a channel of notifications for the pin.
@@ -116,7 +116,7 @@ type PiPin interface {
 
 // Notification represents a change in the state of the pin.
 type Notification struct {
-	Pin   uint8
+	Pin   uint
 	Time  time.Time
 	Value GpioState
 }

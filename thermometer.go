@@ -92,7 +92,7 @@ type GpioThermometer struct {
 }
 
 // NewGpioThermometer returns a GpioThermometer
-func NewGpioThermometer(name string, manufacturer string, gpio uint8) *GpioThermometer {
+func NewGpioThermometer(name string, manufacturer string, gpio uint) *GpioThermometer {
 	return newGpioThermometer(name, manufacturer, NewGpio(gpio))
 }
 

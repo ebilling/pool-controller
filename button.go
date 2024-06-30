@@ -16,7 +16,7 @@ type Button struct {
 }
 
 // NewGpioButton sets up a specific GPIO pin as a button, and runs the callback when it is pressed.
-func NewGpioButton(pin uint8, callback func()) *Button {
+func NewGpioButton(pin uint, callback func()) *Button {
 	return newButton(NewGpio(pin), callback)
 }
 

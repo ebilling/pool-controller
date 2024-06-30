@@ -44,7 +44,7 @@ func timeStr(t time.Time) string {
 }
 
 // NewRelay creates a relay for a given GPIO
-func NewRelay(pin uint8, name string, manufacturer string) *Relay {
+func NewRelay(pin uint, name string, manufacturer string) *Relay {
 	gpin := NewGpio(pin)
 	gpin.Output(Low) // start in off position
 	return newRelay(gpin, name, manufacturer)
@@ -155,7 +155,7 @@ func (r *Relay) GetStopTime() time.Time {
 // NewSolarValve creates a special controller for the Solar Valve operation
 // When set to ON, it runs the motor forward for 15 seconds
 // When set to OFF, it runs the motor in reverse for 15 seconds
-func NewSolarValve(forward uint8, reverse uint8, ledPin uint8, name string, manufacturer string, timeout time.Duration) *SolarValve {
+func NewSolarValve(forward uint, reverse uint, ledPin uint, name string, manufacturer string, timeout time.Duration) *SolarValve {
 	r := &SolarValve{
 		fwdRelay:  newRelay(NewGpio(forward), "", ""),
 		revRelay:  newRelay(NewGpio(reverse), "", ""),
