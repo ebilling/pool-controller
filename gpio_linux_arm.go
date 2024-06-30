@@ -97,7 +97,6 @@ func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 		detections := stats{detections: true}
 		nodetections := stats{detections: false}
 		g.Output(s)
-		time.Sleep(10 * time.Millisecond)
 		g.Input()
 		g.gpioPin.PullOff()
 		g.gpioPin.Detect(rEdge(e))
@@ -120,11 +119,11 @@ func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 				}
 			} else {
 				// Testing
-				if g.gpioPin.Read() == rpio.High {
-					nodetections.highs++
-				} else {
-					nodetections.lows++
-				}
+				// if g.gpioPin.Read() == rpio.High {
+				// 	nodetections.highs++
+				// } else {
+				// 	nodetections.lows++
+				// }
 			}
 		}
 		g.gpioPin.Detect(rpio.NoEdge)
