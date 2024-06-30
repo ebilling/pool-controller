@@ -7,6 +7,7 @@ import (
 	"time"
 
 	rpio "github.com/stianeikeland/go-rpio/v4"
+	"github.com/stretchr/testify/require"
 )
 
 type samples struct {
@@ -21,7 +22,8 @@ type samples struct {
 }
 
 func TestValues(t *testing.T) {
-	rpio.Open()
+	err := rpio.Open()
+	require.NoError(t, err)
 	defer rpio.Close()
 	pin := rpio.Pin(14)
 	out := []samples{}
