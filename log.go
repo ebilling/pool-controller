@@ -26,7 +26,6 @@ func init() {
 		} else {
 			syslogWriter, _ = syslog.New(syslog.LOG_USER, "pool-controller")
 		}
-
 	}
 }
 

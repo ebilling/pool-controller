@@ -142,12 +142,12 @@ func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
 				Time:  time.Now(),
 				Value: gState(g.pin.Read()),
 			}
+			Info("Sending Notification: %s", n)
 			err := h(n)
 			if err != nil {
 				Info("Handler Error: watcher exited after %s: pin(%d) %v", time.Since(start), g.Pin(), err)
 				break
 			}
-			Info("Sending Notification: %s", n)
 		}
 		g.pin.Detect(rpio.NoEdge)
 	}()

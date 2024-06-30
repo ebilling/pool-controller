@@ -229,7 +229,7 @@ func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 
 // Temperature returns the current temperature of the GpioThermometer
 func (t *GpioThermometer) Temperature() float64 {
-	if time.Since(t.updated) > time.Minute {
+	if time.Since(t.updated) > time.Minute*30 {
 		// thread must have exited, restart it
 		t.startWatcher()
 	}
