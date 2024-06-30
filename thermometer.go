@@ -141,7 +141,7 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 }
 
 func (t *GpioThermometer) startWatcher() {
-	t.pin.Watch(t.handler, RisingEdge, Low)
+	t.pin.Watch(t.handler, Float, RisingEdge, Low)
 }
 
 func (t *GpioThermometer) handler(n Notification) error {
@@ -200,7 +200,7 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 	Info("Expecting %0.3f ms", calculated)
 	h := NewHistory(20)
 	t.history = h
-	t.pin.Watch(t.calibrationHandler, RisingEdge, Low)
+	t.pin.Watch(t.calibrationHandler, Float, RisingEdge, Low)
 	for t.history.ttl < 20 {
 		time.Sleep(10 * time.Millisecond)
 	}
