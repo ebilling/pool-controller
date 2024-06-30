@@ -121,7 +121,6 @@ func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermo
 		updated:     time.Now().Add(-24 * time.Hour),
 		accessory:   acc,
 	}
-	th.startWatcher()
 	return &th
 }
 
