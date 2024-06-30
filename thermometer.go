@@ -141,7 +141,7 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 }
 
 func (t *GpioThermometer) startWatcher() {
-	t.pin.Watch(t.handler, PullUp, RisingEdge, Low)
+	t.pin.Watch(t.handler, Float, RisingEdge, Low)
 }
 
 func (t *GpioThermometer) handler(n Notification) error {
