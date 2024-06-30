@@ -21,6 +21,8 @@ type samples struct {
 }
 
 func TestValues(t *testing.T) {
+	rpio.Open()
+	defer rpio.Close()
 	pin := rpio.Pin(14)
 	out := []samples{}
 	for p := rpio.PullOff; p <= rpio.PullNone; p++ {
