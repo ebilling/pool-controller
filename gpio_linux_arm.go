@@ -119,15 +119,20 @@ type stateCounter struct {
 // Watch registers a handler to be called when a notification is received.
 func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
 	g.pin.Pull(rPull(p))
+	g.Output(s)
 	go func() {
 		start := time.Now()
 		end := start.Add(time.Second / 4)
 		detections := stats{detections: true}
-		g.Output(s)
 		g.Input()
+		g.pin.Detect(rEdge(e))
 		scnt := stateCounter{state: Low}
 		for i := 0; time.Now().Before(end); i++ {
 			val := Low
+			if g.pin.EdgeDetected() {
+				g.pin.Detect(rEdge(e))
+				Info("Edge detected[%d]: %s", g.Pin(), e)
+			}
 			if g.pin.Read() == rpio.High {
 				val = High
 				detections.highs++
