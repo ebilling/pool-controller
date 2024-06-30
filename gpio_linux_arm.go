@@ -116,8 +116,45 @@ type stateCounter struct {
 	time  time.Time
 }
 
+func gState(s rpio.State) GpioState {
+	if s == rpio.High {
+		return High
+	}
+	return Low
+}
+
 // Watch registers a handler to be called when a notification is received.
 func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
+	Info("Watching pin(%d) p(%s) e(%s) s(%s)", g.Pin(), p, e, s)
+	start := time.Now()
+	g.pin.Pull(rPull(p))
+	go func() {
+		for {
+			g.Output(s)
+			g.Input()
+			g.pin.Detect(rEdge(e))
+			if g.pin.EdgeDetected() {
+				Info("Edge detected[%d]: %s", g.Pin(), e)
+				n := Notification{
+					Pin:   g.Pin(),
+					Time:  time.Now(),
+					Value: gState(g.pin.Read()),
+				}
+				err := h(n)
+				if err != nil {
+					Info("Handler Error: watcher exited after %s: pin(%d) %v", time.Since(start), g.Pin(), err)
+					break
+				}
+				Info("Sending Notification: %s", n)
+			}
+		}
+		g.pin.Detect(rpio.NoEdge)
+	}()
+	return nil
+}
+
+// Watch registers a handler to be called when a notification is received.
+func (g *Gpio) oldWatch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
 	Info("Watching pin(%d) p(%s) e(%s) s(%s)", g.Pin(), p, e, s)
 	g.pin.Pull(rPull(p))
 	g.Output(s)
