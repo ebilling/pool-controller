@@ -41,6 +41,11 @@ func (g *Gpio) Close() {
 // Output sets the pin to be written to.
 func (g *Gpio) Output(s GpioState) {
 	g.gpioPin.Output()
+	if s == High {
+		g.gpioPin.Write(rpio.High)
+		return
+	}
+	g.gpioPin.Write(rpio.Low)
 }
 
 // Read returns the current state of the pin
@@ -84,6 +89,19 @@ func rEdge(e Edge) rpio.Edge {
 	}
 }
 
+func rPull(p Pull) rpio.Pull {
+	switch p {
+	case PullDown:
+		return rpio.PullDown
+	case PullUp:
+		return rpio.PullUp
+	case PullNoChange:
+		return rpio.PullNone
+	default:
+		return rpio.PullOff
+	}
+}
+
 type stats struct {
 	detections bool
 	highs      int
@@ -97,13 +115,12 @@ type stateCounter struct {
 }
 
 // Watch registers a handler to be called when a notification is received.
-func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
+func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
+	g.gpioPin.Pull(rPull(p))
 	go func() {
 		start := time.Now()
 		detections := stats{detections: true}
-		g.gpioPin.PullOff()
-		g.Output(Low)
-		g.gpioPin.Write(rpio.Low)
+		g.Output(s)
 		g.Input()
 		scnt := stateCounter{state: Low}
 		for i := 0; i < 100000; i++ {
