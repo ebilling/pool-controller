@@ -90,6 +90,12 @@ type stats struct {
 	lows       int
 }
 
+type stateCounter struct {
+	state GpioState
+	count int
+	time  time.Time
+}
+
 // Watch registers a handler to be called when a notification is received.
 func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 	go func() {
@@ -97,8 +103,9 @@ func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 		detections := stats{detections: true}
 		g.gpioPin.PullOff()
 		g.Output(Low)
-		g.Input()
 		g.gpioPin.Write(rpio.Low)
+		g.Input()
+		scnt := stateCounter{state: Low}
 		for i := 0; i < 100000; i++ {
 			val := Low
 			if g.gpioPin.Read() == rpio.High {
@@ -106,6 +113,16 @@ func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 				detections.highs++
 			} else {
 				detections.lows++
+			}
+			if i == 0 {
+				scnt.state = val
+				scnt.time = time.Now()
+			}
+			if val != scnt.state {
+				Info("state change detected: %s -> %s after %d polls %s", scnt.state, val, i, time.Since(scnt.time))
+				scnt.state = val
+				scnt.count = 1
+				scnt.time = time.Now()
 			}
 			err := h(Notification{
 				Pin:   g.Pin(),
