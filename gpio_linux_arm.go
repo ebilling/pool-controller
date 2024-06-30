@@ -126,7 +126,7 @@ func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
 		detections := stats{detections: true}
 		g.Input()
 		g.pin.Detect(rEdge(e))
-		scnt := stateCounter{state: Low, time: time.Now()}
+		scnt := stateCounter{state: s, time: time.Now()}
 		for i := 0; time.Now().Before(end); i++ {
 			val := Low
 			if g.pin.Read() == rpio.High {
