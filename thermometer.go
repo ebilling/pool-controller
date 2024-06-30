@@ -153,7 +153,7 @@ func (t *GpioThermometer) handler(n Notification) error {
 	median := t.history.Duration(t.history.Median())
 	ohms := t.getOhms(median)
 	temp := t.getTemp(ohms)
-	Debug("Temperature (%fC / %fF) for %s: %f ohms, median %s", temp, toFarenheit(temp), t.name, ohms, median)
+	Info("Temperature (%fC / %fF) for %s: %f ohms, median %s", temp, toFarenheit(temp), t.name, ohms, median)
 	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
 	t.updated = time.Now()
 	if t.calibrating {
