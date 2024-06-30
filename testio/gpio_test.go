@@ -13,14 +13,16 @@ import (
 )
 
 type samples struct {
-	Edge      rpio.Edge
-	Pull      rpio.Pull
-	InitState rpio.State
-	Values    []struct {
-		Time  time.Time
-		State rpio.State
-	}
+	Edge       rpio.Edge
+	Pull       rpio.Pull
+	InitState  rpio.State
+	Values     []*Value
 	Detections []time.Time
+}
+
+type Value struct {
+	Time  time.Time
+	State rpio.State
 }
 
 func TestValues(t *testing.T) {
@@ -28,14 +30,14 @@ func TestValues(t *testing.T) {
 	require.NoError(t, err)
 	defer rpio.Close()
 	pin := rpio.Pin(15)
-	out := []samples{}
+	out := []*samples{}
 	for p := rpio.PullOff; p <= rpio.PullNone; p++ {
 		for e := rpio.NoEdge; e <= rpio.AnyEdge; e++ {
 			edgeEvents := 0
 			readEvents := 0
 			for s := rpio.Low; s <= rpio.High; s++ {
 				t.Run(fmt.Sprintf("Edge(%d) Pull(%d) InitState(%d)", e, p, s), func(t *testing.T) {
-					sample := samples{
+					sample := &samples{
 						Edge:      e,
 						Pull:      p,
 						InitState: s,
@@ -65,10 +67,7 @@ func TestValues(t *testing.T) {
 						stat := pin.Read()
 						if i == 0 || stat != last {
 							readEvents++
-							sample.Values = append(sample.Values, struct {
-								Time  time.Time
-								State rpio.State
-							}{
+							sample.Values = append(sample.Values, &Value{
 								Time:  time.Now(),
 								State: stat,
 							})
