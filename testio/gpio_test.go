@@ -41,8 +41,9 @@ func TestValues(t *testing.T) {
 					out = append(out, sample)
 					end := time.Now().Add(time.Second)
 					pin.Output()
-					pin.Pull(p)
+					pin.Write(s)
 					pin.Input()
+					pin.Pull(p)
 					pin.Detect(e)
 					detected := false
 					for time.Now().Before(end) {
