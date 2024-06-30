@@ -9,7 +9,7 @@ const (
 	mftr = "Bonnie Labs"
 
 	// Do not use GPIO4 for thermistors
-
+	powerLed     = 5
 	roofGpio     = 14
 	waterGpio    = 15
 	buttonGpio   = 18

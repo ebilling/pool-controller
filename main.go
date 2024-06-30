@@ -12,7 +12,11 @@ func main() {
 	fs := flag.NewFlagSet("pool-controller", flag.PanicOnError)
 	help := fs.Bool("h", false, "Display this usage message")
 	config := NewConfig(fs, os.Args[1:]) // Parses flags
-
+	err := OpenGPIO()
+	if err != nil {
+		Fatal("Could not open GPIO: %s", err.Error())
+	}
+	defer CloseGPIO()
 	if *help {
 		flag.Usage()
 		fmt.Fprintf(os.Stderr, "Any changes put into the web interface will override these"+
@@ -25,12 +29,12 @@ func main() {
 	Info("Args: %s", os.Args[1:])
 
 	// Write PID
-	err := os.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
+	err = os.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
 	if err != nil {
 		Fatal("Could not write pid file: %s", err.Error())
 	}
 
-	PowerLed := NewGpio(5)
+	PowerLed := NewGpio(powerLed)
 	PowerLed.Output(High)
 	ppc := NewPoolPumpController(config)
 	err = ppc.Start()

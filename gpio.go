@@ -2,12 +2,7 @@ package main
 
 import (
 	"time"
-
-	"github.com/ebilling/gpio"
 )
-
-// gpioProvider generates pins for the platform (used for testing)
-var gpioProvider = xGpioProvider // For testing on non-test setups
 
 // GpioState represents the current binary value of the pin.  Is it High or Low Voltage
 type GpioState bool
@@ -49,19 +44,6 @@ const (
 	BothEdges Edge = 3
 )
 
-func NewEdge(e gpio.Edge) Edge {
-	switch e {
-	case gpio.EdgeBoth:
-		return BothEdges
-	case gpio.EdgeRising:
-		return RisingEdge
-	case gpio.EdgeFalling:
-		return FallingEdge
-	default:
-		return NoEdge
-	}
-}
-
 // String returns the string representation of the edge.
 func (e Edge) String() string {
 	switch e {
@@ -79,25 +61,33 @@ func (e Edge) String() string {
 }
 
 // Pull refers to the configuration of the pin circuitry.
-// type Pull int
+type Pull int
 
-// const (
-// 	// PullNoChange does not change the previous pull resistor setting
-// 	PullNoChange Pull = 0
-// 	// Float lets the input flow directly, resistance is handled elswhere.
-// 	Float Pull = 1
-// 	// PullDown applies pull-down resistance to the pin
-// 	PullDown Pull = 2
-// 	// PullUp applies pull-up resistance to the pin
-// 	PullUp Pull = 3
-// )
+const (
+	// PullNoChange does not change the previous pull resistor setting
+	PullNoChange Pull = 0
+	// Float lets the input flow directly, resistance is handled elswhere.
+	Float Pull = 1
+	// PullDown applies pull-down resistance to the pin
+	PullDown Pull = 2
+	// PullUp applies pull-up resistance to the pin
+	PullUp Pull = 3
+)
 
-// // Pull returns the current state of the pin's pull configuration
-// func (p Pull) Pull() gpio.Pull {
-// 	return gpio.Pull(p)
-// }
-
-// func (p Pull) String() string { return p.Pull().String() }
+func (p Pull) String() string {
+	switch p {
+	case PullNoChange:
+		return "No Change"
+	case Float:
+		return "Float"
+	case PullDown:
+		return "Pull Down"
+	case PullUp:
+		return "Pull Up"
+	default:
+		return "Unknown"
+	}
+}
 
 // NotificationHandler is a callback function that is called when a notification is received.
 // It must be registered with the PiPin Watch method.
@@ -131,108 +121,9 @@ type Notification struct {
 	Value GpioState
 }
 
-// Gpio implements a PiPin interface for a Raspberry Pi system.
-type Gpio struct {
-	pin     uint8
-	gpioPin gpio.Pin
-}
-
-// SetGpioProvider allows you to change the type of GPIO for the system (useful for testing)
-func SetGpioProvider(p func(uint8) PiPin) {
-	gpioProvider = p
-}
-
-func xGpioProvider(pin uint8) PiPin {
-	g := Gpio{
-		pin: pin,
-	}
-	return (PiPin)(&g)
-}
-
-// NewGpio creates a new PiPin for a given gpio value.
-func NewGpio(gpio uint8) PiPin {
-	return gpioProvider(gpio)
-}
-
-// Input sets the pin to be read from.
-func (g *Gpio) Input() {
-	if g.gpioPin.Number != 0 {
-		g.Close()
-	}
-	g.gpioPin = gpio.NewInput(uint(g.pin))
-}
-
-// Close releases the resources related to the pin.
-func (g *Gpio) Close() {
-	g.gpioPin.Close()
-	g.gpioPin.Number = 0
-}
-
-// Output sets the pin to be written to.
-func (g *Gpio) Output(s GpioState) {
-	if g.gpioPin.Number != 0 {
-		g.Close()
-	}
-	g.gpioPin = gpio.NewOutput(uint(g.pin), bool(s))
-	Info("Setting pin %d to %s", g.pin, s)
-}
-
-// Read returns the current state of the pin
-func (g *Gpio) Read() (GpioState, error) {
-	v, err := g.gpioPin.Read()
-	if v == uint(gpio.ActiveHigh) {
-		return High, err
-	}
-	return Low, err
-}
-
-// Write sets the state of the pin
-func (g *Gpio) Write(s GpioState) error {
-	if s == High {
-		return g.gpioPin.SetLogicLevel(gpio.ActiveHigh)
-	}
-	return g.gpioPin.SetLogicLevel(gpio.ActiveLow)
-}
-
-// Notifications returns a channel of notifications for the pin.
-func (g *Gpio) Notifications(e Edge, s GpioState) <-chan Notification {
-	notify := make(chan Notification, 100)
-	g.Watch(func(n Notification) error {
-		notify <- n
-		return nil
-	}, e, s)
-	return notify
-}
-
-// Watch registers a handler to be called when a notification is received.
-func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
-	w := gpio.NewWatcher()
-	w.AddPinWithEdgeAndLogic(uint(g.pin), gpio.Edge(e), gpio.LogicLevel(s.uint()))
-	go func() {
-		for w != nil {
-			select {
-			case n := <-w.Notification:
-				val := Low
-				if n.Value == uint(gpio.ActiveHigh) {
-					val = High
-				}
-				err := h(Notification{
-					Pin:   g.pin,
-					Time:  time.Now(),
-					Value: val,
-				})
-				if err != nil {
-					w.Close()
-				}
-			}
-		}
-	}()
-	return nil
-}
-
-// Pin returns the GPIO number of the pin.
-func (g *Gpio) Pin() uint8 {
-	return g.pin
+// String returns the string representation of the notification.
+func (n Notification) String() string {
+	return n.Time.Format("2006-01-02 15:04:05") + " Pin " + string(n.Pin) + " is " + n.Value.String()
 }
 
 // Direction refers to the usage of the pin.  Is it being used for input or output?
@@ -244,3 +135,11 @@ const (
 	// Output means that the value of the pin will be written to and is controlled internally.
 	Output Direction = true
 )
+
+// String returns the string representation of the direction.
+func (d Direction) String() string {
+	if d == Input {
+		return "Input"
+	}
+	return "Output"
+}
