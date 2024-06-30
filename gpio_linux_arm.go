@@ -126,7 +126,7 @@ func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
 		g.Output(s)
 		g.Input()
 		scnt := stateCounter{state: Low}
-		for time.Now().Before(end) {
+		for i := 0; time.Now().Before(end); i++ {
 			val := Low
 			if g.pin.Read() == rpio.High {
 				val = High
@@ -148,7 +148,7 @@ func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
 					Time:  time.Now(),
 					Value: val,
 				}
-				Info("Sending Notification[%d]: %s", g.gpio, n)
+				Info("Sending Notification: %s", n)
 				err := h(n)
 				if err != nil {
 					Info("Handler Error: watcher exited after %s: pin(%d) d(%d/%d) %v", time.Since(start), g.gpio, detections.lows, detections.highs, err)

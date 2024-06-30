@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -123,7 +124,7 @@ type Notification struct {
 
 // String returns the string representation of the notification.
 func (n Notification) String() string {
-	return n.Time.Format("2006-01-02 15:04:05") + " Pin " + string(n.Pin) + " is " + n.Value.String()
+	return fmt.Sprintf("%s Pin %d is %s", n.Time.Format("2006-01-02 15:04:05"), n.Pin, n.Value)
 }
 
 // Direction refers to the usage of the pin.  Is it being used for input or output?
