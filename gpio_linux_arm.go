@@ -95,39 +95,28 @@ func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 	go func() {
 		start := time.Now()
 		detections := stats{detections: true}
-		nodetections := stats{detections: false}
 		g.Input()
 		g.gpioPin.PullOff()
-		g.gpioPin.Detect(rEdge(e))
 		for i := 0; i < 100000; i++ {
 			val := Low
-			if g.gpioPin.EdgeDetected() {
-				if g.gpioPin.Read() == rpio.High {
-					val = High
-					detections.highs++
-				} else {
-					detections.lows++
-				}
-				err := h(Notification{
-					Pin:   g.Pin(),
-					Time:  time.Now(),
-					Value: val,
-				})
-				if err != nil {
-					break
-				}
+			if g.gpioPin.Read() == rpio.High {
+				val = High
+				detections.highs++
 			} else {
-				// Testing
-				// if g.gpioPin.Read() == rpio.High {
-				// 	nodetections.highs++
-				// } else {
-				// 	nodetections.lows++
-				// }
+				detections.lows++
+			}
+			err := h(Notification{
+				Pin:   g.Pin(),
+				Time:  time.Now(),
+				Value: val,
+			})
+			if err != nil {
+				break
 			}
 		}
 		g.gpioPin.Detect(rpio.NoEdge)
-		Info("watcher exited after %s: pin(%d) d(%d/%d) nd(%d/%d)",
-			time.Since(start), g.gpioPin, detections.lows, detections.highs, nodetections.lows, nodetections.highs)
+		Info("watcher exited after %s: pin(%d) d(%d/%d)",
+			time.Since(start), g.gpioPin, detections.lows, detections.highs)
 	}()
 	return nil
 }
