@@ -1,6 +1,8 @@
 package test
 
 import (
+	"fmt"
+	"io/ioutil"
 	"time"
 
 	rpio "github.com/stianeikeland/go-rpio/v4"
@@ -44,19 +46,20 @@ func TestValues() {
 					time.Sleep(time.Microsecond)
 				}
 				pin.Detect(rpio.NoEdge) // Reset
-				end  = time.Now().Add(time.Second)
+				end = time.Now().Add(time.Second)
 				last := rpio.Low
 				for i := 0; time.Now().Before(end); i++ {
 					stat := pin.Read()
-					if i == 0  || stat != last {
-					sample.Values = append(sample.Values, struct {
-						Time  time.Time
-						State rpio.State
-					}{
-						Time:  time.Now(),
-						State: stat,
-					})
-					time.Sleep(time.Microsecond)
+					if i == 0 || stat != last {
+						sample.Values = append(sample.Values, struct {
+							Time  time.Time
+							State rpio.State
+						}{
+							Time:  time.Now(),
+							State: stat,
+						})
+						time.Sleep(time.Microsecond)
+					}
 				}
 			}
 		}
