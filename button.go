@@ -33,6 +33,7 @@ func newButton(pin PiPin, callback func()) *Button {
 
 // Start runs a thread in the background that monitors the button activity.
 func (b *Button) Start() {
+	Info("Button Started[%d]", b.pin.Pin())
 	b.pin.Watch(b.buttonHandler, PullDown, FallingEdge, Low)
 }
 
