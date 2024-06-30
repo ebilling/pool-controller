@@ -87,9 +87,13 @@ func rEdge(e Edge) rpio.Edge {
 // Watch registers a handler to be called when a notification is received.
 func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 	go func() {
+		start := time.Now()
+		detections := 0
+		nodetections := 0
 		g.gpioPin.Detect(rEdge(e))
-		for {
+		for i := 0; i < 1000; i++ {
 			if g.gpioPin.EdgeDetected() {
+				detections++
 				val := Low
 				if g.gpioPin.Read() == rpio.High {
 					val = High
@@ -103,9 +107,12 @@ func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 				if err != nil {
 					break
 				}
+			} else {
+				nodetections++
 			}
 		}
 		g.gpioPin.Detect(rpio.NoEdge)
+		Info("watcher exited after %s: d(%d) nd(%d)", time.Since(start), detections, nodetections)
 	}()
 	return nil
 }
