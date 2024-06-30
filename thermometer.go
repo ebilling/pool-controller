@@ -147,6 +147,7 @@ func (t *GpioThermometer) startWatcher() {
 func (t *GpioThermometer) handler(n Notification) error {
 	duration := n.Time.Sub(t.last.Time)
 	t.last = n
+	Info("Duration: %s", duration)
 	if duration < 10*time.Millisecond && duration > time.Microsecond*50 {
 		t.history.PushDuration(duration)
 	}

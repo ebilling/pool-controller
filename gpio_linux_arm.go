@@ -118,7 +118,7 @@ type stateCounter struct {
 
 // Watch registers a handler to be called when a notification is received.
 func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
-	Info("Watching pin(%d) p(%s) e(%s) s(%s)", g.gpio, p, e, s)
+	Info("Watching pin(%d) p(%s) e(%s) s(%s)", g.Pin(), p, e, s)
 	g.pin.Pull(rPull(p))
 	g.Output(s)
 	go func() {
