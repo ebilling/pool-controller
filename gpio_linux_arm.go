@@ -119,7 +119,7 @@ func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 				scnt.time = time.Now()
 			}
 			if val != scnt.state {
-				Info("state change detected: %s -> %s after %d polls %s", scnt.state, val, i, time.Since(scnt.time))
+				Info("state change detected[%d]: %s -> %s after %d polls %s", g.gpioPin, scnt.state, val, i, time.Since(scnt.time))
 				scnt.state = val
 				scnt.count = 1
 				scnt.time = time.Now()
