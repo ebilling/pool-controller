@@ -96,9 +96,8 @@ func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 		start := time.Now()
 		detections := stats{detections: true}
 		nodetections := stats{detections: false}
-		g.Output(s)
 		g.Input()
-		g.gpioPin.PullDown()
+		g.gpioPin.PullOff()
 		g.gpioPin.Detect(rEdge(e))
 		for i := 0; i < 100000; i++ {
 			val := Low
