@@ -112,7 +112,7 @@ func (g *Gpio) Watch(h NotificationHandler, e Edge, s GpioState) error {
 			}
 		}
 		g.gpioPin.Detect(rpio.NoEdge)
-		Info("watcher exited after %s: d(%d) nd(%d)", time.Since(start), detections, nodetections)
+		Info("watcher exited after %s: ping(%d) d(%d) nd(%d)", time.Since(start), g.gpioPin, detections, nodetections)
 	}()
 	return nil
 }
