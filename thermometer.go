@@ -148,9 +148,10 @@ func (t *GpioThermometer) handler(n Notification) error {
 	duration := n.Time.Sub(t.last.Time)
 	t.last = n
 	Info("Duration: %s", duration)
-	if duration < 10*time.Millisecond && duration > time.Microsecond*50 {
-		t.history.PushDuration(duration)
+	if duration > 10*time.Millisecond && duration < time.Microsecond*50 {
+		return nil
 	}
+	t.history.PushDuration(duration)
 	median := t.history.Duration(t.history.Median())
 	ohms := t.getOhms(median)
 	temp := t.getTemp(ohms)
