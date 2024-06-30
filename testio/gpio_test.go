@@ -8,6 +8,7 @@ import (
 	"time"
 
 	rpio "github.com/stianeikeland/go-rpio/v4"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,7 @@ func TestValues(t *testing.T) {
 	err := rpio.Open()
 	require.NoError(t, err)
 	defer rpio.Close()
-	pin := rpio.Pin(14)
+	pin := rpio.Pin(15)
 	out := []samples{}
 	for p := rpio.PullOff; p <= rpio.PullNone; p++ {
 		for e := rpio.NoEdge; e <= rpio.AnyEdge; e++ {
@@ -56,6 +57,7 @@ func TestValues(t *testing.T) {
 						}
 						time.Sleep(time.Microsecond)
 					}
+					assert.Greater(t, edgeEvents, 0)
 					pin.Detect(rpio.NoEdge) // Reset
 					end = time.Now().Add(time.Second)
 					last := rpio.Low
@@ -73,6 +75,7 @@ func TestValues(t *testing.T) {
 							time.Sleep(time.Microsecond)
 						}
 					}
+					assert.Greater(t, readEvents, 0)
 				})
 			}
 		}
