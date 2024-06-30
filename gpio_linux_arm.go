@@ -129,25 +129,24 @@ func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
 		scnt := stateCounter{state: Low}
 		for i := 0; time.Now().Before(end); i++ {
 			val := Low
-			if g.pin.EdgeDetected() {
-				g.pin.Detect(rEdge(e))
-				Info("Edge detected[%d]: %s", g.Pin(), e)
-			}
 			if g.pin.Read() == rpio.High {
 				val = High
 				detections.highs++
 			} else {
 				detections.lows++
 			}
-			if i == 0 {
-				scnt.state = val
-				scnt.time = time.Now()
-			}
-			if val != scnt.state {
-				Info("state change detected[%d]: %s -> %s after %d polls %s", g.gpio, scnt.state, val, i, time.Since(scnt.time))
-				scnt.state = val
-				scnt.count = 1
-				scnt.time = time.Now()
+			if g.pin.EdgeDetected() {
+				Info("Edge detected[%d]: %s", g.Pin(), e)
+				if i == 0 {
+					scnt.state = val
+					scnt.time = time.Now()
+				}
+				if val != scnt.state {
+					Info("state change detected[%d]: %s -> %s after %d polls %s", g.gpio, scnt.state, val, i, time.Since(scnt.time))
+					scnt.state = val
+					scnt.count = 1
+					scnt.time = time.Now()
+				}
 				n := Notification{
 					Pin:   g.Pin(),
 					Time:  time.Now(),
@@ -159,6 +158,7 @@ func (g *Gpio) Watch(h NotificationHandler, p Pull, e Edge, s GpioState) error {
 					Info("Handler Error: watcher exited after %s: pin(%d) d(%d/%d) %v", time.Since(start), g.gpio, detections.lows, detections.highs, err)
 					break
 				}
+				g.pin.Detect(rEdge(e))
 			}
 		}
 		g.pin.Detect(rpio.NoEdge)
