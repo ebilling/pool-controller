@@ -67,12 +67,12 @@ func (g *Gpio) Write(s GpioState) error {
 }
 
 // Notifications returns a channel of notifications for the pin.
-func (g *Gpio) Notifications(e Edge, s GpioState) <-chan Notification {
+func (g *Gpio) Notifications(p Pull, e Edge, s GpioState) <-chan Notification {
 	notify := make(chan Notification, 100)
 	g.Watch(func(n Notification) error {
 		notify <- n
 		return nil
-	}, e, s)
+	}, p, e, s)
 	return notify
 }
 

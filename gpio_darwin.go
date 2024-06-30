@@ -61,7 +61,7 @@ func (t *testPin) Notifications(Edge, GpioState) <-chan Notification {
 }
 
 // Watch registers a handler to be called when a notification is received.
-func (t *testPin) Watch(NotificationHandler, Edge, GpioState) error {
+func (t *testPin) Watch(NotificationHandler, Pull, Edge, GpioState) error {
 	// Unimplemented
 	return nil
 }

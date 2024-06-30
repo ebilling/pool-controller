@@ -109,9 +109,9 @@ type PiPin interface {
 	// Close releases the resources related to the pin.
 	Close()
 	// Notifications returns a channel of notifications for the pin.
-	Notifications(Edge, GpioState) <-chan Notification
+	Notifications(Pull, Edge, GpioState) <-chan Notification
 	// Watch registers a handler to be called when a notification is received.
-	Watch(NotificationHandler, Edge, GpioState) error
+	Watch(NotificationHandler, Pull, Edge, GpioState) error
 }
 
 // Notification represents a change in the state of the pin.
