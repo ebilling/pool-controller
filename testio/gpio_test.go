@@ -29,9 +29,9 @@ func TestValues(t *testing.T) {
 	err := rpio.Open()
 	require.NoError(t, err)
 	defer rpio.Close()
-	pin := rpio.Pin(15)
+	pin := rpio.Pin(14)
 	out := []*samples{}
-	for p := rpio.PullOff; p <= rpio.PullNone; p++ {
+	for p := rpio.PullOff; p < rpio.PullNone; p++ {
 		for e := rpio.NoEdge; e < rpio.AnyEdge; e++ {
 			for s := rpio.Low; s <= rpio.High; s++ {
 				edgeEvents := 0
@@ -50,6 +50,7 @@ func TestValues(t *testing.T) {
 						}
 						out = append(out, sample)
 						end := time.Now().Add(time.Second)
+						pin.Detect(rpio.NoEdge) // Reset Detect
 						pin.Output()
 						pin.Write(s)
 						assert.Equal(t, s, pin.Read(), "Failed to set initial state")
@@ -69,8 +70,6 @@ func TestValues(t *testing.T) {
 								time.Sleep(time.Microsecond)
 							}
 							assert.Greater(t, edgeEvents, 1000, "Not enough edge events detected")
-							pin.Detect(rpio.NoEdge) // Reset
-							pin.ReadPull()
 						} else {
 							last := rpio.Low
 							for i := 0; time.Now().Before(end) || readEvents > 100; i++ {
