@@ -33,49 +33,58 @@ func TestValues(t *testing.T) {
 	out := []*samples{}
 	for p := rpio.PullOff; p <= rpio.PullNone; p++ {
 		for e := rpio.NoEdge; e <= rpio.AnyEdge; e++ {
-			edgeEvents := 0
-			readEvents := 0
 			for s := rpio.Low; s <= rpio.High; s++ {
-				t.Run(fmt.Sprintf("Edge(%d) Pull(%d) InitState(%d)", e, p, s), func(t *testing.T) {
-					sample := &samples{
-						Edge:      e,
-						Pull:      p,
-						InitState: s,
+				edgeEvents := 0
+				readEvents := 0
+				for poll := 0; poll < 2; poll++ {
+					DoPoll := poll == 1
+					pollStr := "Poll"
+					if !DoPoll {
+						pollStr = "Detect"
 					}
-					out = append(out, sample)
-					end := time.Now().Add(time.Second)
-					pin.Output()
-					pin.Write(s)
-					pin.Input()
-					pin.Pull(p)
-					pin.Detect(e)
-					detected := false
-					for time.Now().Before(end) {
-						detected = pin.EdgeDetected()
-						if detected {
-							edgeEvents++
+					t.Run(fmt.Sprintf("Edge(%d) Pull(%d) InitState(%d) Poll(%s)", e, p, s, pollStr), func(t *testing.T) {
+						sample := &samples{
+							Edge:      e,
+							Pull:      p,
+							InitState: s,
+						}
+						out = append(out, sample)
+						end := time.Now().Add(time.Second)
+						pin.Output()
+						pin.Write(s)
+						pin.Input()
+						pin.Pull(p)
+						if !DoPoll {
 							pin.Detect(e)
-							sample.Detections = append(sample.Detections, time.Now())
+							detected := false
+							for time.Now().Before(end) {
+								detected = pin.EdgeDetected()
+								if detected {
+									edgeEvents++
+									pin.Detect(e)
+									sample.Detections = append(sample.Detections, time.Now())
+								}
+								time.Sleep(time.Microsecond)
+							}
+							assert.Greater(t, edgeEvents, 1000)
+							pin.Detect(rpio.NoEdge) // Reset
+						} else {
+							last := rpio.Low
+							for i := 0; time.Now().Before(end); i++ {
+								stat := pin.Read()
+								if i == 0 || stat != last {
+									readEvents++
+									sample.Values = append(sample.Values, &Value{
+										Time:  time.Now(),
+										State: stat,
+									})
+									time.Sleep(time.Microsecond)
+								}
+							}
+							assert.Greater(t, readEvents, 1000)
 						}
-						time.Sleep(time.Microsecond)
-					}
-					assert.Greater(t, edgeEvents, 0)
-					pin.Detect(rpio.NoEdge) // Reset
-					end = time.Now().Add(time.Second)
-					last := rpio.Low
-					for i := 0; time.Now().Before(end); i++ {
-						stat := pin.Read()
-						if i == 0 || stat != last {
-							readEvents++
-							sample.Values = append(sample.Values, &Value{
-								Time:  time.Now(),
-								State: stat,
-							})
-							time.Sleep(time.Microsecond)
-						}
-					}
-					assert.Greater(t, readEvents, 0)
-				})
+					})
+				}
 			}
 		}
 	}
