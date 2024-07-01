@@ -42,7 +42,7 @@ func TestValues(t *testing.T) {
 					if !DoPoll {
 						pollStr = "Detect"
 					}
-					t.Run(fmt.Sprintf("Edge(%d) Pull(%d) InitState(%d) Poll(%s)", e, p, s, pollStr), func(t *testing.T) {
+					t.Run(fmt.Sprintf("Edge(%d) Pull(%d) State(%d) Poll(%s)", e, p, s, pollStr), func(t *testing.T) {
 						sample := &samples{
 							Edge:      e,
 							Pull:      p,
@@ -52,12 +52,13 @@ func TestValues(t *testing.T) {
 						end := time.Now().Add(time.Second)
 						pin.Output()
 						pin.Write(s)
+						assert.Equal(t, s, pin.Read(), "Failed to set initial state")
 						pin.Input()
 						pin.Pull(p)
 						if !DoPoll {
 							pin.Detect(e)
 							detected := false
-							for time.Now().Before(end) {
+							for time.Now().Before(end) || edgeEvents > 100 {
 								detected = pin.EdgeDetected()
 								if detected {
 									edgeEvents++
@@ -66,11 +67,11 @@ func TestValues(t *testing.T) {
 								}
 								time.Sleep(time.Microsecond)
 							}
-							assert.Greater(t, edgeEvents, 1000)
+							assert.Greater(t, edgeEvents, 1000, "Not enough edge events detected")
 							pin.Detect(rpio.NoEdge) // Reset
 						} else {
 							last := rpio.Low
-							for i := 0; time.Now().Before(end); i++ {
+							for i := 0; time.Now().Before(end) || readEvents > 100; i++ {
 								stat := pin.Read()
 								if i == 0 || stat != last {
 									readEvents++
@@ -81,7 +82,7 @@ func TestValues(t *testing.T) {
 									time.Sleep(time.Microsecond)
 								}
 							}
-							assert.Greater(t, readEvents, 1000)
+							assert.Greater(t, readEvents, 1000, "Not enough read events detected")
 						}
 					})
 				}
