@@ -50,6 +50,7 @@ type PersistedConfig struct {
 	Disabled       bool
 	ButtonDisabled bool
 	SolarDisabled  bool
+	CoolDisabled   bool
 	Auth           string
 	Pin            string
 	Target         float64
