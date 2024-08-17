@@ -31,15 +31,16 @@ const (
 // The PoolPumpController manages the relays that control the pumps based on
 // data from temperature probes.
 type PoolPumpController struct {
-	config      *Config
-	switches    *Switches
-	pumpTemp    Thermometer
-	runningTemp Thermometer
-	roofTemp    Thermometer
-	button      *Button
-	tempRrd     *Rrd
-	pumpRrd     *Rrd
-	done        chan bool
+	config         *Config
+	switches       *Switches
+	pumpTemp       Thermometer
+	runningTemp    Thermometer
+	roofTemp       Thermometer
+	poolThermostat Thermostat
+	button         *Button
+	tempRrd        *Rrd
+	pumpRrd        *Rrd
+	done           chan bool
 }
 
 // RunningWaterThermometer creates a thermometer that remembers the temperature of the water when the
@@ -53,14 +54,17 @@ func RunningWaterThermometer(t Thermometer, s *Switches) *SelectiveThermometer {
 
 // NewPoolPumpController creates a new pump controller
 func NewPoolPumpController(config *Config) *PoolPumpController {
+	pumpTherm := NewGpioThermometer("Pump", mftr, waterGpio)
+	roofTherm := NewGpioThermometer("Roof", mftr, roofGpio)
 	ppc := PoolPumpController{
-		config:   config,
-		switches: NewSwitches(mftr),
-		pumpTemp: NewGpioThermometer("Pump", mftr, waterGpio),
-		roofTemp: NewGpioThermometer("Roof", mftr, roofGpio),
-		tempRrd:  NewRrd(*config.dataDirectory + "/temperature.rrd"),
-		pumpRrd:  NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
-		done:     make(chan bool),
+		config:         config,
+		switches:       NewSwitches(mftr),
+		pumpTemp:       pumpTherm,
+		roofTemp:       roofTherm,
+		poolThermostat: NewThermostat("Pool", mftr, config.cfg.Target, config.cfg.Tolerance, pumpTherm, roofTherm),
+		tempRrd:        NewRrd(*config.dataDirectory + "/temperature.rrd"),
+		pumpRrd:        NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
+		done:           make(chan bool),
 	}
 	ppc.SyncAdjustments()
 	ppc.runningTemp = RunningWaterThermometer(ppc.pumpTemp, ppc.switches)
@@ -138,17 +142,15 @@ func adjustedRunTime(runTime float64, sinceTime time.Time) float64 {
 // run to help mix the water as it approaches the target.
 func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	state := ppc.switches.State()
+	// respect the manual state
 	if ppc.switches.ManualState(ppc.config.cfg.RunTime) {
 		// Don't warm past the target
-		if state == SOLAR && !ppc.shouldWarm() {
+		if (state == SOLAR || state == MIXING) && ppc.poolThermostat.ExpectedState() != ThermOff {
 			ppc.switches.SetState(PUMP, true, adjustedRunTime(ppc.config.cfg.RunTime, ppc.switches.GetStartTime()))
 		}
 		return
 	}
-	if state == DISABLED && !ppc.config.cfg.Disabled && !ppc.config.cfg.SolarDisabled {
-		ppc.switches.setSwitches(false, false, false, false, OFF)
-		return
-	}
+	// enforce a disabled state
 	if ppc.config.cfg.Disabled {
 		if state > DISABLED {
 			ppc.switches.setSwitches(false, false, false, false, DISABLED)
@@ -156,12 +158,35 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		return
 	}
 
-	if ppc.shouldCool() || ppc.shouldWarm() {
-		// Wide deltaT between target and temp or when it's cold, run sweep
-		if state == MIXING {
-			return
+	// update after a disable is removed
+	if state == DISABLED && !ppc.config.cfg.Disabled && !ppc.config.cfg.SolarDisabled {
+		ppc.switches.setSwitches(false, false, false, false, OFF)
+		return
+	}
+
+	if ppc.runSolar(state) {
+		return
+	}
+
+	if ppc.clean() {
+		return
+	}
+
+	// If there is no reason to turn on the pumps and it's not manual, turn off after 30 minutes
+	if state > OFF && time.Since(ppc.switches.GetStartTime()) > time.Hour/2 {
+		ppc.switches.StopAll(false)
+	}
+}
+
+func (ppc *PoolPumpController) runSolar(state State) bool {
+	expected := ppc.poolThermostat.ExpectedState()
+	ppc.poolThermostat.SetState(ppc.poolThermostat.ExpectedState())
+	if expected != ThermOff {
+		// Already running
+		if state == MIXING || state == SOLAR {
+			return true
 		}
-		Info("ShouldCool(%t) - ShouldWarm(%t)", ppc.shouldCool(), ppc.shouldWarm())
+		// Big difference in temperature, run the sweep with the solar on
 		if ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.DeltaT ||
 			ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance {
 			ppc.switches.SetState(MIXING, false, ppc.config.cfg.RunTime)
@@ -169,24 +194,28 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 			// Just push water through the panels
 			ppc.switches.SetState(SOLAR, false, ppc.config.cfg.RunTime)
 		}
-		return
+		return true
 	}
 
+	// Thermostat says to turn off
+	ppc.switches.SetState(OFF, false, ppc.config.cfg.RunTime)
+	return false
+}
+
+func (ppc *PoolPumpController) clean() bool {
 	// If the pumps havent run in a day, wait til 4AM then start them
 	freqHours := DurationFromHours((ppc.config.cfg.DailyFrequency-0.25)*24.0, 12.0)
 	runtime := DurationFromHours(ppc.config.cfg.RunTime, 1.0)
 	if time.Since(ppc.switches.GetStopTime()) > freqHours {
 		Log("Daily SWEEP running for %s every %s - %s remaining", runtime, freqHours.String(), runtime-time.Since(ppc.switches.GetStartTime()))
-		ppc.switches.SetState(SWEEP, false, ppc.config.cfg.RunTime) // Clean pool
 		if time.Since(ppc.switches.GetStartTime()) > runtime {
 			ppc.switches.StopAll(false) // End daily
+		} else {
+			ppc.switches.SetState(SWEEP, false, ppc.config.cfg.RunTime) // Clean pool
+			return true
 		}
-		return
 	}
-	// If there is no reason to turn on the pumps and it's not manual, turn off after 2 hours
-	if state > OFF && time.Since(ppc.switches.GetStartTime()) > 2*time.Hour {
-		ppc.switches.StopAll(false)
-	}
+	return false
 }
 
 // Runs calls PoolPumpController.Update() and PoolPumpController.RunPumpsIfNeeded()

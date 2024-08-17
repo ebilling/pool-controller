@@ -38,7 +38,7 @@ type SelectiveThermometer struct {
 // NewSelectiveThermometer creates a SelectiveThermometer
 func NewSelectiveThermometer(name string, manufacturer string, thermometer Thermometer,
 	filter func() bool) *SelectiveThermometer {
-	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), 0.0, -20.0, 100.0, 1.0)
+	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), 0.0, -20.0, 100.0, 0.1)
 	thermometer.Update()
 	acc.TempSensor.CurrentTemperature.SetValue(thermometer.Temperature())
 	return &SelectiveThermometer{
@@ -55,7 +55,7 @@ func (t *SelectiveThermometer) Name() string {
 }
 
 // Calibrate runs a calibration operation the thermometer
-func (t *SelectiveThermometer) Calibrate(a float64) error {
+func (t *SelectiveThermometer) Calibrate(_ float64) error {
 	return errors.New("not supported")
 }
 
@@ -110,7 +110,7 @@ func us(t time.Duration) float64 {
 }
 
 func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermometer {
-	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), 0.0, -20.0, 100.0, 1.0)
+	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), 0.0, -20.0, 100.0, 0.1)
 	th := GpioThermometer{
 		name:        name,
 		mutex:       sync.Mutex{},
@@ -140,32 +140,6 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 }
 
 func (t *GpioThermometer) getDischargeTime() time.Duration {
-	pull := Float
-	edge := FallingEdge
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-	// Discharge the capacitor (low temps could make this really long)
-	t.pin.Output(Low)
-	time.Sleep(time.Millisecond / 2)
-	end := time.Now().Add(10 * time.Millisecond)
-	// Set to input
-	t.pin.InputEdge(pull, edge)
-	start := time.Now()
-	// poll for the change
-	for time.Now().Before(end) {
-		if t.pin.Read() {
-			dt := time.Since(start)
-			Info("Thermometer %s (%s, %s) %s: %s %0.1fF", t.name, pull, edge, dt, t.pin.Read(), toFarenheit(t.getTemp(t.getOhms(dt))))
-			return dt
-		}
-		time.Sleep(time.Microsecond)
-	}
-	dt := time.Since(start)
-	Info("TIMED_OUT Thermometer %s (%s, %s) %s max(%s): %s %0.1fF", t.name, pull, edge, dt, maxTime, t.pin.Read(), toFarenheit(t.getTemp(t.getOhms(dt))))
-	return time.Duration(0)
-}
-
-func (t *GpioThermometer) oldGetDischargeTime() time.Duration {
 	pull := PullDown
 	edge := FallingEdge
 	t.mutex.Lock()
@@ -251,7 +225,6 @@ func (t *GpioThermometer) Temperature() float64 {
 func (t *GpioThermometer) Update() error {
 	var dischargeTime time.Duration
 	h := NewHistory(5)
-	// TODO, allow for more bites at the apple
 	for i := 0; h.Len() < 5 && i < 5; i++ {
 		dischargeTime = t.getDischargeTime()
 		if dischargeTime > 0 && t.inRange(dischargeTime) {
