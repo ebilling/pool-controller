@@ -117,8 +117,7 @@ func (p *Switches) bindHK() {
 		Log("HomeKit request to turn Solar on=%t", on)
 		state := p.state
 		switch p.state {
-		case SWEEP:
-		case MIXING:
+		case SWEEP, MIXING:
 			if on {
 				state = MIXING
 			} else {
