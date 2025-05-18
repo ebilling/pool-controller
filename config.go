@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"flag"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -50,6 +50,7 @@ type PersistedConfig struct {
 	Disabled       bool
 	ButtonDisabled bool
 	SolarDisabled  bool
+	CoolDisabled   bool
 	Auth           string
 	Pin            string
 	Target         float64
@@ -146,14 +147,14 @@ func (c *Config) Save() error {
 	}
 	cfgFilename := filepath.Join(*c.dataDirectory, serverConfiguration)
 	Info("Writing config file to: %s\n%s", cfgFilename, string(buf))
-	err = ioutil.WriteFile(cfgFilename, buf, 0600)
+	err = os.WriteFile(cfgFilename, buf, 0600)
 	return err
 }
 
 // Read reads the config from the fileystem
 func (c *Config) Read() error {
 	cfgFilename := filepath.Join(*c.dataDirectory, serverConfiguration)
-	cfg, err := ioutil.ReadFile(cfgFilename)
+	cfg, err := os.ReadFile(cfgFilename)
 	if err != nil {
 		Error("Unable to read configuration file: %s", err.Error())
 		return err
