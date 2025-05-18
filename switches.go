@@ -181,11 +181,7 @@ func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state St
 	turnOn(p.sweep, sweepOn)
 	turnOn(p.solar, solarOn) // deal with solar valve last because it takes time
 	if isManual {
-		if p.GetStartTime().After(p.GetStopTime()) {
-			p.manualOp = p.GetStartTime()
-		} else {
-			p.manualOp = p.GetStopTime()
-		}
+		p.manualOp = time.Now()
 	}
 	p.state = state
 }
