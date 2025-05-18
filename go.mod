@@ -8,7 +8,7 @@ require (
 	github.com/brutella/hc v1.2.5
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/stretchr/testify v1.9.0
-	github.com/ziutek/rrd v0.0.3
+	github.com/ziutek/rrd v0.0.4
 	golang.org/x/crypto v0.38.0
 	periph.io/x/conn/v3 v3.7.2
 	periph.io/x/host/v3 v3.8.5

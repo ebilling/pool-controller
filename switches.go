@@ -117,10 +117,12 @@ func (p *Switches) bindHK() {
 		Log("HomeKit request to turn Solar on=%t", on)
 		state := p.state
 		switch p.state {
-		case SWEEP, MIXING:
+		case SWEEP:
 			if on {
 				state = MIXING
-			} else {
+			}
+		case MIXING:
+			if !on {
 				state = SWEEP
 			}
 		case SOLAR:
@@ -248,14 +250,5 @@ func DurationFromHours(hours float64, minHours float64) time.Duration {
 
 // ManualState returns true if the pumps were started or stopped manually
 func (p *Switches) ManualState(runtime float64) bool {
-	if time.Since(p.manualOp) > DurationFromHours(runtime, 2.0) {
-		return false
-	}
-	if p.manualOp.Equal(p.GetStartTime()) && p.GetStartTime().After(p.GetStopTime()) {
-		return true
-	}
-	if p.manualOp.Equal(p.GetStopTime()) && p.GetStopTime().After(p.GetStartTime()) {
-		return true
-	}
-	return false
+	return time.Since(p.manualOp) < DurationFromHours(runtime, 2.0)
 }
