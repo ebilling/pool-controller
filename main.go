@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/brutella/hc"
@@ -26,7 +25,7 @@ func main() {
 	Info("Args: %s", os.Args[1:])
 
 	// Write PID
-	err := ioutil.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
+	err := os.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
 	if err != nil {
 		Fatal("Could not write pid file: %s", err.Error())
 	}

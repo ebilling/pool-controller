@@ -118,10 +118,11 @@ func (p *Switches) bindHK() {
 		state := p.state
 		switch p.state {
 		case SWEEP:
-		case MIXING:
 			if on {
 				state = MIXING
-			} else {
+			}
+		case MIXING:
+			if !on {
 				state = SWEEP
 			}
 		case SOLAR:
@@ -182,11 +183,7 @@ func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state St
 	turnOn(p.sweep, sweepOn)
 	turnOn(p.solar, solarOn) // deal with solar valve last because it takes time
 	if isManual {
-		if p.GetStartTime().After(p.GetStopTime()) {
-			p.manualOp = p.GetStartTime()
-		} else {
-			p.manualOp = p.GetStopTime()
-		}
+		p.manualOp = time.Now()
 	}
 	p.state = state
 }
@@ -253,14 +250,5 @@ func DurationFromHours(hours float64, minHours float64) time.Duration {
 
 // ManualState returns true if the pumps were started or stopped manually
 func (p *Switches) ManualState(runtime float64) bool {
-	if time.Since(p.manualOp) > DurationFromHours(runtime, 2.0) {
-		return false
-	}
-	if p.manualOp.Equal(p.GetStartTime()) && p.GetStartTime().After(p.GetStopTime()) {
-		return true
-	}
-	if p.manualOp.Equal(p.GetStopTime()) && p.GetStopTime().After(p.GetStartTime()) {
-		return true
-	}
-	return false
+	return time.Since(p.manualOp) < DurationFromHours(runtime, 2.0)
 }
