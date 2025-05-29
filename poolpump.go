@@ -91,7 +91,7 @@ func (ppc *PoolPumpController) shouldCool() bool {
 	if ppc.config.cfg.SolarDisabled || ppc.config.cfg.CoolDisabled {
 		return false
 	}
-	return ppc.pumpTemp.Temperature() > (ppc.config.cfg.Target+ppc.config.cfg.Tolerance) &&
+	return ppc.pumpTemp.Temperature() > (ppc.config.cfg.Target+(2*ppc.config.cfg.Tolerance)) &&
 		ppc.pumpTemp.Temperature() > (ppc.roofTemp.Temperature()+ppc.config.cfg.DeltaT)
 }
 
