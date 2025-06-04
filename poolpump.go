@@ -108,6 +108,7 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 	warm := waterCold && roofHot
 	if warm {
 		Info("ShouldWarm: %t waterCold(%t) roofHot(%t)", warm, waterCold, roofHot)
+		Info(ppc.Status())
 		Info("Temp(%0.3f) < %0.3f {Target(%0.3f) - Tolerance(%0.3f)} : WaterCold(%t)",
 			ppc.runningTemp.Temperature(),
 			ppc.config.cfg.Target-ppc.config.cfg.Tolerance,
