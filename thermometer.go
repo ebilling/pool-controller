@@ -234,7 +234,7 @@ func (t *GpioThermometer) Update() error {
 	stdd := t.history.Stddev()
 	avg := t.history.Average()
 	med := t.history.Median()
-	dev := stdd * 3
+	dev := stdd * 2
 
 	// Throw away bad results
 	if math.Abs(avg-h.Median()) > dev {
@@ -247,7 +247,7 @@ func (t *GpioThermometer) Update() error {
 			dev/MillisecondFloat)
 		return fmt.Errorf("could not update temperature successfully")
 	}
-	ohms := t.getOhms(time.Duration(int64(h.Median())))
+	ohms := t.getOhms(time.Duration(int64(avg)))
 	temp := t.getTemp(ohms)
 	Debug("Calculating temperature (%f) for %s: %f ohms, median %s", temp, t.name, ohms, time.Duration(int64(h.Median())))
 	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
