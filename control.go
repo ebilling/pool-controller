@@ -36,6 +36,19 @@ type controlDecision struct {
 	reason string
 }
 
+func thermostatDisables(mode ThermostatMode) (heat, cool bool) {
+	switch mode {
+	case ThermostatOff:
+		return true, true
+	case ThermostatHeat:
+		return false, true
+	case ThermostatCool:
+		return true, false
+	default:
+		return false, false
+	}
+}
+
 func keepState(in controlInputs, reason string) controlDecision {
 	return controlDecision{state: in.state, reason: reason}
 }

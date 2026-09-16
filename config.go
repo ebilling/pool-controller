@@ -28,6 +28,15 @@ var (
 	serverConfiguration   = "/server.conf"
 )
 
+type ThermostatMode string
+
+const (
+	ThermostatOff  ThermostatMode = "off"
+	ThermostatHeat ThermostatMode = "heat"
+	ThermostatCool ThermostatMode = "cool"
+	ThermostatAuto ThermostatMode = "auto"
+)
+
 // Config holds various configuration entries for the system.
 type Config struct {
 	// Commandline only
@@ -55,6 +64,9 @@ type PersistedConfig struct {
 	Disabled       bool
 	ButtonDisabled bool
 	SolarDisabled  bool
+	ThermostatMode ThermostatMode
+	// Deprecated: retained only to migrate configuration files written before
+	// ThermostatMode was introduced.
 	HeatDisabled   bool
 	CoolDisabled   bool
 	Auth           string
@@ -117,9 +129,41 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		c.cfg.Tolerance = defaultTolerance
 		c.cfg.DailyFrequency = float64(defaultFrequency)
 		c.cfg.RunTime = float64(defaultRunTime)
+		c.cfg.ThermostatMode = ThermostatAuto
 		c.Save()
 	}
+	normalizeThermostatMode(c.cfg)
 	return &c
+}
+
+func normalizeThermostatMode(cfg *PersistedConfig) {
+	switch cfg.ThermostatMode {
+	case ThermostatOff, ThermostatHeat, ThermostatCool, ThermostatAuto:
+		return
+	}
+	cfg.ThermostatMode = legacyThermostatMode(cfg)
+}
+
+func legacyThermostatMode(cfg *PersistedConfig) ThermostatMode {
+	switch {
+	case cfg.HeatDisabled && cfg.CoolDisabled:
+		return ThermostatOff
+	case cfg.HeatDisabled:
+		return ThermostatCool
+	case cfg.CoolDisabled:
+		return ThermostatHeat
+	default:
+		return ThermostatAuto
+	}
+}
+
+func configuredThermostatMode(cfg *PersistedConfig) ThermostatMode {
+	switch cfg.ThermostatMode {
+	case ThermostatOff, ThermostatHeat, ThermostatCool, ThermostatAuto:
+		return cfg.ThermostatMode
+	default:
+		return legacyThermostatMode(cfg)
+	}
 }
 
 func crypt(s string) []byte {

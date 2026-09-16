@@ -126,30 +126,27 @@ func thermostatModeFromConfig(cfg *PersistedConfig) int {
 	if cfg.Disabled {
 		return characteristic.TargetHeatingCoolingStateOff
 	}
-	if cfg.HeatDisabled && !cfg.CoolDisabled {
-		return characteristic.TargetHeatingCoolingStateCool
-	}
-	if cfg.CoolDisabled && !cfg.HeatDisabled {
+	switch configuredThermostatMode(cfg) {
+	case ThermostatOff:
+		return characteristic.TargetHeatingCoolingStateOff
+	case ThermostatHeat:
 		return characteristic.TargetHeatingCoolingStateHeat
+	case ThermostatCool:
+		return characteristic.TargetHeatingCoolingStateCool
+	default:
+		return characteristic.TargetHeatingCoolingStateAuto
 	}
-	return characteristic.TargetHeatingCoolingStateAuto
 }
 
 func applyThermostatMode(cfg *PersistedConfig, mode int) {
 	switch mode {
 	case characteristic.TargetHeatingCoolingStateOff:
-		cfg.Disabled = true
+		cfg.ThermostatMode = ThermostatOff
 	case characteristic.TargetHeatingCoolingStateHeat:
-		cfg.Disabled = false
-		cfg.HeatDisabled = false
-		cfg.CoolDisabled = true
+		cfg.ThermostatMode = ThermostatHeat
 	case characteristic.TargetHeatingCoolingStateCool:
-		cfg.Disabled = false
-		cfg.HeatDisabled = true
-		cfg.CoolDisabled = false
+		cfg.ThermostatMode = ThermostatCool
 	default:
-		cfg.Disabled = false
-		cfg.HeatDisabled = false
-		cfg.CoolDisabled = false
+		cfg.ThermostatMode = ThermostatAuto
 	}
 }

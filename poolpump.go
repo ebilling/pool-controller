@@ -112,9 +112,10 @@ func (ppc *PoolPumpController) Update() error {
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
 	cfg := ppc.config.cfg
+	_, coolDisabled := thermostatDisables(configuredThermostatMode(cfg))
 	return wantsCooling(controlInputs{
 		solarDisabled: cfg.SolarDisabled,
-		coolDisabled:  cfg.CoolDisabled,
+		coolDisabled:  coolDisabled,
 		water:         ppc.runningTemp.Temperature(),
 		roof:          ppc.roofTemp.Temperature(),
 		target:        cfg.Target,
@@ -127,9 +128,10 @@ func (ppc *PoolPumpController) shouldCool() bool {
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
 	cfg := ppc.config.cfg
+	heatDisabled, _ := thermostatDisables(configuredThermostatMode(cfg))
 	return wantsHeating(controlInputs{
 		solarDisabled: cfg.SolarDisabled,
-		heatDisabled:  cfg.HeatDisabled,
+		heatDisabled:  heatDisabled,
 		water:         ppc.runningTemp.Temperature(),
 		roof:          ppc.roofTemp.Temperature(),
 		target:        cfg.Target,
@@ -144,14 +146,15 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 // run to help mix the water as it approaches the target.
 func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 	cfg := ppc.config.cfg
+	heatDisabled, coolDisabled := thermostatDisables(configuredThermostatMode(cfg))
 	decision := decideControl(controlInputs{
 		now:            ppc.now(),
 		state:          ppc.switches.State(),
 		manual:         ppc.switches.ManualState(cfg.RunTime),
 		disabled:       cfg.Disabled,
 		solarDisabled:  cfg.SolarDisabled,
-		heatDisabled:   cfg.HeatDisabled,
-		coolDisabled:   cfg.CoolDisabled,
+		heatDisabled:   heatDisabled,
+		coolDisabled:   coolDisabled,
 		water:          ppc.runningTemp.Temperature(),
 		roof:           ppc.roofTemp.Temperature(),
 		target:         cfg.Target,

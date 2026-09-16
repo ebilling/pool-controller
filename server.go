@@ -564,6 +564,20 @@ func processFloatUpdate(r *http.Request, formname string, ptr *float64) bool {
 	return false
 }
 
+func processThermostatModeUpdate(r *http.Request, cfg *PersistedConfig) bool {
+	value := ThermostatMode(getFormValue(r, "thermostat_mode", ""))
+	switch value {
+	case ThermostatOff, ThermostatHeat, ThermostatCool, ThermostatAuto:
+	default:
+		return false
+	}
+	if cfg.ThermostatMode == value {
+		return false
+	}
+	cfg.ThermostatMode = value
+	return true
+}
+
 func (h *Handler) configBoolRow(name, inputName string, value bool) string {
 	checked := ""
 	if value {
@@ -616,12 +630,7 @@ func (h *Handler) processForm(r *http.Request, c *Config) {
 		processBoolUpdate(r, "solar_disabled", &c.cfg.SolarDisabled) {
 		foundone = true
 	}
-	if getFormValue(r, "_present_heat_disabled", "") == "true" &&
-		processBoolUpdate(r, "heat_disabled", &c.cfg.HeatDisabled) {
-		foundone = true
-	}
-	if getFormValue(r, "_present_cool_disabled", "") == "true" &&
-		processBoolUpdate(r, "cool_disabled", &c.cfg.CoolDisabled) {
+	if processThermostatModeUpdate(r, c.cfg) {
 		foundone = true
 	}
 	if processFloatUpdate(r, "daily_freq", &c.cfg.DailyFrequency) {
@@ -663,6 +672,14 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	passArgs := `type="password" autocomplete="new-password"`
+	mode := configuredThermostatMode(c.cfg)
+	modeOption := func(value ThermostatMode, label string) string {
+		selected := ""
+		if mode == value {
+			selected = " selected"
+		}
+		return fmt.Sprintf(`<option value="%s"%s>%s</option>`, value, selected, label)
+	}
 
 	body := `<form class="stack" action="/config" method="POST">
 <fieldset>
@@ -677,6 +694,12 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 </fieldset>
 <fieldset>
 <legend>Solar</legend>
+<label>Thermostat mode<select name="thermostat_mode">
+` + modeOption(ThermostatOff, "Off") +
+		modeOption(ThermostatHeat, "Heat only") +
+		modeOption(ThermostatCool, "Cool only") +
+		modeOption(ThermostatAuto, "Auto") + `
+</select></label>
 ` + h.configRow("Target (°C)", "target", fmt.Sprintf("%0.2f", c.cfg.Target), "") + `
 ` + h.configRow("Tolerance (°C)", "tolerance", fmt.Sprintf("%0.2f", c.cfg.Tolerance), "") + `
 ` + h.configRow("Min delta (°C)", "mindelta", fmt.Sprintf("%0.2f", c.cfg.DeltaT), "") + `
@@ -689,8 +712,6 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 ` + h.configBoolRow("Disable all pumps", "disabled", c.cfg.Disabled) + `
 ` + h.configBoolRow("Disable button", "button_disabled", c.cfg.ButtonDisabled) + `
 ` + h.configBoolRow("Disable solar", "solar_disabled", c.cfg.SolarDisabled) + `
-` + h.configBoolRow("Disable heating (HomeKit Cool)", "heat_disabled", c.cfg.HeatDisabled) + `
-` + h.configBoolRow("Disable cooling (HomeKit Heat)", "cool_disabled", c.cfg.CoolDisabled) + `
 </fieldset>
 <input type="hidden" name="posted" value="true">
 <input type="submit" value="Save">

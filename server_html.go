@@ -115,7 +115,7 @@ form.stack label.check {
 }
 /* Matches on exclusion: configRow emits inputs with no type attribute,
    which input[type=text] would not select. */
-form.stack input:not([type=checkbox]):not([type=submit]) {
+form.stack input:not([type=checkbox]):not([type=submit]), form.stack select {
   font: inherit;
   font-weight: 400;
   padding: 0.4rem 0.55rem;
