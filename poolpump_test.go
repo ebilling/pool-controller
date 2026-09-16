@@ -45,6 +45,7 @@ func (t *TestRunPumps) setConditions(target, pump, roof, outside float64, state 
 	t.ppc.config.cfg.Target = target
 	t.pumpTemp.temp = pump
 	t.roofTemp.temp = roof
+	t.ppc.runningTemp = &t.pumpTemp
 	t.ppc.switches.state = state
 }
 
@@ -58,6 +59,7 @@ func NewTestRunPumps() *TestRunPumps {
 	}
 	t.ppc.pumpTemp = &t.pumpTemp
 	t.ppc.roofTemp = &t.roofTemp
+	t.ppc.runningTemp = &t.pumpTemp
 	return &t
 }
 

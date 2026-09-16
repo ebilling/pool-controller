@@ -37,6 +37,7 @@ type PoolPumpController struct {
 	button      *Button
 	tempRrd     *Rrd
 	pumpRrd     *Rrd
+	now         func() time.Time
 	done        chan struct{}
 	stopped     chan struct{}
 	stopOnce    sync.Once
@@ -58,6 +59,7 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 		switches: NewSwitches(mftr),
 		tempRrd:  NewRrd(*config.dataDirectory + "/temperature.rrd"),
 		pumpRrd:  NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
+		now:      time.Now,
 		done:     make(chan struct{}),
 		stopped:  make(chan struct{}),
 	}
@@ -109,41 +111,31 @@ func (ppc *PoolPumpController) Update() error {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
-	if ppc.config.cfg.SolarDisabled || ppc.config.cfg.CoolDisabled {
-		return false
-	}
-	return ppc.pumpTemp.Temperature() > (ppc.config.cfg.Target+ppc.config.cfg.Tolerance) &&
-		ppc.pumpTemp.Temperature() > (ppc.roofTemp.Temperature()+ppc.config.cfg.DeltaT)
+	cfg := ppc.config.cfg
+	return wantsCooling(controlInputs{
+		solarDisabled: cfg.SolarDisabled,
+		coolDisabled:  cfg.CoolDisabled,
+		water:         ppc.runningTemp.Temperature(),
+		roof:          ppc.roofTemp.Temperature(),
+		target:        cfg.Target,
+		tolerance:     cfg.Tolerance,
+		deltaT:        cfg.DeltaT,
+	})
 }
 
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
-	if ppc.config.cfg.SolarDisabled || ppc.config.cfg.HeatDisabled {
-		Debug("shouldWarm: solarDisabled(%t) heatDisabled(%t)",
-			ppc.config.cfg.SolarDisabled, ppc.config.cfg.HeatDisabled)
-		return false
-	}
-
-	waterCold := ppc.pumpTemp.Temperature() < (ppc.config.cfg.Target - ppc.config.cfg.Tolerance)
-	roofHot := ppc.pumpTemp.Temperature() < (ppc.roofTemp.Temperature() - ppc.config.cfg.DeltaT)
-	warm := waterCold && roofHot
-	if warm {
-		Info("ShouldWarm: %t waterCold(%t) roofHot(%t)", warm, waterCold, roofHot)
-		Info("Temp(%0.3f) < %0.3f {Target(%0.3f) - Tolerance(%0.3f)} : WaterCold(%t)",
-			ppc.pumpTemp.Temperature(),
-			ppc.config.cfg.Target-ppc.config.cfg.Tolerance,
-			ppc.config.cfg.Target,
-			ppc.config.cfg.Tolerance,
-			waterCold)
-		Info("Temp(%0.3f) < %0.3f {Roof(%0.3f) - DeltaT(%0.3f)} : RoofHot(%t)",
-			ppc.pumpTemp.Temperature(),
-			ppc.roofTemp.Temperature()-ppc.config.cfg.DeltaT,
-			ppc.roofTemp.Temperature(),
-			ppc.config.cfg.DeltaT,
-			roofHot)
-	}
-	return warm
+	cfg := ppc.config.cfg
+	return wantsHeating(controlInputs{
+		solarDisabled: cfg.SolarDisabled,
+		heatDisabled:  cfg.HeatDisabled,
+		water:         ppc.runningTemp.Temperature(),
+		roof:          ppc.roofTemp.Temperature(),
+		target:        cfg.Target,
+		tolerance:     cfg.Tolerance,
+		deltaT:        cfg.DeltaT,
+	})
 }
 
 // RunPumpsIfNeeded - If the water is not within the tolerance limit of the target, and the roof
@@ -151,51 +143,28 @@ func (ppc *PoolPumpController) shouldWarm() bool {
 // turned on.  If the outdoor temperature is low or the pool is very cold, the sweep will also be
 // run to help mix the water as it approaches the target.
 func (ppc *PoolPumpController) RunPumpsIfNeeded() {
-	state := ppc.switches.State()
-	if ppc.switches.ManualState(ppc.config.cfg.RunTime) {
-		return
-	}
-	if state == DISABLED && !ppc.config.cfg.Disabled && !ppc.config.cfg.SolarDisabled {
-		ppc.switches.Enable()
-		return
-	}
-	if ppc.config.cfg.Disabled {
-		if state > DISABLED {
-			ppc.switches.SetState(DISABLED, false, ppc.config.cfg.RunTime)
-		}
-		return
-	}
-
-	if ppc.shouldCool() || ppc.shouldWarm() {
-		// Wide deltaT between target and temp or when it's cold, run sweep
-		if state == MIXING {
-			return
-		}
-		Info("ShouldCool(%t) - ShouldWarm(%t)", ppc.shouldCool(), ppc.shouldWarm())
-		if ppc.pumpTemp.Temperature() < ppc.config.cfg.Target-ppc.config.cfg.DeltaT ||
-			ppc.pumpTemp.Temperature() > ppc.config.cfg.Target+ppc.config.cfg.Tolerance {
-			ppc.switches.SetState(MIXING, false, ppc.config.cfg.RunTime)
-		} else {
-			// Just push water through the panels
-			ppc.switches.SetState(SOLAR, false, ppc.config.cfg.RunTime)
-		}
-		return
-	}
-
-	// If the pumps havent run in a day, wait til 4AM then start them
-	freqHours := DurationFromHours((ppc.config.cfg.DailyFrequency-0.25)*24.0, 12.0)
-	runtime := DurationFromHours(ppc.config.cfg.RunTime, 1.0)
-	if time.Since(ppc.switches.GetStopTime()) > freqHours && time.Now().Hour() < 6 { // run in the early morning
-		Log("Daily running SWEEP: %s", freqHours.String())
-		ppc.switches.SetState(SWEEP, false, ppc.config.cfg.RunTime) // Clean pool
-		if time.Since(ppc.switches.GetStartTime()) > runtime {
-			ppc.switches.StopAll(false) // End daily
-		}
-		return
-	}
-	// If there is no reason to turn on the pumps and it's not manual, turn off
-	if state > OFF && ppc.switches.GetStartTime().Add(time.Hour).Before(time.Now()) {
-		ppc.switches.StopAll(false)
+	cfg := ppc.config.cfg
+	decision := decideControl(controlInputs{
+		now:            ppc.now(),
+		state:          ppc.switches.State(),
+		manual:         ppc.switches.ManualState(cfg.RunTime),
+		disabled:       cfg.Disabled,
+		solarDisabled:  cfg.SolarDisabled,
+		heatDisabled:   cfg.HeatDisabled,
+		coolDisabled:   cfg.CoolDisabled,
+		water:          ppc.runningTemp.Temperature(),
+		roof:           ppc.roofTemp.Temperature(),
+		target:         cfg.Target,
+		tolerance:      cfg.Tolerance,
+		deltaT:         cfg.DeltaT,
+		dailyFrequency: cfg.DailyFrequency,
+		runTime:        cfg.RunTime,
+		lastStart:      ppc.switches.GetStartTime(),
+		lastStop:       ppc.switches.GetStopTime(),
+	})
+	if decision.change {
+		Info("Automatic state change to %s: %s", decision.state, decision.reason)
+		ppc.switches.SetState(decision.state, false, cfg.RunTime)
 	}
 }
 
