@@ -80,6 +80,33 @@ func TestConfig_DataDir(t *testing.T) {
 	}
 }
 
+func TestConfig_Simulate(t *testing.T) {
+	c := flagTestSetup([]string{"-simulate", "-sim-pump-temp", "18", "-sim-roof-temp", "55", "-http_port", "8443"})
+	if !*c.simulate {
+		t.Errorf("simulate flag not set")
+	}
+	if *c.simPumpTemp != 18 {
+		t.Errorf("sim-pump-temp: %v", *c.simPumpTemp)
+	}
+	if *c.simRoofTemp != 55 {
+		t.Errorf("sim-roof-temp: %v", *c.simRoofTemp)
+	}
+	if *c.httpPort != 8443 {
+		t.Errorf("http_port: %v", *c.httpPort)
+	}
+}
+
+func TestConfig_GpioDriverDefault(t *testing.T) {
+	c := NewConfig(flag.NewFlagSet("gpio-default", flag.PanicOnError), nil)
+	if *c.gpioDriver != "cdev" {
+		t.Errorf("gpio-driver default: %q, want cdev", *c.gpioDriver)
+	}
+	c = flagTestSetup([]string{"-gpio-driver", "periph"})
+	if *c.gpioDriver != "periph" {
+		t.Errorf("gpio-driver: %q, want periph", *c.gpioDriver)
+	}
+}
+
 func TestConfig_Pidfile(t *testing.T) {
 	flag := "-pid"
 	value := "This is my Process ID path"

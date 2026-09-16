@@ -9,8 +9,14 @@ import (
 	"periph.io/x/host/v3"
 )
 
-// gpioProvider generates pins for the platform (used for testing)
-var gpioProvider = xGpioProvider // For testing on non-test setups
+// gpioProvider generates pins for the platform (used for testing and simulation)
+var gpioProvider = xGpioProvider
+
+// gpioInitFn initializes the host GPIO driver. Simulation replaces this with a no-op.
+var gpioInitFn = func() error {
+	_, err := host.Init()
+	return err
+}
 
 // GpioState represents the current binary value of the pin.  Is it High or Low Voltage
 type GpioState bool
@@ -133,10 +139,16 @@ func NewGpio(gpio uint8) PiPin {
 	return gpioProvider(gpio)
 }
 
-// GpioInit initializes the system
+// GpioInit initializes the system GPIO driver (or a simulation stand-in).
 func GpioInit() error {
-	_, err := host.Init()
-	return err
+	return gpioInitFn()
+}
+
+// EnableCdevGpio switches GPIO to the Linux character device backend in
+// gpiocdev_pin.go, replacing periph for every pin.
+func EnableCdevGpio() {
+	gpioInitFn = CdevGpioInit
+	SetGpioProvider(newCdevPin)
 }
 
 // Input sets the pin to be read from.

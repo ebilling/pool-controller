@@ -36,6 +36,11 @@ type Config struct {
 	dataDirectory  *string
 	forceRrd       *bool
 	persist        *bool
+	httpPort       *int
+	gpioDriver     *string
+	simulate       *bool
+	simPumpTemp    *float64
+	simRoofTemp    *float64
 
 	// Internal
 	pidfile *string
@@ -84,6 +89,19 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		"If true, any parameter values changed via web interface are saved to a file and read on "+
 			"startup.  If false, any saved values will be ignored on start.  Saved changes "+
 			"supercede all flags.")
+	c.httpPort = fs.Int("http_port", 443,
+		"HTTPS port for the web interface")
+	c.gpioDriver = fs.String("gpio-driver", "cdev",
+		"GPIO backend: 'cdev' for the Linux GPIO character device (kernel edge "+
+			"timestamps, more accurate charge timing), or 'periph' for the legacy "+
+			"periph.io/sysfs path.")
+	c.simulate = fs.Bool("simulate", false,
+		"Skip real GPIO/host init. Script thermometer readings and log relay pin changes. "+
+			"For Docker/UTM only; not a hardware qualification.")
+	c.simPumpTemp = fs.Float64("sim-pump-temp", 24.0,
+		"Simulated pump/water temperature in Celsius (used with -simulate)")
+	c.simRoofTemp = fs.Float64("sim-roof-temp", 45.0,
+		"Simulated roof temperature in Celsius (used with -simulate)")
 	fs.Parse(args)
 	err := c.Read()
 	if err != nil {

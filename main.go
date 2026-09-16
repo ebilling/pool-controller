@@ -31,6 +31,19 @@ func main() {
 		Fatal("Could not write pid file: %s", err.Error())
 	}
 
+	switch {
+	case *config.simulate:
+		EnableSimulation()
+		Info("Simulation mode: pump=%0.1fC roof=%0.1fC (no real GPIO)",
+			*config.simPumpTemp, *config.simRoofTemp)
+	case *config.gpioDriver == "cdev":
+		EnableCdevGpio()
+	case *config.gpioDriver == "periph":
+		Info("GPIO: using periph.io")
+	default:
+		Fatal("Unknown -gpio-driver %q: want 'cdev' or 'periph'", *config.gpioDriver)
+	}
+
 	if err := GpioInit(); err != nil {
 		Fatal("Could not initialize GPIO: %s", err.Error())
 	}
@@ -43,7 +56,7 @@ func main() {
 		Fatal("Could not start pool controller: %s", err.Error())
 	}
 
-	server := NewServer(AnyHost, 443, ppc)
+	server := NewServer(AnyHost, *config.httpPort, ppc)
 	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
 	hcConfig := hc.Config{

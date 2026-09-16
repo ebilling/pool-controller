@@ -24,7 +24,9 @@ func TestGpioThermometer(t *testing.T) {
 	})
 
 	t.Run("getOhms", func(t *testing.T) {
-		expected := 10000 * therm.adjust
+		// ohms = adjust * microseconds / microfarads (100 nF in thermometer.go).
+		// The old 10 µF test-rig comments were leftover from before the capacitor change.
+		expected := therm.adjust * us(100*time.Millisecond) / therm.microfarads
 		o := therm.getOhms(100 * time.Millisecond)
 		if int(o) != int(expected) {
 			t.Errorf("Expected %0.3f k-ohms found %0.3f k-ohms",

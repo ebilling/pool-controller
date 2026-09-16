@@ -8,14 +8,7 @@ import (
 	"time"
 
 	"github.com/brutella/hc/accessory"
-)
-
-const (
-	// nanoFarads is the value of capacitor used for measuring the thermistor
-	nanoFarads = 100
-	// minTime and maxTime are the expectations for how long it should take for the capacitor to discharge
-	minTime = time.Duration(nanoFarads) * time.Microsecond
-	maxTime = time.Duration(nanoFarads) / 10 * time.Millisecond
+	"github.com/ebilling/pool-controller/internal/rctime"
 )
 
 // Thermometer reads a thermal resistance thermometer using the timings of a capacitor charge/discharge cycle
@@ -84,6 +77,7 @@ type GpioThermometer struct {
 	name        string
 	mutex       sync.Mutex
 	pin         PiPin
+	edge        rctime.EdgePin
 	microfarads float64
 	adjust      float64
 	updated     time.Time
@@ -115,7 +109,8 @@ func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermo
 		name:        name,
 		mutex:       sync.Mutex{},
 		pin:         pin,
-		microfarads: float64(nanoFarads) / 1000.0,
+		edge:        newEdgePin(pin),
+		microfarads: rctime.Microfarads,
 		adjust:      2.5,
 		history:     *NewHistory(100),
 		updated:     time.Now().Add(-24 * time.Hour),
@@ -140,41 +135,47 @@ func (t *GpioThermometer) Accessory() *accessory.Accessory {
 }
 
 func (t *GpioThermometer) getDischargeTime() time.Duration {
-	pull := Float
-	edge := RisingEdge
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	// Discharge the capacitor (low temps could make this really long)
-	t.pin.Output(Low)
-	time.Sleep(2 * maxTime)
-	// Start polling
-	start := time.Now()
-	// Set to input
-	t.pin.InputEdge(pull, edge)
-	if !t.pin.WaitForEdge(maxTime) {
-		Debug("Thermometer %s, WaitForEdge(%s, %s) timed out", t.name, pull, edge)
-		return time.Duration(0)
+	dt, err := rctime.Discharge(t.edge)
+	if err != nil {
+		Debug("Thermometer %s could not measure a charge time: %s", t.name, err)
+		return 0
 	}
-	dt := time.Since(start)
-	t.pin.Output(Low)
 	Debug("Discharge time for %s: %s", t.name, dt)
 	return dt
 }
 
-func (t *GpioThermometer) getTemp(ohms float64) float64 {
-	const a = 79463.85
-	const b = 0.1453676
-	const c = 2.517178e-15
-	const d = -132.2399
-	if ohms == 0.0 {
-		return 0.0
+type gpioEdgePin struct{ pin PiPin }
+
+func (p gpioEdgePin) OutputLow() { p.pin.Output(Low) }
+
+func (p gpioEdgePin) InputRisingFloat() { p.pin.InputEdge(Float, RisingEdge) }
+
+func (p gpioEdgePin) WaitForEdge(d time.Duration) bool { return p.pin.WaitForEdge(d) }
+
+// timedEdgePin is a pin whose driver can time the charge cycle itself, against
+// a clock that does not include this process's scheduling delay.
+type timedEdgePin struct {
+	gpioEdgePin
+	rctime.ChargeMeter
+}
+
+// newEdgePin adapts a PiPin for rctime, preferring the driver's own
+// kernel-timestamped measurement when it offers one.
+func newEdgePin(pin PiPin) rctime.EdgePin {
+	if m, ok := pin.(rctime.ChargeMeter); ok {
+		return timedEdgePin{gpioEdgePin{pin}, m}
 	}
-	return d + (a-d)/(1+math.Pow(ohms/c, b))
+	return gpioEdgePin{pin}
+}
+
+func (t *GpioThermometer) getTemp(ohms float64) float64 {
+	return rctime.Temp(ohms)
 }
 
 func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
-	uSec := t.adjust * us(dischargeTime)
-	return uSec / t.microfarads
+	return rctime.Ohms(dischargeTime, t.adjust)
 }
 
 // Calibrate asserts a specific resistance and calculates the proper setting
@@ -204,11 +205,7 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 }
 
 func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
-	// Completely bogus, ignore
-	if dischargeTime < minTime || dischargeTime > maxTime {
-		return false
-	}
-	return true
+	return rctime.InRange(dischargeTime)
 }
 
 // Temperature returns the current temperature of the GpioThermometer

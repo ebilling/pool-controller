@@ -8,12 +8,20 @@ import (
 	"time"
 )
 
-//  To run these tests, you need to build a system that is set up as follows:
+//  Hardware fixture for these tests (must match thermometer.go, not the old 10µF wiring).
+//  Production sensing uses a 100 nF (0.1 µF) capacitor. The previous 10 µF fixture
+//  documentation is obsolete after that design change.
+//
 //      GPIO5  -> <1k Resistor  -> LED    -> GND
-//      +3.3v  -> 4.7k Resistor -> GPIO19 -> 10uF capacitor -> GND
-//      +3.3v  ->  10k Resistor -> GPIO6  -> 10uF capacitor -> GND
+//      +3.3v  -> 4.7k Resistor -> GPIO19 -> 100nF capacitor -> GND
+//      +3.3v  ->  10k Resistor -> GPIO6  -> 100nF capacitor -> GND
 //      GPIO13 -> 4.7k Resistor -> Relay Input
 //      GPIO26 -> Open Relay Terminals -> GND, relay will push the button...
+//
+//  With 100 nF, a ~10 kΩ charge is on the order of 1 ms (was ~100 ms at 10 µF).
+//  Userspace WaitForEdge latency is then a large fraction of the sample, which is
+//  why shrinking the capacitor hurt accuracy and why edge-trigger/timing fixes
+//  are required before this fixture can qualify upgrades.
 //
 //      SUPER IMPORTANT: Create an empty file in the current directory named TestRig
 //                       to tell the test system it's ok to run these tests.

@@ -1,0 +1,6 @@
+.tmp
+.git
+.github
+data
+*.md
+.DS_Store

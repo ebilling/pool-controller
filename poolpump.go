@@ -50,11 +50,16 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 	ppc := PoolPumpController{
 		config:   config,
 		switches: NewSwitches(mftr),
-		pumpTemp: NewGpioThermometer("Pump", mftr, waterGpio),
-		roofTemp: NewGpioThermometer("Roof", mftr, roofGpio),
 		tempRrd:  NewRrd(*config.dataDirectory + "/temperature.rrd"),
 		pumpRrd:  NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
 		done:     make(chan bool),
+	}
+	if config.simulate != nil && *config.simulate {
+		ppc.pumpTemp = NewSimulatedThermometer("Pump", mftr, *config.simPumpTemp)
+		ppc.roofTemp = NewSimulatedThermometer("Roof", mftr, *config.simRoofTemp)
+	} else {
+		ppc.pumpTemp = NewGpioThermometer("Pump", mftr, waterGpio)
+		ppc.roofTemp = NewGpioThermometer("Roof", mftr, roofGpio)
 	}
 	ppc.SyncAdjustments()
 	ppc.runningTemp = RunningWaterThermometer(ppc.pumpTemp, ppc.switches)

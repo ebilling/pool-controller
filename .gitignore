@@ -1,0 +1,6 @@
+/.tmp/
+/therm-capture
+*.jsonl
+therm.log
+*.tgz
+

@@ -1,0 +1,20 @@
+services:
+  pool-controller:
+    build:
+      context: .
+      target: runtime
+    ports:
+      - "8443:443"
+    environment:
+      DATA_DIR: /var/cache/homekit
+    volumes:
+      - pool-homekit:/var/cache/homekit
+    command:
+      - -simulate
+      - -sim-pump-temp=24
+      - -sim-roof-temp=45
+    # HomeKit mDNS needs multicast. Uncomment to put the container on the LAN:
+    # network_mode: host
+
+volumes:
+  pool-homekit:
