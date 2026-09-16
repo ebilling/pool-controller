@@ -147,6 +147,46 @@ input[type=submit], button {
 .qr { display: block; margin: 0.75rem 0 0; border-radius: 8px; }
 `
 
+const liveRefreshScript = `<script>
+(function () {
+  function bumpGraphs() {
+    document.querySelectorAll(".chart img").forEach(function (img) {
+      var u = new URL(img.src, location.origin);
+      u.searchParams.set("_", Date.now().toString());
+      img.src = u.toString();
+    });
+  }
+  function setPill(id, label, value, on) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.className = on ? "pill on" : "pill";
+    el.textContent = label + ": " + value;
+  }
+  function setText(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+  function bumpStatus() {
+    fetch("/status", { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("status " + r.status);
+      return r.json();
+    }).then(function (s) {
+      setPill("pill-pump", "Pump", s.pump, s.pump_on);
+      setPill("pill-solar", "Solar", s.solar, s.solar_on);
+      setPill("pill-thermostat", "Thermostat", s.thermostat, s.thermostat !== "Off");
+      setPill("pill-control", "Control", s.control, s.control === "Manual");
+      setText("metric-target", s.target_f.toFixed(1) + " °F");
+      setText("metric-pool", s.pool_f.toFixed(1) + " °F");
+      setText("metric-roof", s.roof_f.toFixed(1) + " °F");
+      setText("updated", "Updated " + s.updated);
+    }).catch(function () {});
+  }
+  setInterval(bumpGraphs, 20000);
+  setInterval(bumpStatus, 5000);
+})();
+</script>
+`
+
 func page(title, body string) string {
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -178,17 +218,17 @@ func nav() string {
 </nav>`
 }
 
-func metricCard(label, value string) string {
+func metricCard(id, label, value string) string {
 	return `<div class="card metric"><div class="label">` + html.EscapeString(label) +
-		`</div><div class="value">` + html.EscapeString(value) + `</div></div>`
+		`</div><div class="value" id="` + html.EscapeString(id) + `">` + html.EscapeString(value) + `</div></div>`
 }
 
-func statusPill(label, value string, on bool) string {
+func statusPill(id, label, value string, on bool) string {
 	class := "pill"
 	if on {
 		class += " on"
 	}
-	return `<span class="` + class + `">` + html.EscapeString(label+": "+value) + `</span>`
+	return `<span id="` + html.EscapeString(id) + `" class="` + class + `">` + html.EscapeString(label+": "+value) + `</span>`
 }
 
 func image(which string, width, height int, scale string) string {

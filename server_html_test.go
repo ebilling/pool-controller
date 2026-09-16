@@ -17,8 +17,20 @@ func TestPageForcesLightColorScheme(t *testing.T) {
 }
 
 func TestMetricCardEscapes(t *testing.T) {
-	got := metricCard("<script>", "1°F")
+	got := metricCard("metric-x", "<script>", "1°F")
 	if strings.Contains(got, "<script>") {
 		t.Fatal("metric labels must be escaped")
+	}
+	if !strings.Contains(got, `id="metric-x"`) {
+		t.Fatal("metric values need ids so live refresh can patch them")
+	}
+}
+
+func TestLiveRefreshScriptReloadsGraphs(t *testing.T) {
+	if !strings.Contains(liveRefreshScript, `fetch("/status"`) {
+		t.Fatal("status JSON must be polled")
+	}
+	if !strings.Contains(liveRefreshScript, ".chart img") {
+		t.Fatal("graph images must be reloaded in place")
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html"
 	"net/http"
@@ -126,6 +127,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/temps":
 		h.graphHandler(w, r, TempImage)
 		return
+	case "/status":
+		h.statusHandler(w, r)
+		return
 	case "/config":
 		h.configHandler(w, r)
 		return
@@ -213,8 +217,51 @@ func (h *Handler) graphHandler(w http.ResponseWriter, r *http.Request, which int
 	if err != nil {
 		Error("Could not produce graph: %s", err.Error())
 	}
-	h.setRefresh(w, r, 20) // Refresh image every 20 seconds
+	w.Header().Set("Cache-Control", "no-store")
 	h.writeResponse(w, graph, "image/png")
+}
+
+type liveStatus struct {
+	Pump       string  `json:"pump"`
+	PumpOn     bool    `json:"pump_on"`
+	Solar      string  `json:"solar"`
+	SolarOn    bool    `json:"solar_on"`
+	Thermostat string  `json:"thermostat"`
+	Control    string  `json:"control"`
+	TargetF    float64 `json:"target_f"`
+	PoolF      float64 `json:"pool_f"`
+	RoofF      float64 `json:"roof_f"`
+	Updated    string  `json:"updated"`
+}
+
+func (h *Handler) liveStatus() liveStatus {
+	control := "Auto"
+	if h.ppc.switches.ManualState(h.ppc.config.cfg.RunTime) {
+		control = "Manual"
+	}
+	mode := thermostatModeName(h.ppc.config.cfg)
+	return liveStatus{
+		Pump:       h.ppc.switches.State().String(),
+		PumpOn:     h.ppc.switches.State() > OFF,
+		Solar:      h.ppc.switches.solar.Status(),
+		SolarOn:    h.ppc.switches.solar.Status() == "On",
+		Thermostat: mode,
+		Control:    control,
+		TargetF:    toFarenheit(h.ppc.config.cfg.Target),
+		PoolF:      toFarenheit(h.ppc.runningTemp.Temperature()),
+		RoofF:      toFarenheit(h.ppc.roofTemp.Temperature()),
+		Updated:    time.Now().Format("2006-01-02 15:04:05"),
+	}
+}
+
+func (h *Handler) statusHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	buf, err := json.Marshal(h.liveStatus())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	h.writeResponse(w, buf, "application/json")
 }
 
 func (h *Handler) pin() string {
@@ -245,7 +292,6 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 		MaxAge: int(365 * 24 * time.Hour / time.Second),
 	}
 	http.SetCookie(w, cookie)
-	h.setRefresh(w, r, 60)
 	controlStr := "Auto"
 	if h.ppc.switches.ManualState(h.ppc.config.cfg.RunTime) {
 		controlStr = "Manual"
@@ -255,15 +301,15 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	solarOn := h.ppc.switches.solar.Status() == "On"
 
 	body := `<div class="pills">` +
-		statusPill("Pump", h.ppc.switches.State().String(), pumpOn) +
-		statusPill("Solar", h.ppc.switches.solar.Status(), solarOn) +
-		statusPill("Thermostat", thermostatMode, thermostatMode != "Off") +
-		statusPill("Control", controlStr, controlStr == "Manual") +
+		statusPill("pill-pump", "Pump", h.ppc.switches.State().String(), pumpOn) +
+		statusPill("pill-solar", "Solar", h.ppc.switches.solar.Status(), solarOn) +
+		statusPill("pill-thermostat", "Thermostat", thermostatMode, thermostatMode != "Off") +
+		statusPill("pill-control", "Control", controlStr, controlStr == "Manual") +
 		`</div>
 <div class="metrics">` +
-		metricCard("Target", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.config.cfg.Target))) +
-		metricCard("Pool", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.runningTemp.Temperature()))) +
-		metricCard("Roof", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.roofTemp.Temperature()))) +
+		metricCard("metric-target", "Target", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.config.cfg.Target))) +
+		metricCard("metric-pool", "Pool", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.runningTemp.Temperature()))) +
+		metricCard("metric-roof", "Roof", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.roofTemp.Temperature()))) +
 		`</div>
 <form class="toolbar" action="/" method="POST">
 <label>Window <input name="scale" value="` + html.EscapeString(scale) + `" placeholder="12h"></label>
@@ -273,7 +319,8 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 <div class="card chart">` + image("temps", 900, 320, scale) + `</div>
 <div class="card chart">` + image("pumps", 900, 220, scale) + `</div>
 <p class="legend">4 solar mixing · 3 solar heating · 2 cleaning · 1 pump · 0 off · −1 disabled</p>
-<p class="updated">Updated ` + html.EscapeString(time.Now().Format("2006-01-02 15:04:05")) + `</p>`
+<p class="updated" id="updated">Updated ` + html.EscapeString(time.Now().Format("2006-01-02 15:04:05")) + `</p>
+` + liveRefreshScript
 
 	h.writeResponse(w, []byte(page("Pool controller", body)), "text/html")
 }
