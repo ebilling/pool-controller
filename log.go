@@ -15,7 +15,10 @@ import (
 var (
 	syslogWriter *syslog.Writer
 	doDebug      bool
-	priority     = syslog.LOG_USER
+	// httpErrorPriority is facility+severity for net/http's ErrorLog.
+	// LOG_USER alone is severity 0 (EMERG), which rsyslog walls to every
+	// terminal. Handshake EOFs from phones/HomeKit then become console spam.
+	httpErrorPriority = syslog.LOG_USER | syslog.LOG_ERR
 )
 
 func init() {
@@ -40,11 +43,40 @@ func writeLog(send func(string) error, format string, a ...interface{}) error {
 
 // NewLogger creates a logger
 func NewLogger() *log.Logger {
-	logger, err := syslog.NewLogger(priority, log.LstdFlags)
+	logger, err := syslog.NewLogger(httpErrorPriority, log.LstdFlags)
 	if err != nil || logger == nil {
 		return log.New(os.Stderr, "pool-controller: ", log.LstdFlags)
 	}
 	return logger
+}
+
+// NewHTTPErrorLogger is the http.Server ErrorLog. Routine TLS handshake
+// failures (client hung up, timeout, plain HTTP on 443) are debug; anything
+// else still goes to syslog at err without using EMERG.
+func NewHTTPErrorLogger() *log.Logger {
+	return log.New(httpErrorWriter{}, "", 0)
+}
+
+type httpErrorWriter struct{}
+
+func (httpErrorWriter) Write(p []byte) (int, error) {
+	msg := strings.TrimSpace(string(p))
+	if isRoutineTLSHandshake(msg) {
+		_ = Debug("%s", msg)
+		return len(p), nil
+	}
+	_ = Error("%s", msg)
+	return len(p), nil
+}
+
+func isRoutineTLSHandshake(msg string) bool {
+	if !strings.Contains(msg, "TLS handshake error") {
+		return false
+	}
+	return strings.Contains(msg, "EOF") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "connection reset by peer") ||
+		strings.Contains(msg, "first record does not look like a TLS handshake")
 }
 
 // EnableDebug - enables all calls to {#Debug()} that follow to go to syslog.

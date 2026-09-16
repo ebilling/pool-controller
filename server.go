@@ -61,7 +61,7 @@ func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 		Addr:    addr,
 		Handler: s.handler,
 	}
-	s.server.ErrorLog = NewLogger() // Direct errors to common log
+	s.server.ErrorLog = NewHTTPErrorLogger()
 	return &s
 }
 

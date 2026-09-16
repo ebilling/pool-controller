@@ -37,3 +37,15 @@ func TestLog(t *testing.T) {
 		checkErr(t, Trace("testing %s", "trace"))
 	})
 }
+
+func TestIsRoutineTLSHandshake(t *testing.T) {
+	if !isRoutineTLSHandshake("http: TLS handshake error from 192.168.0.153:55052: EOF") {
+		t.Fatal("EOF handshake should be treated as routine")
+	}
+	if isRoutineTLSHandshake("http: TLS handshake error from 1.2.3.4:443: no certificates") {
+		t.Fatal("unexpected TLS errors should still be reported")
+	}
+	if isRoutineTLSHandshake("listen tcp :443: bind: address already in use") {
+		t.Fatal("non-TLS server errors should still be reported")
+	}
+}
