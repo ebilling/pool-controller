@@ -231,7 +231,26 @@ type liveStatus struct {
 	TargetF    float64 `json:"target_f"`
 	PoolF      float64 `json:"pool_f"`
 	RoofF      float64 `json:"roof_f"`
+	SensorsOK  bool    `json:"sensors_ok"`
+	SensorInfo string  `json:"sensor_info"`
 	Updated    string  `json:"updated"`
+}
+
+func sensorStatus(t Thermometer, now time.Time) (bool, string) {
+	reporter, ok := t.(interface {
+		ReadingStatus() (time.Time, error)
+	})
+	if !ok {
+		return true, "OK"
+	}
+	updated, err := reporter.ReadingStatus()
+	if err != nil {
+		return false, err.Error()
+	}
+	if now.Sub(updated) > time.Minute {
+		return false, "reading is stale"
+	}
+	return true, "OK"
 }
 
 func (h *Handler) liveStatus() liveStatus {
@@ -240,6 +259,15 @@ func (h *Handler) liveStatus() liveStatus {
 		control = "Manual"
 	}
 	mode := thermostatModeName(h.ppc.config.cfg)
+	now := time.Now()
+	pumpOK, pumpInfo := sensorStatus(h.ppc.pumpTemp, now)
+	roofOK, roofInfo := sensorStatus(h.ppc.roofTemp, now)
+	sensorInfo := "OK"
+	if !pumpOK {
+		sensorInfo = "Pump: " + pumpInfo
+	} else if !roofOK {
+		sensorInfo = "Roof: " + roofInfo
+	}
 	return liveStatus{
 		Pump:       h.ppc.switches.State().String(),
 		PumpOn:     h.ppc.switches.State() > OFF,
@@ -250,7 +278,9 @@ func (h *Handler) liveStatus() liveStatus {
 		TargetF:    toFarenheit(h.ppc.config.cfg.Target),
 		PoolF:      toFarenheit(h.ppc.runningTemp.Temperature()),
 		RoofF:      toFarenheit(h.ppc.roofTemp.Temperature()),
-		Updated:    time.Now().Format("2006-01-02 15:04:05"),
+		SensorsOK:  pumpOK && roofOK,
+		SensorInfo: sensorInfo,
+		Updated:    now.Format("2006-01-02 15:04:05"),
 	}
 }
 
@@ -299,12 +329,21 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	thermostatMode := thermostatModeName(h.ppc.config.cfg)
 	pumpOn := h.ppc.switches.State() > OFF
 	solarOn := h.ppc.switches.solar.Status() == "On"
+	pumpSensorOK, pumpSensorInfo := sensorStatus(h.ppc.pumpTemp, time.Now())
+	roofSensorOK, roofSensorInfo := sensorStatus(h.ppc.roofTemp, time.Now())
+	sensorInfo := "OK"
+	if !pumpSensorOK {
+		sensorInfo = "Pump: " + pumpSensorInfo
+	} else if !roofSensorOK {
+		sensorInfo = "Roof: " + roofSensorInfo
+	}
 
 	body := `<div class="pills">` +
 		statusPill("pill-pump", "Pump", h.ppc.switches.State().String(), pumpOn) +
 		statusPill("pill-solar", "Solar", h.ppc.switches.solar.Status(), solarOn) +
 		statusPill("pill-thermostat", "Thermostat", thermostatMode, thermostatMode != "Off") +
 		statusPill("pill-control", "Control", controlStr, controlStr == "Manual") +
+		statusPill("pill-sensors", "Sensors", sensorInfo, pumpSensorOK && roofSensorOK) +
 		`</div>
 <div class="metrics">` +
 		metricCard("metric-target", "Target", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.config.cfg.Target))) +

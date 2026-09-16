@@ -76,11 +76,14 @@ func (t *SelectiveThermometer) Accessory() *accessory.Accessory {
 type GpioThermometer struct {
 	name        string
 	mutex       sync.Mutex
+	updateMutex sync.Mutex
+	stateMutex  sync.RWMutex
 	pin         PiPin
 	edge        rctime.EdgePin
 	microfarads float64
 	adjust      float64
 	updated     time.Time
+	lastErr     error
 	history     History
 	accessory   *accessory.Thermometer
 }
@@ -121,6 +124,8 @@ func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermo
 
 // SetAdjustment provides a multiplier to the teperature sensor
 func (t *GpioThermometer) SetAdjustment(a float64) {
+	t.stateMutex.Lock()
+	defer t.stateMutex.Unlock()
 	t.adjust = a
 }
 
@@ -175,7 +180,10 @@ func (t *GpioThermometer) getTemp(ohms float64) float64 {
 }
 
 func (t *GpioThermometer) getOhms(dischargeTime time.Duration) float64 {
-	return rctime.Ohms(dischargeTime, t.adjust)
+	t.stateMutex.RLock()
+	adjust := t.adjust
+	t.stateMutex.RUnlock()
+	return rctime.Ohms(dischargeTime, adjust)
 }
 
 // Calibrate asserts a specific resistance and calculates the proper setting
@@ -200,7 +208,7 @@ func (t *GpioThermometer) Calibrate(ohms float64) error {
 			value, 100.0*h.Stddev()/h.Median(), h.Len())
 	}
 	Debug("Setting adjustment to %0.3f", value)
-	t.adjust = value
+	t.SetAdjustment(value)
 	return nil
 }
 
@@ -210,14 +218,30 @@ func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 
 // Temperature returns the current temperature of the GpioThermometer
 func (t *GpioThermometer) Temperature() float64 {
-	if time.Now().After(t.updated.Add(time.Minute)) {
-		t.Update()
-	}
 	return t.accessory.TempSensor.CurrentTemperature.GetValue()
+}
+
+// ReadingStatus reports when a reading last succeeded and the most recent
+// sampling error. Temperature deliberately does not perform GPIO I/O; the
+// controller loop is the single owner of sensor sampling.
+func (t *GpioThermometer) ReadingStatus() (time.Time, error) {
+	t.stateMutex.RLock()
+	defer t.stateMutex.RUnlock()
+	return t.updated, t.lastErr
+}
+
+func (t *GpioThermometer) recordError(err error) error {
+	t.stateMutex.Lock()
+	t.lastErr = err
+	t.stateMutex.Unlock()
+	return err
 }
 
 // Update updates the current temperature of the GpioThermometer
 func (t *GpioThermometer) Update() error {
+	t.updateMutex.Lock()
+	defer t.updateMutex.Unlock()
+
 	var dischargeTime time.Duration
 	h := NewHistory(5)
 	for i := 0; h.Len() < 5 && i < 20; i++ {
@@ -226,6 +250,9 @@ func (t *GpioThermometer) Update() error {
 			t.history.PushDuration(dischargeTime)
 			h.PushDuration(dischargeTime)
 		}
+	}
+	if h.Len() < 5 {
+		return t.recordError(fmt.Errorf("only %d valid temperature samples out of 20 attempts", h.Len()))
 	}
 
 	stdd := t.history.Stddev()
@@ -242,13 +269,16 @@ func (t *GpioThermometer) Update() error {
 			avg/MillisecondFloat,
 			stdd/MillisecondFloat,
 			dev/MillisecondFloat)
-		return fmt.Errorf("could not update temperature successfully")
+		return t.recordError(fmt.Errorf("could not update temperature successfully"))
 	}
 	ohms := t.getOhms(time.Duration(int64(h.Median())))
 	temp := t.getTemp(ohms)
 	Debug("Calculating temperature (%f) for %s: %f ohms, median %s", temp, t.name, ohms, time.Duration(int64(h.Median())))
 	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
+	t.stateMutex.Lock()
 	t.updated = time.Now()
+	t.lastErr = nil
+	t.stateMutex.Unlock()
 	return nil
 }
 

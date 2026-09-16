@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -71,17 +72,20 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 // Update the solar configuration parameters from the config file (if changed)
 // and updates the values of the Thermometers.
 func (ppc *PoolPumpController) Update() error {
-	err := ppc.pumpTemp.Update()
-	if err != nil {
-		return fmt.Errorf("pump temp update failed: %w", err)
+	var updateErrors []error
+	pumpErr := ppc.pumpTemp.Update()
+	if pumpErr != nil {
+		updateErrors = append(updateErrors, fmt.Errorf("pump temp update failed: %w", pumpErr))
 	}
-	err = ppc.roofTemp.Update()
-	if err != nil {
-		return fmt.Errorf("roof temp update failed: %w", err)
+	if err := ppc.roofTemp.Update(); err != nil {
+		updateErrors = append(updateErrors, fmt.Errorf("roof temp update failed: %w", err))
 	}
-	err = ppc.runningTemp.Update()
-	if err != nil {
-		return fmt.Errorf("running temp update failed: %w", err)
+	// The selective pool temperature is derived from the pump thermometer. Do
+	// not stamp it with a stale pump reading after a failed physical sample.
+	if pumpErr == nil {
+		if err := ppc.runningTemp.Update(); err != nil {
+			updateErrors = append(updateErrors, fmt.Errorf("running temp update failed: %w", err))
+		}
 	}
 	if ppc.button != nil {
 		if ppc.config.cfg.ButtonDisabled {
@@ -93,7 +97,7 @@ func (ppc *PoolPumpController) Update() error {
 	if ppc.thermostat != nil {
 		ppc.thermostat.Sync()
 	}
-	return nil
+	return errors.Join(updateErrors...)
 }
 
 // A return value of 'True' indicates that the pool is too hot and the roof is cold
@@ -209,7 +213,10 @@ func (ppc *PoolPumpController) runLoop() {
 			ppc.switches.Disable()
 			keepRunning = false
 		case <-time.After(interval):
-			ppc.Update()
+			if err := ppc.Update(); err != nil {
+				Error("Sensor update failed; retaining current relay state: %s", err)
+				continue
+			}
 			ppc.RunPumpsIfNeeded()
 			ppc.UpdateRrd()
 			Debug(ppc.Status())

@@ -24,6 +24,9 @@ type History struct {
 
 // NewHistory creates a history object
 func NewHistory(sz int) *History {
+	if sz <= 0 {
+		panic("history size must be positive")
+	}
 	return &History{
 		data: make([]float64, sz),
 		ttl:  0,
@@ -76,7 +79,7 @@ func (h *History) Average() float64 {
 	if h.Len() == 0 {
 		return total
 	}
-	for _, element := range h.data {
+	for _, element := range h.data[:h.Len()] {
 		total += element
 	}
 	h.avg.value = total / float64(h.Len())
@@ -92,7 +95,9 @@ func (h *History) Median() float64 {
 	if h.Len() < 2 {
 		h.med.value = h.Average()
 	} else {
-		data := []float64(h.data[:h.Len()])
+		// Median must not sort the ring buffer itself. Push relies on each
+		// index retaining its age so ttl%sz always replaces the oldest value.
+		data := append([]float64(nil), h.data[:h.Len()]...)
 		sort.Float64s(data)
 		h.med.value = data[h.Len()/2]
 	}

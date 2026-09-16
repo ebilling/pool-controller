@@ -35,6 +35,24 @@ func TestGpioThermometer(t *testing.T) {
 	})
 }
 
+func TestTemperatureDoesNotSampleGPIO(t *testing.T) {
+	pin := TestPin{sleepTime: 50 * time.Millisecond}
+	therm := newGpioThermometer("Test Thermometer", mftr, &pin)
+	therm.accessory.TempSensor.CurrentTemperature.SetValue(21.5)
+	therm.updated = time.Now().Add(-time.Hour)
+
+	start := time.Now()
+	if got := therm.Temperature(); got != 21.5 {
+		t.Fatalf("Temperature() = %v, want 21.5", got)
+	}
+	if elapsed := time.Since(start); elapsed > 10*time.Millisecond {
+		t.Fatalf("Temperature performed GPIO I/O and took %s", elapsed)
+	}
+	if got := therm.updated; !got.Before(start) {
+		t.Fatalf("Temperature unexpectedly refreshed reading at %s", got)
+	}
+}
+
 func TestCalibration(t *testing.T) {
 	sleeptime := 50 * time.Millisecond
 	pin := TestPin{

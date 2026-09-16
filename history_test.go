@@ -63,3 +63,33 @@ func TestHistory(t *testing.T) {
 		}
 	})
 }
+
+func TestHistoryMedianDoesNotCorruptRing(t *testing.T) {
+	h := NewHistory(3)
+	h.Push(30)
+	h.Push(10)
+	h.Push(20)
+
+	if got := h.Median(); got != 20 {
+		t.Fatalf("Median() = %v, want 20", got)
+	}
+
+	// The fourth value must replace 30, the oldest value. Median used to sort
+	// h.data in place, causing this push to replace 10 instead.
+	h.Push(40)
+	if got := h.Average(); got != (10+20+40)/3.0 {
+		t.Fatalf("Average() after wrap = %v, want %v", got, (10+20+40)/3.0)
+	}
+	if got := h.Median(); got != 20 {
+		t.Fatalf("Median() after wrap = %v, want 20", got)
+	}
+}
+
+func TestHistoryRejectsNonPositiveSize(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewHistory(0) should panic")
+		}
+	}()
+	NewHistory(0)
+}

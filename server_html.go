@@ -175,6 +175,7 @@ const liveRefreshScript = `<script>
       setPill("pill-solar", "Solar", s.solar, s.solar_on);
       setPill("pill-thermostat", "Thermostat", s.thermostat, s.thermostat !== "Off");
       setPill("pill-control", "Control", s.control, s.control === "Manual");
+      setPill("pill-sensors", "Sensors", s.sensor_info, s.sensors_ok);
       setText("metric-target", s.target_f.toFixed(1) + " °F");
       setText("metric-pool", s.pool_f.toFixed(1) + " °F");
       setText("metric-roof", s.roof_f.toFixed(1) + " °F");
