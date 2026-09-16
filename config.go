@@ -80,7 +80,6 @@ type PersistedConfig struct {
 	RunTime        float64 // hours when a pump is manually engaged it will run for this many hours
 	Mtime          time.Time
 	Ctime          time.Time
-	Schedule       *Schedule
 }
 
 // NewConfig creates a config objects based on a given flagset and arguments.

@@ -9,29 +9,26 @@ func (r *Rrd) addTemp(name, title string, colorid, which int) {
 	vname := fmt.Sprintf("t%d", which)
 	cname := fmt.Sprintf("f%d", which)
 	r.grapher.Def(vname, r.path, name, "AVERAGE")
-	if name == "solar" {
-		r.grapher.CDef(cname, vname+",10,/")
-	} else {
-		r.grapher.CDef(cname, "9,5,/,"+vname+",*,32,+")
-	}
+	r.grapher.CDef(cname, "9,5,/,"+vname+",*,32,+")
 	r.grapher.Line(2.0, cname, colorStr(colorid), title)
 }
 
 func (ppc *PoolPumpController) createRrds() error {
 	ppc.tempRrd.addTemp("pump", "Pump", 8, 1)
-	ppc.tempRrd.addTemp("weather", "Weather", 1, 2)
+	// Keep the legacy weather and solar data sources so deployed RRD files
+	// remain compatible, but do not graph values the controller does not
+	// collect.
+	ppc.tempRrd.creator.DS("weather", "GAUGE", "30", "-273", "1000")
 	ppc.tempRrd.addTemp("roof", "Roof", 2, 3)
-	ppc.tempRrd.addTemp("solar", "SolRad w/sqm", 4, 4)
+	ppc.tempRrd.creator.DS("solar", "GAUGE", "30", "-273", "1000")
 	ppc.tempRrd.addTemp("pool", "Pool", 0, 5)
 	ppc.tempRrd.addTemp("target", "Target", 6, 6)
 	ppc.tempRrd.AddStandardRRAs()
 	ppc.tempRrd.Creator().Create(*ppc.config.forceRrd)
 
 	tg := ppc.tempRrd.grapher
-	tg.SetTitle("Temperatures and Solar Radiation")
+	tg.SetTitle("Pool Temperatures")
 	tg.SetVLabel("Degrees Farenheit")
-	tg.SetRightAxis(1, 0.0)
-	tg.SetRightAxisLabel("dekawatts/sqm")
 	tg.SetSize(640, 300) // Config?
 	tg.SetImageFormat("PNG")
 
