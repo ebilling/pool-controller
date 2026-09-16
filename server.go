@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -216,20 +217,6 @@ func (h *Handler) graphHandler(w http.ResponseWriter, r *http.Request, which int
 	h.writeResponse(w, graph, "image/png")
 }
 
-func image(which string, width, height int, scale string) string {
-	return fmt.Sprintf("<img src=\"/%s?scale=%s&width=%d&height=%d\" width=%d height=%d "+
-		"alt=\"Temperatures and Solar Radiation\" />",
-		which, scale, width, height, width, height)
-}
-
-func indent(howmany int) string {
-	out := ""
-	for i := 0; i < howmany; i++ {
-		out += "\t"
-	}
-	return out
-}
-
 func (h *Handler) pin() string {
 	var p1, p2, p3 string
 	fmt.Sscanf(h.ppc.config.cfg.Pin, "%3s%2s%3s", &p1, &p2, &p3)
@@ -237,29 +224,18 @@ func (h *Handler) pin() string {
 }
 
 func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
-	html := "<html><head><title>HomeKit Pairing Codes</title></head><body><center>"
-	html += "<table><tr><th>" + h.pin() + "</th></tr>"
-	html += "<tr><td><img src=\"/qr\"></td></tr></table>"
-	html += nav()
-	html += "</center></body></html>"
-	h.writeResponse(w, []byte(html), "text/html")
+	body := `<div class="card">
+<h2>HomeKit pairing</h2>
+<p class="pin">` + html.EscapeString(h.pin()) + `</p>
+<img class="qr" src="/qr" width="256" height="256" alt="HomeKit pairing QR code">
+</div>`
+	h.writeResponse(w, []byte(page("HomeKit pairing", body)), "text/html")
 }
 
 func (h *Handler) qrHandler(w http.ResponseWriter, r *http.Request) {
 	png, _ := qrcode.Encode(h.ppc.config.cfg.Pin, qrcode.Medium, 256)
 	h.writeResponse(w, []byte(png), "image/png")
 }
-
-func nav() string {
-	out := "<p><font face=helvetica color=#444444 size=-2>"
-	out += "<table cellspacing=5><tr><td><a href=/>graphs</a></td><td>&nbsp;</td>\n"
-	out += "<td><a href=/pair>homekit</a></td><td>&nbsp;</td>\n"
-	out += "<td><a href=/calibrate>calibrate</a></td><td>&nbsp;</td>\n"
-	out += "<td><a href=/config>config</a></td></tr></table></font>\n"
-	return out
-}
-
-// TODO: update ui to set runtime and frequency
 
 func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	scale := getscale(r)
@@ -270,58 +246,49 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, cookie)
 	h.setRefresh(w, r, 60)
-	modeStr := "Auto"
+	controlStr := "Auto"
 	if h.ppc.switches.ManualState(h.ppc.config.cfg.RunTime) {
-		modeStr = "Manual"
+		controlStr = "Manual"
 	}
+	thermostatMode := thermostatModeName(h.ppc.config.cfg)
+	pumpOn := h.ppc.switches.State() > OFF
+	solarOn := h.ppc.switches.solar.Status() == "On"
 
-	html := "<html><head><title>Pool Pump Controller</title></head><body><center>" +
-		"<table>\n"
-	html += indent(1) + "<tr><td colspan=2 align=center><font face=helvetica color=#444444 " +
-		"size=-1><form action=/ method=POST>Time Window:<input name=scale value=\"" +
-		scale + "\" size=5> ex. 12h (w, d, h, m)</form></font></td></tr>\n"
-	html += indent(1) + "<tr><td>" + image("temps", 640, 300, scale) + "</td>"
-	html += "<td align=left nowrap><font face=helvetica color=#444444 size=-1>"
-	html += fmt.Sprintf("Target: %0.1f F<br>", toFarenheit(h.ppc.config.cfg.Target))
-	html += fmt.Sprintf("Pool: %0.1f F<br>", toFarenheit(h.ppc.runningTemp.Temperature()))
-	html += fmt.Sprintf("Roof: %0.1f F<br>", toFarenheit(h.ppc.roofTemp.Temperature()))
-	html += "</font></td></tr>\n"
-	html += indent(1) + "<tr><td colspan=2><br></td></tr>"
-	html += indent(1) + "<tr>"
-	html += "<td>" + image("pumps", 640, 200, scale) + "</td>"
-	html += "<td align=left nowrap><font face=helvetica color=#444444 size=-1>"
-	html += fmt.Sprintf("Pump: %s<br>", h.ppc.switches.State())
-	html += fmt.Sprintf("Solar: %s<br>", h.ppc.switches.solar.Status())
-	html += fmt.Sprintf("Mode: %s", modeStr)
-	html += "</font></td></tr>\n"
-	html += indent(1) + "<tr><td align=center><font size=-1 color=#aaaaaa>" +
-		"4=SolarMixing, 3=SolarHeating, 2=Cleaning, 1=PumpRunning, 0=Off, " +
-		"-1=Disabled</font></td><td></td></tr>\n"
-	html += "<tr><td colspan=2><br></td></tr>\n"
-	html += indent(1) + "<tr><td align=center>" +
-		fmt.Sprintf("Updated: %.19s", time.Now().String()) +
-		"</td><td></td></tr>\n"
-	html += "<tr><td align=center>" + nav() + "</td><td></td></tr>\n"
-	html += "</table></font>"
-	html += "</center></body></html>"
-	h.writeResponse(w, []byte(html), "text/html")
+	body := `<div class="pills">` +
+		statusPill("Pump", h.ppc.switches.State().String(), pumpOn) +
+		statusPill("Solar", h.ppc.switches.solar.Status(), solarOn) +
+		statusPill("Thermostat", thermostatMode, thermostatMode != "Off") +
+		statusPill("Control", controlStr, controlStr == "Manual") +
+		`</div>
+<div class="metrics">` +
+		metricCard("Target", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.config.cfg.Target))) +
+		metricCard("Pool", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.runningTemp.Temperature()))) +
+		metricCard("Roof", fmt.Sprintf("%0.1f °F", toFarenheit(h.ppc.roofTemp.Temperature()))) +
+		`</div>
+<form class="toolbar" action="/" method="POST">
+<label>Window <input name="scale" value="` + html.EscapeString(scale) + `" placeholder="12h"></label>
+<span>Examples: 12h, 2d, 1w</span>
+<input type="submit" value="Show">
+</form>
+<div class="card chart">` + image("temps", 900, 320, scale) + `</div>
+<div class="card chart">` + image("pumps", 900, 220, scale) + `</div>
+<p class="legend">4 solar mixing · 3 solar heating · 2 cleaning · 1 pump · 0 off · −1 disabled</p>
+<p class="updated">Updated ` + html.EscapeString(time.Now().Format("2006-01-02 15:04:05")) + `</p>`
+
+	h.writeResponse(w, []byte(page("Pool controller", body)), "text/html")
 }
 
 func (h *Handler) calibrateHandler(w http.ResponseWriter, r *http.Request) {
-	html := "<html><head><title>Thermometer Calibration</title></head><body><center>"
-	html += `<font face=helvetica color=#444444 size=-1>To calibrate your system, please
-	insert resistors of known value across the terminals for BOTH temperature probes.
-	<b>Suggested value is 10,000Ohms.</b>, but you can measure it for increased
-	accuracy.</font><br>`
-	html += "<table><form action=/runCalibration method=POST>\n"
-	html += "<tr><td align=right><font face=helvetica color=#444444 size=-1>Pump Resistor Value</td>"
-	html += "<td><input name=pump_res value=10000 size=5></font> ohms</td></tr>\n"
-	html += "<tr><td align=right><font face=helvetica color=#444444 size=-1>Roof Resistor Value</td>"
-	html += "<td><input name=roof_res value=10000 size=5></font> ohms</td></tr>\n"
-	html += "<tr><td colspan=2 align=center><input type=submit name=submit value=Run Calibration></td></tr>\n"
-	html += "<tr><td colspan=2 align=center>" + nav() + "</td></tr>\n"
-	html += "</form></table></font></center></body></html>"
-	h.writeResponse(w, []byte(html), "text/html")
+	body := `<div class="card">
+<h2>Thermometer calibration</h2>
+<p class="lead">Put known resistors across both probe terminals. 10,000 ohms is the usual value; measure yours if you can.</p>
+<form class="stack" action="/runCalibration" method="POST">
+<label>Pump resistor (ohms)<input name="pump_res" value="10000" inputmode="decimal"></label>
+<label>Roof resistor (ohms)<input name="roof_res" value="10000" inputmode="decimal"></label>
+<input type="submit" name="submit" value="Run calibration">
+</form>
+</div>`
+	h.writeResponse(w, []byte(page("Calibration", body)), "text/html")
 }
 
 // Calibrate runs a routine to calibrate the thermometers using measured resistors
@@ -344,7 +311,7 @@ func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) 
 	pumpResistance := getFormValue(r, "pump_res", "")
 	roofResistance := getFormValue(r, "roof_res", "")
 
-	html := "<html><head><title>Thermometer Calibration</title></head><body><center>"
+	html := "<div class=\"card\"><h2>Thermometer calibration</h2>"
 	retry := http.Request{
 		URL: &url.URL{
 			RawPath: "/calibrate",
@@ -379,8 +346,8 @@ func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) 
 			h.setRefresh(w, &retry, 10)
 		}
 	}
-	html += "</body></html>"
-	h.writeResponse(w, []byte(html), "text/html")
+	html += "</div>"
+	h.writeResponse(w, []byte(page("Calibration", html)), "text/html")
 }
 
 // Authenticate the user
@@ -430,17 +397,19 @@ func processFloatUpdate(r *http.Request, formname string, ptr *float64) bool {
 }
 
 func (h *Handler) configBoolRow(name, inputName string, value bool) string {
-	checkbox := "type=checkbox value=true"
+	checked := ""
 	if value {
-		checkbox += " checked"
+		checked = " checked"
 	}
-	return h.configRow(name, inputName, "", checkbox)
+	return fmt.Sprintf(
+		`<label class="check"><input type="checkbox" name="%s" value="true"%s> %s</label>`+"\n",
+		html.EscapeString(inputName), checked, html.EscapeString(name))
 }
 
 func (h *Handler) configRow(name, inputName, configValue, extraArgs string) string {
 	return fmt.Sprintf(
-		"<tr><td align=right>%s:</td><td><font size=-1><input name=\"%s\" size=20 %s></font></td><td>%s</td></tr>\n",
-		name, inputName, extraArgs, configValue)
+		`<label>%s<input name="%s" value="%s" %s></label>`+"\n",
+		html.EscapeString(name), html.EscapeString(inputName), configValue, extraArgs)
 }
 
 func (h *Handler) processForm(r *http.Request, c *Config) {
@@ -474,6 +443,12 @@ func (h *Handler) processForm(r *http.Request, c *Config) {
 		foundone = true
 	}
 	if processBoolUpdate(r, "solar_disabled", &c.cfg.SolarDisabled) {
+		foundone = true
+	}
+	if processBoolUpdate(r, "heat_disabled", &c.cfg.HeatDisabled) {
+		foundone = true
+	}
+	if processBoolUpdate(r, "cool_disabled", &c.cfg.CoolDisabled) {
 		foundone = true
 	}
 	if processFloatUpdate(r, "daily_freq", &c.cfg.DailyFrequency) {
@@ -513,45 +488,44 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	posted := getFormValue(r, "posted", "")
 	if posted == "true" {
 		h.processForm(r, c)
+		if h.ppc.thermostat != nil {
+			h.ppc.thermostat.Sync()
+		}
 	}
 
-	passArgs := " type=\"password\" autocomplete=\"new-password\""
+	passArgs := `type="password" autocomplete="new-password"`
 
-	html := "<html><head><title>Pool Controller Configuration</title></head><body>"
-	html += "<center><font face=helvetica color=#444444>Pool Controller Configuration"
-	html += "<font size=-1>\n"
-	html += "<table border=0 cellpadding=3>\n"
-	html += "<form action=/config method=POST>\n"
-	html += "<tr><th align=left>Administrator:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Admin Password", "passcode", "", passArgs)
-	html += h.configRow("Confirm Password", "passcode2", "", passArgs)
-	html += "<tr><td colspan=3><br></td></tr>\n"
+	body := `<form class="stack" action="/config" method="POST">
+<fieldset>
+<legend>Administrator</legend>
+` + h.configRow("Admin password", "passcode", "", passArgs) + `
+` + h.configRow("Confirm password", "passcode2", "", passArgs) + `
+</fieldset>
+<fieldset>
+<legend>Sensor tuning</legend>
+` + h.configRow("Pump adjustment", "adj_pump", fmt.Sprintf("%0.2f", c.cfg.PumpAdjustment), "") + `
+` + h.configRow("Roof adjustment", "adj_roof", fmt.Sprintf("%0.2f", c.cfg.RoofAdjustment), "") + `
+</fieldset>
+<fieldset>
+<legend>Solar</legend>
+` + h.configRow("Target (°C)", "target", fmt.Sprintf("%0.2f", c.cfg.Target), "") + `
+` + h.configRow("Tolerance (°C)", "tolerance", fmt.Sprintf("%0.2f", c.cfg.Tolerance), "") + `
+` + h.configRow("Min delta (°C)", "mindelta", fmt.Sprintf("%0.2f", c.cfg.DeltaT), "") + `
+` + h.configRow("Daily run frequency (days)", "daily_freq", fmt.Sprintf("%0.2f", c.cfg.DailyFrequency), "") + `
+` + h.configRow("Run period (hours)", "run_time", fmt.Sprintf("%0.2f", c.cfg.RunTime), "") + `
+</fieldset>
+<fieldset>
+<legend>Debug and disables</legend>
+` + h.configBoolRow("Debug logging", "debug", doDebug) + `
+` + h.configBoolRow("Disable all pumps", "disabled", c.cfg.Disabled) + `
+` + h.configBoolRow("Disable button", "button_disabled", c.cfg.ButtonDisabled) + `
+` + h.configBoolRow("Disable solar", "solar_disabled", c.cfg.SolarDisabled) + `
+` + h.configBoolRow("Disable heating (HomeKit Cool)", "heat_disabled", c.cfg.HeatDisabled) + `
+` + h.configBoolRow("Disable cooling (HomeKit Heat)", "cool_disabled", c.cfg.CoolDisabled) + `
+</fieldset>
+<input type="hidden" name="posted" value="true">
+<input type="submit" value="Save">
+</form>`
 
-	html += "<tr><th align=left>Temperature Sensor Adjustment:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Pump Tuning", "adj_pump", fmt.Sprintf("%0.2f", c.cfg.PumpAdjustment), "")
-	html += h.configRow("Roof Tuning", "adj_roof", fmt.Sprintf("%0.2f", c.cfg.RoofAdjustment), "")
-	html += "<tr><td colspan=3><br></td></tr>\n"
-
-	html += "<tr><th align=left>Solar Settings:</th><td colspan=3></td></tr>\n"
-	html += h.configRow("Target", "target", fmt.Sprintf("%0.2f&deg;C", c.cfg.Target), "")
-	html += h.configRow("Tolerance", "tolerance", fmt.Sprintf("%0.2f&deg;C", c.cfg.Tolerance), "")
-	html += h.configRow("MinDelta", "mindelta", fmt.Sprintf("%0.2f&deg;C", c.cfg.DeltaT), "")
-
-	html += "<tr><td colspan=3><br></td></tr>\n"
-	html += h.configRow("Daily Run Frequency", "daily_freq", fmt.Sprintf("%0.2f Days", c.cfg.DailyFrequency), "")
-	html += h.configRow("Run period", "run_time", fmt.Sprintf("%0.2f hours", c.cfg.RunTime), "")
-
-	html += "<tr><td colspan=3><br></td></tr>\n"
-	html += "<tr><th align=left>Debug Settings:</th><td colspan=3></td></tr>\n"
-	html += h.configBoolRow("Debug Logging Enabled", "debug", doDebug)
-	html += h.configBoolRow("Disable all pumps", "disabled", c.cfg.Disabled)
-	html += h.configBoolRow("Disable button", "button_disabled", c.cfg.ButtonDisabled)
-	html += h.configBoolRow("Disable solar", "solar_disabled", c.cfg.SolarDisabled)
-
-	html += "<input type=hidden name=posted value=true>\n"
-	html += "</table><input type=submit value=Save></font></font></form>\n"
-	html += nav()
-	html += "</center></body></html>\n"
-
-	h.writeResponse(w, []byte(html), "text/html")
+	h.writeResponse(w, []byte(page("Configuration", body)), "text/html")
 }

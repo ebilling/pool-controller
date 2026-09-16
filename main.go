@@ -73,7 +73,7 @@ func main() {
 
 	transport, err := hc.NewIPTransport(
 		hcConfig,
-		ppc.runningTemp.Accessory(),
+		ppc.thermostat.Accessory(),
 		ppc.pumpTemp.Accessory(),
 		ppc.roofTemp.Accessory(),
 		ppc.switches.pump.Accessory(),

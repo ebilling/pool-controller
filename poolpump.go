@@ -30,6 +30,7 @@ type PoolPumpController struct {
 	pumpTemp    Thermometer
 	runningTemp Thermometer
 	roofTemp    Thermometer
+	thermostat  *PoolThermostat
 	button      *Button
 	tempRrd     *Rrd
 	pumpRrd     *Rrd
@@ -63,6 +64,7 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 	}
 	ppc.SyncAdjustments()
 	ppc.runningTemp = RunningWaterThermometer(ppc.pumpTemp, ppc.switches)
+	ppc.thermostat = NewPoolThermostat(&ppc)
 	return &ppc
 }
 
@@ -81,10 +83,15 @@ func (ppc *PoolPumpController) Update() error {
 	if err != nil {
 		return fmt.Errorf("running temp update failed: %w", err)
 	}
-	if ppc.config.cfg.ButtonDisabled {
-		ppc.button.Disable()
-	} else {
-		ppc.button.Enable()
+	if ppc.button != nil {
+		if ppc.config.cfg.ButtonDisabled {
+			ppc.button.Disable()
+		} else {
+			ppc.button.Enable()
+		}
+	}
+	if ppc.thermostat != nil {
+		ppc.thermostat.Sync()
 	}
 	return nil
 }
@@ -93,7 +100,7 @@ func (ppc *PoolPumpController) Update() error {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
-	if ppc.config.cfg.SolarDisabled {
+	if ppc.config.cfg.SolarDisabled || ppc.config.cfg.CoolDisabled {
 		return false
 	}
 	return ppc.pumpTemp.Temperature() > (ppc.config.cfg.Target+ppc.config.cfg.Tolerance) &&
@@ -103,8 +110,9 @@ func (ppc *PoolPumpController) shouldCool() bool {
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
-	if ppc.config.cfg.SolarDisabled {
-		Debug("shouldWarm: disabled(%t)", ppc.config.cfg.SolarDisabled)
+	if ppc.config.cfg.SolarDisabled || ppc.config.cfg.HeatDisabled {
+		Debug("shouldWarm: solarDisabled(%t) heatDisabled(%t)",
+			ppc.config.cfg.SolarDisabled, ppc.config.cfg.HeatDisabled)
 		return false
 	}
 
