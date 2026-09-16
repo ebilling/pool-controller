@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -60,8 +61,15 @@ func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	Info("Creating server on %s", addr)
 	s.server = http.Server{
-		Addr:    addr,
-		Handler: s.handler,
+		Addr:              addr,
+		Handler:           s.handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
 	}
 	s.server.ErrorLog = NewHTTPErrorLogger()
 	return &s
@@ -109,39 +117,95 @@ const (
 )
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:")
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
 	Debug("Received: %s", r.URL)
 	switch r.URL.Path {
 	case "/":
+		if !allowMethods(w, r, http.MethodGet, http.MethodPost) {
+			return
+		}
 		h.rootHandler(w, r)
 		return
 	case "/pair":
+		if !allowMethods(w, r, http.MethodGet) || !h.requireAuth(w, r) {
+			return
+		}
 		h.pairHandler(w, r)
 		return
 	case "/qr":
+		if !allowMethods(w, r, http.MethodGet) || !h.requireAuth(w, r) {
+			return
+		}
 		h.qrHandler(w, r)
 		return
 	case "/pumps":
+		if !allowMethods(w, r, http.MethodGet) {
+			return
+		}
 		h.graphHandler(w, r, PumpImage)
 		return
 	case "/temps":
+		if !allowMethods(w, r, http.MethodGet) {
+			return
+		}
 		h.graphHandler(w, r, TempImage)
 		return
 	case "/status":
+		if !allowMethods(w, r, http.MethodGet) {
+			return
+		}
 		h.statusHandler(w, r)
 		return
 	case "/config":
+		if !allowMethods(w, r, http.MethodGet, http.MethodPost) || !h.requireAuth(w, r) {
+			return
+		}
 		h.configHandler(w, r)
 		return
 	case "/runCalibration":
+		if !allowMethods(w, r, http.MethodPost) || !h.requireAuth(w, r) {
+			return
+		}
 		h.runCalibrationHandler(w, r)
 		return
 	case "/calibrate":
+		if !allowMethods(w, r, http.MethodGet) || !h.requireAuth(w, r) {
+			return
+		}
 		h.calibrateHandler(w, r)
 		return
 	default:
 		http.Error(w, "Unknown request type", 404)
 	}
+}
+
+func allowMethods(w http.ResponseWriter, r *http.Request, methods ...string) bool {
+	for _, method := range methods {
+		if r.Method == method {
+			return true
+		}
+	}
+	for _, method := range methods {
+		w.Header().Add("Allow", method)
+	}
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	return false
+}
+
+func (h *Handler) requireAuth(w http.ResponseWriter, r *http.Request) bool {
+	if h.Authenticate(r) {
+		return true
+	}
+	w.Header().Set("WWW-Authenticate", `Basic realm="pool-controller", charset="UTF-8"`)
+	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	return false
 }
 
 func (h *Handler) setRefresh(w http.ResponseWriter, r *http.Request, seconds int) {
@@ -320,7 +384,11 @@ func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) qrHandler(w http.ResponseWriter, r *http.Request) {
 	h.ppc.mu.RLock()
 	defer h.ppc.mu.RUnlock()
-	png, _ := qrcode.Encode(h.ppc.config.cfg.Pin, qrcode.Medium, 256)
+	png, err := qrcode.Encode(h.ppc.config.cfg.Pin, qrcode.Medium, 256)
+	if err != nil {
+		http.Error(w, "Could not generate pairing code", http.StatusInternalServerError)
+		return
+	}
 	h.writeResponse(w, []byte(png), "image/png")
 }
 
@@ -502,8 +570,8 @@ func (h *Handler) configBoolRow(name, inputName string, value bool) string {
 		checked = " checked"
 	}
 	return fmt.Sprintf(
-		`<label class="check"><input type="checkbox" name="%s" value="true"%s> %s</label>`+"\n",
-		html.EscapeString(inputName), checked, html.EscapeString(name))
+		`<input type="hidden" name="_present_%s" value="true"><label class="check"><input type="checkbox" name="%s" value="true"%s> %s</label>`+"\n",
+		html.EscapeString(inputName), html.EscapeString(inputName), checked, html.EscapeString(name))
 }
 
 func (h *Handler) configRow(name, inputName, configValue, extraArgs string) string {
@@ -536,19 +604,24 @@ func (h *Handler) processForm(r *http.Request, c *Config) {
 	if processFloatUpdate(r, "mindelta", &c.cfg.DeltaT) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "disabled", &c.cfg.Disabled) {
+	if getFormValue(r, "_present_disabled", "") == "true" &&
+		processBoolUpdate(r, "disabled", &c.cfg.Disabled) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "button_disabled", &c.cfg.ButtonDisabled) {
+	if getFormValue(r, "_present_button_disabled", "") == "true" &&
+		processBoolUpdate(r, "button_disabled", &c.cfg.ButtonDisabled) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "solar_disabled", &c.cfg.SolarDisabled) {
+	if getFormValue(r, "_present_solar_disabled", "") == "true" &&
+		processBoolUpdate(r, "solar_disabled", &c.cfg.SolarDisabled) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "heat_disabled", &c.cfg.HeatDisabled) {
+	if getFormValue(r, "_present_heat_disabled", "") == "true" &&
+		processBoolUpdate(r, "heat_disabled", &c.cfg.HeatDisabled) {
 		foundone = true
 	}
-	if processBoolUpdate(r, "cool_disabled", &c.cfg.CoolDisabled) {
+	if getFormValue(r, "_present_cool_disabled", "") == "true" &&
+		processBoolUpdate(r, "cool_disabled", &c.cfg.CoolDisabled) {
 		foundone = true
 	}
 	if processFloatUpdate(r, "daily_freq", &c.cfg.DailyFrequency) {
@@ -563,7 +636,7 @@ func (h *Handler) processForm(r *http.Request, c *Config) {
 
 	// Don't persist this one
 	posted := getFormValue(r, "posted", "")
-	if posted == "true" { // only change on form submission
+	if posted == "true" && getFormValue(r, "_present_debug", "") == "true" {
 		value := getFormValue(r, "debug", "")
 		if value == "on" {
 			EnableDebug()
@@ -576,12 +649,6 @@ func (h *Handler) processForm(r *http.Request, c *Config) {
 }
 
 func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: move this to a form on the page.
-	w.Header().Set("WWW-Authenticate", "Basic") //  realm=\"Bonnie Labs\"
-	if !h.Authenticate(r) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
 	h.ppc.mu.Lock()
 	defer h.ppc.mu.Unlock()
 	c := h.ppc.config
