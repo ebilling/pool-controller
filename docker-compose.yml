@@ -3,6 +3,8 @@ services:
     build:
       context: .
       target: runtime
+      args:
+        VERSION: ${VERSION:-unknown}
     ports:
       - "8443:443"
     environment:

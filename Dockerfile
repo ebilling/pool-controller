@@ -19,7 +19,8 @@ FROM toolchain AS test
 RUN go test -mod=readonly -count=1 -short ./...
 
 FROM toolchain AS build
-RUN go build -mod=readonly -o /out/pool-controller .
+ARG VERSION=unknown
+RUN go build -mod=readonly -ldflags "-X main.version=${VERSION}" -o /out/pool-controller .
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update \

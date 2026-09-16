@@ -12,7 +12,13 @@ import (
 func main() {
 	fs := flag.NewFlagSet("pool-controller", flag.PanicOnError)
 	help := fs.Bool("h", false, "Display this usage message")
+	printVersion := fs.Bool("version", false, "Print the build version and exit")
 	config := NewConfig(fs, os.Args[1:]) // Parses flags
+
+	if *printVersion {
+		fmt.Println(versionLine())
+		os.Exit(0)
+	}
 
 	if *help {
 		flag.Usage()
@@ -23,6 +29,7 @@ func main() {
 	}
 
 	// Recover saved values, edit conf to clean them
+	Info("%s", versionLine())
 	Info("Args: %s", os.Args[1:])
 
 	// Write PID

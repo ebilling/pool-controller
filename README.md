@@ -4,6 +4,16 @@ Raspberry Pi based controller for a solar heated pool written in go.
 
 Requires Go 1.27+.
 
+A `go build` from this git tree stamps the commit automatically. `pool-controller`
+logs `pool-controller <sha> go=<version>` on startup, and `-version` prints the
+same line. If you are building without `.git` (Docker copies omit it), pass the
+SHA at link time:
+
+```sh
+go build -ldflags "-X main.version=$(git rev-parse --short=12 HEAD)"
+VERSION=$(git rev-parse --short=12 HEAD) docker compose build
+```
+
 ## GPIO drivers
 
 `-gpio-driver` selects how the process talks to the GPIO pins.
