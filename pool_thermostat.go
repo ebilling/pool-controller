@@ -45,6 +45,8 @@ func (t *PoolThermostat) Accessory() *accessory.Accessory {
 }
 
 func (t *PoolThermostat) onTargetTemperature(celsius float64) {
+	t.ppc.mu.Lock()
+	defer t.ppc.mu.Unlock()
 	Info("HomeKit set pool target to %0.2fC", celsius)
 	t.config.cfg.Target = celsius
 	if err := t.config.Save(); err != nil {
@@ -54,6 +56,8 @@ func (t *PoolThermostat) onTargetTemperature(celsius float64) {
 }
 
 func (t *PoolThermostat) onTargetMode(mode int) {
+	t.ppc.mu.Lock()
+	defer t.ppc.mu.Unlock()
 	Info("HomeKit set pool thermostat mode to %d", mode)
 	applyThermostatMode(t.config.cfg, mode)
 	if err := t.config.Save(); err != nil {

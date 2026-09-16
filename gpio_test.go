@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,6 +32,8 @@ func StateStr(s GpioState) string {
 
 func checkPinState(t *testing.T, name string, pin PiPin, dir Direction, state GpioState) bool {
 	tpin := pin.(*TestPin)
+	tpin.mu.Lock()
+	defer tpin.mu.Unlock()
 	if !assert.Equal(t, dir, tpin.direction, "%s Pin direction %s, expected %s", name, DirectionStr(tpin.direction), DirectionStr(dir)) {
 		return false
 	}
@@ -84,6 +87,30 @@ func TestGpioRelay(t *testing.T) {
 			t.Errorf("Status should have been Off")
 		}
 	})
+}
+
+func TestSolarValveIgnoresDuplicatePosition(t *testing.T) {
+	reverse := &TestPin{}
+	valve := &SolarValve{
+		fwdRelay:  newRelay(&TestPin{}, "", ""),
+		revRelay:  newRelay(reverse, "", ""),
+		statusLED: &TestPin{},
+		timeout:   time.Hour,
+		accessory: accessory.NewSwitch(AccessoryInfo("Test Solar Valve", mftr)),
+	}
+
+	valve.TurnOff()
+	first := valve.revRelay.GetStartTime()
+	valve.TurnOff()
+	if got := valve.revRelay.GetStartTime(); !got.Equal(first) {
+		t.Fatalf("duplicate TurnOff restarted valve motor: %s != %s", got, first)
+	}
+
+	valve.mtx.Lock()
+	valve.timer.Stop()
+	valve.fwdRelay.TurnOff()
+	valve.revRelay.TurnOff()
+	valve.mtx.Unlock()
 }
 
 func pumpTest(t *testing.T, pumps *Switches, state State,
@@ -276,6 +303,7 @@ func NewTestPin(gpio uint8) PiPin {
 }
 
 type TestPin struct {
+	mu        sync.Mutex
 	state     GpioState
 	pull      Pull
 	edge      Edge
@@ -287,6 +315,8 @@ type TestPin struct {
 }
 
 func (p *TestPin) Input() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.direction = Input
 	p.inputTime = time.Now()
 	p.pull = Float
@@ -294,6 +324,8 @@ func (p *TestPin) Input() {
 }
 
 func (p *TestPin) InputEdge(pull Pull, e Edge) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.direction = Input
 	p.inputTime = time.Now()
 	p.pull = pull
@@ -301,11 +333,15 @@ func (p *TestPin) InputEdge(pull Pull, e Edge) {
 }
 
 func (p *TestPin) Output(s GpioState) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.direction = Output
 	p.state = s
 }
 
 func (p *TestPin) Read() GpioState {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	now := time.Now()
 	sleeptime := p.inputTime.Add(p.sleepTime)
 	if p.sleepTime > 0 && now.After(sleeptime) {
@@ -332,6 +368,8 @@ func (p *TestPin) Pin() uint8 {
 }
 
 func (p *TestPin) String() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	direction := "Input"
 	if p.direction == Output {
 		direction = "Output"

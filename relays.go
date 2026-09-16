@@ -10,6 +10,7 @@ import (
 
 // Relay controls the behavior of a particular relay in the system.
 type Relay struct {
+	mu        sync.Mutex
 	name      string
 	pin       PiPin
 	startTime time.Time
@@ -21,14 +22,16 @@ type Relay struct {
 // SolarValve controls two relays at the same time.
 // Only one can be engaged at any one time, and will shut off after a given timeout
 type SolarValve struct {
-	fwdRelay  *Relay
-	revRelay  *Relay
-	status    bool // true==ON
-	statusLED PiPin
-	accessory *accessory.Switch
-	mtx       sync.Mutex
-	timeout   time.Duration
-	cid       int // command id, distinguishes the calls to cleanup
+	fwdRelay    *Relay
+	revRelay    *Relay
+	status      bool // true==ON
+	statusLED   PiPin
+	accessory   *accessory.Switch
+	mtx         sync.Mutex
+	timeout     time.Duration
+	timer       *time.Timer
+	idle        chan struct{}
+	initialized bool
 }
 
 // AccessoryInfo tells Apple HomeKit about the device
@@ -83,6 +86,8 @@ func (r *Relay) String() string {
 	if r == nil {
 		return ""
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return fmt.Sprintf(
 		"Relay: { Name: %s, Pin: %v, StartTime: %s, StopTime: %s, Accessory: %v}",
 		r.Name(), r.pin, timeStr(r.startTime), timeStr(r.stopTime), r.accessory)
@@ -90,6 +95,8 @@ func (r *Relay) String() string {
 
 // TurnOn flips the output to HIGH voltage (>1V)
 func (r *Relay) TurnOn() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	Trace("TurnOn %s", r.name)
 	r.pin.Output(High)
 	r.startTime = time.Now()
@@ -100,6 +107,8 @@ func (r *Relay) TurnOn() {
 
 // TurnOff flips the output to LOW voltage (<1V)
 func (r *Relay) TurnOff() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	Trace("TurnOff %s", r.name)
 	r.pin.Output(Low)
 	r.stopTime = time.Now()
@@ -109,6 +118,8 @@ func (r *Relay) TurnOff() {
 }
 
 func (r *Relay) isOn() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.pin.Read() == High {
 		if r.accessory != nil {
 			r.accessory.Switch.On.SetValue(true)
@@ -123,6 +134,8 @@ func (r *Relay) isOn() bool {
 
 // Status returns "On" if at HIGH voltage or "Off" if at LOW voltage
 func (r *Relay) Status() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.pin.Read() == High {
 		return "On"
 	}
@@ -131,11 +144,15 @@ func (r *Relay) Status() string {
 
 // GetStartTime returns the time the relay was last set to HIGH voltage
 func (r *Relay) GetStartTime() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return r.startTime
 }
 
 // GetStopTime returns the time the relay was last set to LOW voltage
 func (r *Relay) GetStopTime() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return r.stopTime
 }
 
@@ -159,21 +176,31 @@ func (s *SolarValve) String() string {
 	return fmt.Sprintf("Forward: %s, Reverse: %s, Status: %s", s.fwdRelay.String(), s.revRelay.String(), s.Status())
 }
 
-func (s *SolarValve) cleanup() {
-	cid := s.cid // capture the cid before sleep
-	time.Sleep(s.timeout)
-	if s.cid == cid {
-		// there isn't another one running
-		s.fwdRelay.TurnOff()
-		s.revRelay.TurnOff()
+func (s *SolarValve) cleanup(idle chan struct{}) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	if s.idle != idle {
+		return
 	}
+	s.fwdRelay.TurnOff()
+	s.revRelay.TurnOff()
+	s.timer = nil
+	close(idle)
+	s.idle = nil
 }
 
 func (s *SolarValve) setState(fwd bool) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-	s.cid++
-	go s.cleanup()
+	if s.initialized && s.status == fwd {
+		return
+	}
+	if s.timer != nil {
+		s.timer.Stop()
+		close(s.idle)
+		s.timer = nil
+		s.idle = nil
+	}
 	s.statusLED.Output(GpioState(fwd))
 	if fwd {
 		s.revRelay.TurnOff()
@@ -185,6 +212,10 @@ func (s *SolarValve) setState(fwd bool) {
 		s.revRelay.TurnOn()
 	}
 	s.status = fwd
+	s.initialized = true
+	idle := make(chan struct{})
+	s.idle = idle
+	s.timer = time.AfterFunc(s.timeout, func() { s.cleanup(idle) })
 }
 
 // TurnOn runs the motor for the valve forward for timeout seconds
@@ -199,6 +230,8 @@ func (s *SolarValve) TurnOff() {
 
 // Status returns "On" if at HIGH voltage or "Off" if at LOW voltage
 func (s *SolarValve) Status() string {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	if s.status {
 		return "On"
 	}
@@ -211,6 +244,8 @@ func (s *SolarValve) Accessory() *accessory.Accessory {
 }
 
 func (s *SolarValve) isOn() bool {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	if s.status {
 		s.accessory.Switch.On.SetValue(true)
 	} else {
@@ -221,10 +256,10 @@ func (s *SolarValve) isOn() bool {
 
 // GetStartTime returns the time the relay was last set to HIGH voltage
 func (s *SolarValve) GetStartTime() time.Time {
-	return s.fwdRelay.startTime
+	return s.fwdRelay.GetStartTime()
 }
 
 // GetStopTime returns the time the relay was last set to LOW voltage
 func (s *SolarValve) GetStopTime() time.Time {
-	return s.revRelay.stopTime
+	return s.revRelay.GetStopTime()
 }

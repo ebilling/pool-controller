@@ -30,8 +30,12 @@ func TestFakeButton(t *testing.T) {
 	button.Start()
 
 	t.Run("FalsePush", func(t *testing.T) {
-		pin.state = Low                                        // Not a push
+		pin.mu.Lock()
+		pin.state = Low // Not a push
+		pin.mu.Unlock()
+		button.mu.Lock()
 		button.pushed = time.Now().Add(-1 * button.bouncetime) // Not a bounce
+		button.mu.Unlock()
 		pin.wake <- true
 		if testBoolChan(pushed, timeout) != true {
 			t.Errorf("Expected pushed(true), found false")
@@ -39,8 +43,12 @@ func TestFakeButton(t *testing.T) {
 	})
 
 	t.Run("QuickPush", func(t *testing.T) {
-		pin.state = High                                             // Push
+		pin.mu.Lock()
+		pin.state = High // Push
+		pin.mu.Unlock()
+		button.mu.Lock()
 		button.pushed = time.Now().Add((-1 * button.bouncetime) / 2) // Bounce
+		button.mu.Unlock()
 		pin.wake <- true
 		if testBoolChan(pushed, timeout) != false {
 			t.Errorf("Expected pushed(false), found true")
@@ -49,12 +57,19 @@ func TestFakeButton(t *testing.T) {
 
 	t.Run("Push", func(t *testing.T) {
 		tm := time.Now().Add(-1 * button.bouncetime)
-		pin.state = High   // Push
+		pin.mu.Lock()
+		pin.state = High // Push
+		pin.mu.Unlock()
+		button.mu.Lock()
 		button.pushed = tm // Not a bounce
+		button.mu.Unlock()
 		pin.wake <- true
 		if testBoolChan(pushed, timeout) != false {
+			button.mu.RLock()
+			pushedAt := button.pushed
+			button.mu.RUnlock()
 			t.Errorf("Expected pushed(false), found true, pushed_t(%s), now(%s)",
-				timeStr(button.pushed), timeStr(tm))
+				timeStr(pushedAt), timeStr(tm))
 		}
 	})
 

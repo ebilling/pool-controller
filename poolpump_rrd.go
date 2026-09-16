@@ -66,7 +66,9 @@ func (ppc *PoolPumpController) UpdateRrd() {
 		ppc.pumpTemp.Temperature(), 0.0, ppc.roofTemp.Temperature(),
 		0.0, ppc.runningTemp.Temperature(), ppc.config.cfg.Target)
 	Debug("Updating TempRrd: %s", update)
+	ppc.tempRrd.mu.Lock()
 	err := ppc.tempRrd.Updater().Update(update)
+	ppc.tempRrd.mu.Unlock()
 	if err != nil {
 		Error("Could not create PumpRrd: %s", err.Error())
 	}
@@ -81,7 +83,9 @@ func (ppc *PoolPumpController) UpdateRrd() {
 	}
 	update = fmt.Sprintf("N:%d.001:%0.3f:%0.3f", ppc.switches.State(), solar, manual)
 	Debug("Updating PumpRrd: %s", update)
+	ppc.pumpRrd.mu.Lock()
 	err = ppc.pumpRrd.Updater().Update(update)
+	ppc.pumpRrd.mu.Unlock()
 	if err != nil {
 		Error("Could not create PumpRrd: %s", err.Error())
 	}

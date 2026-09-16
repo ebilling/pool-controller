@@ -205,9 +205,13 @@ func (h *Handler) graphHandler(w http.ResponseWriter, r *http.Request, which int
 	width, _ := strconv.ParseUint(getFormValue(r, "width", "640"), 10, 32)
 	height, _ := strconv.ParseUint(getFormValue(r, "height", "300"), 10, 32)
 	if which == PumpImage {
+		h.ppc.pumpRrd.mu.Lock()
+		defer h.ppc.pumpRrd.mu.Unlock()
 		h.ppc.pumpRrd.Grapher().SetSize(uint(width), uint(height))
 		_, graph, err = h.ppc.pumpRrd.Grapher().Graph(start, end)
 	} else if which == TempImage {
+		h.ppc.tempRrd.mu.Lock()
+		defer h.ppc.tempRrd.mu.Unlock()
 		h.ppc.tempRrd.Grapher().SetSize(uint(width), uint(height))
 		_, graph, err = h.ppc.tempRrd.Grapher().Graph(start, end)
 	} else {
@@ -254,6 +258,8 @@ func sensorStatus(t Thermometer, now time.Time) (bool, string) {
 }
 
 func (h *Handler) liveStatus() liveStatus {
+	h.ppc.mu.RLock()
+	defer h.ppc.mu.RUnlock()
 	control := "Auto"
 	if h.ppc.switches.ManualState(h.ppc.config.cfg.RunTime) {
 		control = "Manual"
@@ -301,6 +307,8 @@ func (h *Handler) pin() string {
 }
 
 func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
+	h.ppc.mu.RLock()
+	defer h.ppc.mu.RUnlock()
 	body := `<div class="card">
 <h2>HomeKit pairing</h2>
 <p class="pin">` + html.EscapeString(h.pin()) + `</p>
@@ -310,11 +318,15 @@ func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) qrHandler(w http.ResponseWriter, r *http.Request) {
+	h.ppc.mu.RLock()
+	defer h.ppc.mu.RUnlock()
 	png, _ := qrcode.Encode(h.ppc.config.cfg.Pin, qrcode.Medium, 256)
 	h.writeResponse(w, []byte(png), "image/png")
 }
 
 func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
+	h.ppc.mu.RLock()
+	defer h.ppc.mu.RUnlock()
 	scale := getscale(r)
 	cookie := &http.Cookie{
 		Name:   "scale",
@@ -394,6 +406,8 @@ func (h *Handler) Calibrate(html *string, t Thermometer, resStr, name string) er
 }
 
 func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) {
+	h.ppc.mu.Lock()
+	defer h.ppc.mu.Unlock()
 	pumpResistance := getFormValue(r, "pump_res", "")
 	roofResistance := getFormValue(r, "roof_res", "")
 
@@ -421,11 +435,11 @@ func (h *Handler) runCalibrationHandler(w http.ResponseWriter, r *http.Request) 
 			html += "<h2>Success</h2><br>"
 			p, ok := h.ppc.pumpTemp.(*GpioThermometer)
 			if ok {
-				html += fmt.Sprintf("<br>Pool Value: %0.3f", p.adjust)
+				html += fmt.Sprintf("<br>Pool Value: %0.3f", p.Adjustment())
 			}
 			p, ok = h.ppc.roofTemp.(*GpioThermometer)
 			if ok {
-				html += fmt.Sprintf("<br>Roof Value: %0.3f", p.adjust)
+				html += fmt.Sprintf("<br>Roof Value: %0.3f", p.Adjustment())
 			}
 		} else {
 			html += "<p>Redirecting...."
@@ -568,6 +582,8 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	h.ppc.mu.Lock()
+	defer h.ppc.mu.Unlock()
 	c := h.ppc.config
 	Debug("Config: %+v", c.cfg)
 

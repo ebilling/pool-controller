@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -46,6 +47,7 @@ func (s State) String() string {
 
 // Switches controls all of the relays in the system
 type Switches struct {
+	mu       sync.RWMutex
 	state    State
 	pump     *Relay
 	sweep    *Relay
@@ -54,6 +56,8 @@ type Switches struct {
 }
 
 func (p *Switches) String() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	return fmt.Sprintf(
 		"Pump: {State: %s,\nPump: {%s},\nSweep: {%s},\nSolar: {%s},\nManualOp: %s}",
 		p.state.String(), p.pump.String(), p.sweep.String(), p.solar.String(),
@@ -93,8 +97,8 @@ func (p *Switches) bindHK() {
 
 	p.sweep.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		Log("HomeKit request to turn Sweep on=%t", on)
-		state := p.state
-		switch p.state {
+		state := p.State()
+		switch state {
 		case SOLAR:
 			if on {
 				state = MIXING
@@ -115,8 +119,8 @@ func (p *Switches) bindHK() {
 
 	p.solar.accessory.Switch.On.OnValueRemoteUpdate(func(on bool) {
 		Log("HomeKit request to turn Solar on=%t", on)
-		state := p.state
-		switch p.state {
+		state := p.State()
+		switch state {
 		case SWEEP:
 		case MIXING:
 			if on {
@@ -151,15 +155,19 @@ func (p *Switches) GetStopTime() time.Time {
 
 // Enable re-enables the pumps after having been disabled
 func (p *Switches) Enable() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.state == DISABLED {
 		p.state = OFF
-		p.StopAll(true)
+		p.stopAllLocked(true)
 	}
 }
 
 // Disable turns the pumps off and puts them in a state that will not allow them to run
 func (p *Switches) Disable() {
-	p.StopAll(true)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.stopAllLocked(true)
 	p.state = DISABLED
 }
 
@@ -177,7 +185,7 @@ func turnOn(relay OnOff, on bool) {
 	}
 }
 
-func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state State) {
+func (p *Switches) setSwitchesLocked(pumpOn, sweepOn, solarOn, isManual bool, state State) {
 	turnOn(p.pump, pumpOn)
 	turnOn(p.sweep, sweepOn)
 	turnOn(p.solar, solarOn) // deal with solar valve last because it takes time
@@ -193,15 +201,23 @@ func (p *Switches) setSwitches(pumpOn, sweepOn, solarOn, isManual bool, state St
 
 // StopAll turns off all pumps
 func (p *Switches) StopAll(manual bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.stopAllLocked(manual)
+}
+
+func (p *Switches) stopAllLocked(manual bool) {
 	state := OFF
 	if p.state == DISABLED {
 		state = DISABLED
 	}
-	p.setSwitches(false, false, false, manual, state)
+	p.setSwitchesLocked(false, false, false, manual, state)
 }
 
 // SetState sets the pump pins to particular values corresponding to a State
 func (p *Switches) SetState(s State, manual bool, runtime float64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.state == s {
 		return // Nothing to do here
 	}
@@ -210,35 +226,38 @@ func (p *Switches) SetState(s State, manual bool, runtime float64) {
 			p.state, s)
 		return
 	}
-	if p.ManualState(runtime) && !manual {
+	if p.manualStateLocked(runtime) && !manual {
 		Debug("Manual override, can't change state from %s to %s", p.state, s)
 		return // Don't override a manual operation
 	}
 	Info("State change from %s to %s", p.state, s)
 	switch s {
 	case DISABLED:
-		p.Disable()
+		p.stopAllLocked(manual)
+		p.state = DISABLED
 		return
 	case OFF:
-		p.StopAll(manual)
+		p.stopAllLocked(manual)
 		return
 	case PUMP:
-		p.setSwitches(true, false, false, manual, s)
+		p.setSwitchesLocked(true, false, false, manual, s)
 		return
 	case SWEEP:
-		p.setSwitches(true, true, false, manual, s)
+		p.setSwitchesLocked(true, true, false, manual, s)
 		return
 	case SOLAR:
-		p.setSwitches(true, false, true, manual, s)
+		p.setSwitchesLocked(true, false, true, manual, s)
 		return
 	case MIXING:
-		p.setSwitches(true, true, true, manual, s)
+		p.setSwitchesLocked(true, true, true, manual, s)
 		return
 	}
 }
 
 // State returns the current State of the system
 func (p *Switches) State() State {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	return p.state
 }
 
@@ -253,6 +272,12 @@ func DurationFromHours(hours float64, minHours float64) time.Duration {
 
 // ManualState returns true if the pumps were started or stopped manually
 func (p *Switches) ManualState(runtime float64) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.manualStateLocked(runtime)
+}
+
+func (p *Switches) manualStateLocked(runtime float64) bool {
 	if time.Since(p.manualOp) > DurationFromHours(runtime, 2.0) {
 		return false
 	}

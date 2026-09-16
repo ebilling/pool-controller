@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ziutek/rrd"
@@ -9,6 +10,7 @@ import (
 
 // Rrd controls a round-robin database
 type Rrd struct {
+	mu      sync.Mutex
 	path    string
 	creator *rrd.Creator
 	updater *rrd.Updater
@@ -49,6 +51,8 @@ func (r *Rrd) Grapher() *rrd.Grapher {
 
 // SaveGraph creates and saves the graph
 func (r *Rrd) SaveGraph(start, end time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	_, err := r.grapher.SaveGraph(r.path, start, end)
 	return err
 }

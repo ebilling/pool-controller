@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -26,6 +27,7 @@ const (
 // The PoolPumpController manages the relays that control the pumps based on
 // data from temperature probes and the weather.
 type PoolPumpController struct {
+	mu          sync.RWMutex
 	config      *Config
 	switches    *Switches
 	pumpTemp    Thermometer
@@ -35,7 +37,9 @@ type PoolPumpController struct {
 	button      *Button
 	tempRrd     *Rrd
 	pumpRrd     *Rrd
-	done        chan bool
+	done        chan struct{}
+	stopped     chan struct{}
+	stopOnce    sync.Once
 }
 
 // RunningWaterThermometer creates a thermometer that remembers the temperature of the water when the
@@ -54,7 +58,8 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 		switches: NewSwitches(mftr),
 		tempRrd:  NewRrd(*config.dataDirectory + "/temperature.rrd"),
 		pumpRrd:  NewRrd(*config.dataDirectory + "/pumpstatus.rrd"),
-		done:     make(chan bool),
+		done:     make(chan struct{}),
+		stopped:  make(chan struct{}),
 	}
 	if config.simulate != nil && *config.simulate {
 		ppc.pumpTemp = NewSimulatedThermometer("Pump", mftr, *config.simPumpTemp)
@@ -151,12 +156,12 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		return
 	}
 	if state == DISABLED && !ppc.config.cfg.Disabled && !ppc.config.cfg.SolarDisabled {
-		ppc.switches.setSwitches(false, false, false, false, OFF)
+		ppc.switches.Enable()
 		return
 	}
 	if ppc.config.cfg.Disabled {
 		if state > DISABLED {
-			ppc.switches.setSwitches(false, false, false, false, DISABLED)
+			ppc.switches.SetState(DISABLED, false, ppc.config.cfg.RunTime)
 		}
 		return
 	}
@@ -198,36 +203,46 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 // repeatedly until PoolPumpController.Stop() is called
 func (ppc *PoolPumpController) runLoop() {
 	interval := time.Second * 5
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	defer close(ppc.stopped)
 	postStatus := time.Now()
-	keepRunning := true
-	for keepRunning {
+	for {
 		if postStatus.Before(time.Now()) {
 			postStatus = time.Now().Add(5 * time.Minute)
+			ppc.mu.RLock()
 			Info(ppc.Status())
+			ppc.mu.RUnlock()
 		}
-		ppc.SyncAdjustments()
 		select {
 		case <-ppc.done:
-			ppc.button.Stop()
-			// Turn off the pumps, and don't let them turn back on
+			ppc.mu.Lock()
 			ppc.switches.Disable()
-			keepRunning = false
-		case <-time.After(interval):
+			ppc.mu.Unlock()
+			ppc.button.Stop()
+			Alert("Exiting Controller")
+			return
+		case <-ticker.C:
+			ppc.mu.Lock()
+			ppc.SyncAdjustments()
 			if err := ppc.Update(); err != nil {
 				Error("Sensor update failed; retaining current relay state: %s", err)
+				ppc.mu.Unlock()
 				continue
 			}
 			ppc.RunPumpsIfNeeded()
 			ppc.UpdateRrd()
 			Debug(ppc.Status())
+			ppc.mu.Unlock()
 		}
 	}
-	Alert("Exiting Controller")
 }
 
 // Start finishes initializing the PoolPumpController, and kicks off the control thread.
 func (ppc *PoolPumpController) Start() error {
 	ppc.button = NewGpioButton(buttonGpio, func() {
+		ppc.mu.Lock()
+		defer ppc.mu.Unlock()
 		switch ppc.switches.State() {
 		case OFF:
 			ppc.switches.SetState(PUMP, true, ppc.config.cfg.RunTime)
@@ -255,19 +270,19 @@ func (ppc *PoolPumpController) Start() error {
 
 // Stop stops all of the pumps
 func (ppc *PoolPumpController) Stop() {
-	ppc.switches.StopAll(true)
-	ppc.done <- true
+	ppc.stopOnce.Do(func() { close(ppc.done) })
+	<-ppc.stopped
 }
 
 // PersistCalibration saves the callibration data
 func (ppc *PoolPumpController) PersistCalibration() {
 	t, ok := ppc.pumpTemp.(*GpioThermometer)
 	if ok {
-		ppc.config.cfg.PumpAdjustment = t.adjust
+		ppc.config.cfg.PumpAdjustment = t.Adjustment()
 	}
 	t, ok = ppc.roofTemp.(*GpioThermometer)
 	if ok {
-		ppc.config.cfg.RoofAdjustment = t.adjust
+		ppc.config.cfg.RoofAdjustment = t.Adjustment()
 	}
 	err := ppc.config.Save()
 	if err != nil {
@@ -279,11 +294,11 @@ func (ppc *PoolPumpController) PersistCalibration() {
 func (ppc *PoolPumpController) SyncAdjustments() {
 	t, ok := ppc.pumpTemp.(*GpioThermometer)
 	if ok {
-		t.adjust = ppc.config.cfg.PumpAdjustment
+		t.SetAdjustment(ppc.config.cfg.PumpAdjustment)
 	}
 	t, ok = ppc.roofTemp.(*GpioThermometer)
 	if ok {
-		t.adjust = ppc.config.cfg.RoofAdjustment
+		t.SetAdjustment(ppc.config.cfg.RoofAdjustment)
 	}
 }
 

@@ -129,6 +129,13 @@ func (t *GpioThermometer) SetAdjustment(a float64) {
 	t.adjust = a
 }
 
+// Adjustment returns the current calibration multiplier.
+func (t *GpioThermometer) Adjustment() float64 {
+	t.stateMutex.RLock()
+	defer t.stateMutex.RUnlock()
+	return t.adjust
+}
+
 // Name returns the name of the GpioThermometer
 func (t *GpioThermometer) Name() string {
 	return t.name
