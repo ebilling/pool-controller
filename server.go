@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	qrcode "github.com/skip2/go-qrcode"
@@ -17,6 +18,9 @@ import (
 // Handler will handle the http requests
 type Handler struct {
 	ppc *PoolPumpController
+
+	pairingMu  sync.RWMutex
+	pairingURI string
 }
 
 // HostType is used to specify how to listen
@@ -73,6 +77,21 @@ func NewServer(host HostType, port int, ppc *PoolPumpController) *Server {
 	}
 	s.server.ErrorLog = NewHTTPErrorLogger()
 	return &s
+}
+
+// SetPairingURI publishes the HomeKit setup payload (X-HM://...) that the Home
+// app expects to find in a pairing QR code. The bare setup code is not a valid
+// payload, so without this the Home app cannot recognize the image at all.
+func (s *Server) SetPairingURI(uri string) {
+	s.handler.pairingMu.Lock()
+	defer s.handler.pairingMu.Unlock()
+	s.handler.pairingURI = uri
+}
+
+func (h *Handler) setupPayload() string {
+	h.pairingMu.RLock()
+	defer h.pairingMu.RUnlock()
+	return h.pairingURI
 }
 
 func startServer(s *Server, cert, key string) {
@@ -375,16 +394,43 @@ func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
 	defer h.ppc.mu.RUnlock()
 	body := `<div class="card">
 <h2>HomeKit pairing</h2>
-<p class="pin">` + html.EscapeString(h.pin()) + `</p>
+<p class="pin">` + html.EscapeString(h.pin()) + `</p>`
+	if payload := h.setupPayload(); payload != "" {
+		body += `
 <img class="qr" src="/qr" width="256" height="256" alt="HomeKit pairing QR code">
+<p class="legend">Setup payload: ` + html.EscapeString(payload) + `</p>`
+	} else {
+		body += `
+<p class="legend">The HomeKit transport has not reported a setup payload yet.</p>`
+	}
+	body += h.pairingStateHTML() + `
 </div>`
 	h.writeResponse(w, []byte(page("HomeKit pairing", body)), "text/html")
 }
 
+func (h *Handler) pairingStateHTML() string {
+	controllers, err := controllerPairings(*h.ppc.config.dataDirectory)
+	if err != nil {
+		return `
+<p class="legend">Could not read pairing state: ` + html.EscapeString(err.Error()) + `</p>`
+	}
+	if len(controllers) == 0 {
+		return `
+<p class="legend">No controllers are paired, so this accessory is discoverable.</p>`
+	}
+	return fmt.Sprintf(`
+<p class="legend">Paired with %d controller(s), so HomeKit advertises this accessory as
+not discoverable and new setup attempts will hang. If you already removed it from the
+Home app, restart with -reset-homekit-pairings to forget them.</p>`, len(controllers))
+}
+
 func (h *Handler) qrHandler(w http.ResponseWriter, r *http.Request) {
-	h.ppc.mu.RLock()
-	defer h.ppc.mu.RUnlock()
-	png, err := qrcode.Encode(h.ppc.config.cfg.Pin, qrcode.Medium, 256)
+	payload := h.setupPayload()
+	if payload == "" {
+		http.Error(w, "Pairing payload unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	png, err := qrcode.Encode(payload, qrcode.Medium, 256)
 	if err != nil {
 		http.Error(w, "Could not generate pairing code", http.StatusInternalServerError)
 		return

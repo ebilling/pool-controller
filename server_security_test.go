@@ -63,13 +63,34 @@ func TestPartialConfigPostDoesNotClearBooleans(t *testing.T) {
 	}
 }
 
+func TestPairingQRUsesHomeKitSetupPayload(t *testing.T) {
+	server := NewServer(LocalHost, 0, &PoolPumpController{})
+	req := httptest.NewRequest(http.MethodGet, "/qr", nil)
+
+	rec := httptest.NewRecorder()
+	server.handler.qrHandler(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("qr without a setup payload returned %d, wanted 503 rather than an unscannable code", rec.Code)
+	}
+
+	server.SetPairingURI("X-HM://0024K0Y3WHOME")
+	rec = httptest.NewRecorder()
+	server.handler.qrHandler(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("qr returned %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "image/png" {
+		t.Fatalf("qr content type %q, want image/png", got)
+	}
+}
+
 func TestServerHasDefensiveTimeouts(t *testing.T) {
 	server := NewServer(LocalHost, 0, &PoolPumpController{})
 	if server.server.ReadHeaderTimeout <= 0 ||
 		server.server.ReadTimeout <= 0 ||
 		server.server.WriteTimeout <= 0 ||
 		server.server.IdleTimeout <= 0 {
-		t.Fatalf("server timeouts not configured: %+v", server.server)
+		t.Fatal("server timeouts not configured")
 	}
 	if server.server.TLSConfig == nil ||
 		server.server.TLSConfig.MinVersion == 0 {

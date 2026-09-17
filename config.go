@@ -50,6 +50,7 @@ type Config struct {
 	simulate       *bool
 	simPumpTemp    *float64
 	simRoofTemp    *float64
+	resetPairings  *bool
 
 	// Internal
 	pidfile *string
@@ -115,6 +116,10 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		"Simulated pump/water temperature in Celsius (used with -simulate)")
 	c.simRoofTemp = fs.Float64("sim-roof-temp", 45.0,
 		"Simulated roof temperature in Celsius (used with -simulate)")
+	c.resetPairings = fs.Bool("reset-homekit-pairings", false,
+		"Forget paired HomeKit controllers on startup. Use this after removing the "+
+			"accessory in the Home app: the pairing it leaves behind keeps the accessory "+
+			"undiscoverable, so the setup code spins forever.")
 	fs.Parse(args)
 	err := c.Read()
 	if err != nil {

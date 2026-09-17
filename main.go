@@ -63,8 +63,15 @@ func main() {
 		Fatal("Could not start pool controller: %s", err.Error())
 	}
 
-	server := NewServer(AnyHost, *config.httpPort, ppc)
-	server.Start(*config.sslCertificate, *config.sslPrivateKey)
+	// Discoverability is decided when the transport is constructed, so forget
+	// stale controller pairings before that happens.
+	if *config.resetPairings {
+		removed, err := ResetHomeKitPairings(*config.dataDirectory)
+		if err != nil {
+			Fatal("Could not reset HomeKit pairings: %s", err.Error())
+		}
+		Info("Forgot %d HomeKit controller pairing(s)", removed)
+	}
 
 	hcConfig := hc.Config{
 		Pin:         config.cfg.Pin,
@@ -83,6 +90,27 @@ func main() {
 	if err != nil {
 		Fatal("Could not start IP Transport: %s", err.Error())
 	}
+
+	if paired, err := controllerPairings(*config.dataDirectory); err != nil {
+		Error("Could not read HomeKit pairing state: %s", err.Error())
+	} else if len(paired) > 0 {
+		Alert("HomeKit is paired with %d controller(s), so this accessory is not "+
+			"discoverable. If it was removed from the Home app, restart with "+
+			"-reset-homekit-pairings.", len(paired))
+	} else {
+		Info("HomeKit has no controller pairings; accessory is discoverable")
+	}
+
+	// The server serves the pairing QR code, so it needs the setup payload that
+	// only the transport can produce.
+	server := NewServer(AnyHost, *config.httpPort, ppc)
+	if uri, err := transport.XHMURI(); err != nil {
+		Error("Could not build HomeKit setup payload: %s", err.Error())
+	} else {
+		server.SetPairingURI(uri)
+		Info("HomeKit setup payload: %s", uri)
+	}
+	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
 	hc.OnTermination(func() {
 		Debug("Stopping Controller")

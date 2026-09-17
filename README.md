@@ -70,6 +70,31 @@ took (typically ~300 µs on a Pi 3). That is a diagnostic, not an error bar.
 The charge duration is clocked from *before* that ioctl, because on this SoC
 the pinmux happens at the start of the call. `periph` reports 0.
 
+## HomeKit pairing
+
+The pairing page serves the `X-HM://` setup payload as a QR code; the bare
+setup code is not a payload the Home app recognizes. The payload comes from the
+transport at startup and is logged as `HomeKit setup payload`.
+
+Removing the accessory in the Home app only deletes Apple's side of the
+pairing. If this process is stopped or unreachable at the time, it never handles
+the unpair request and keeps the controller's key in `<data_dir>/*.entity`.
+`brutella/hc` then advertises `sf=0` ("already paired", not discoverable) on
+every later start, so the Home app either will not offer the accessory or
+accepts the setup code and spins forever. Discoverability is not a mode you can
+turn on; it is derived from that stored pairing set.
+
+To recover, forget the stale controllers and restart:
+
+```sh
+sudo systemctl stop pool-controller
+sudo pool-controller -reset-homekit-pairings   # or add the flag to the unit once
+```
+
+The accessory keeps its own identity and key pair, so only the iOS pairings are
+dropped. Startup logs whether any pairings remain, and the pairing page shows
+the same state.
+
 ## Docker (simulation)
 
 This is a Linux userspace stand-in for laptop/CI work. It does **not** reproduce Pi GPIO, capacitor timing, or OS-upgrade accuracy. The image is Debian 12 (bookworm); the working pool host is Raspbian 11 on a Pi 3. Debian 11 was skipped because its current security-mirror packages 404 from Docker.
