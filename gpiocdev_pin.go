@@ -8,17 +8,9 @@ import (
 	"github.com/ebilling/pool-controller/internal/gpiocdev"
 )
 
-// This is the GPIO backend that talks to /dev/gpiochip* directly, as an
-// alternative to periph. It exists for two reasons:
-//
-//   - periph's newer gpioioctl driver cannot wait for edges on this hardware at
-//     all: it hands the line fd to os.NewFile and calls SetReadDeadline, which
-//     fails with "file type does not support deadline", so every thermometer
-//     read times out. Its older sysfs path works but depends on a kernel
-//     interface that is on its way out.
-//   - the thermistor reading is more accurate here, because the charge time
-//     comes from the kernel's edge timestamp instead of a userspace clock read
-//     after this process gets scheduled.
+// This is the GPIO backend. It talks to /dev/gpiochip* and times thermistor
+// charges from the kernel's edge timestamp so this process's scheduling delay
+// is not part of the measurement.
 
 var (
 	cdevMu   sync.Mutex
@@ -41,9 +33,9 @@ func cdevOpenChip() (*gpiocdev.Chip, error) {
 	return chip, nil
 }
 
-// cdevManagedPins are the BCM lines this process claims. On upgrade from
-// periph, leftover /sys/class/gpio exports keep them busy and RequestLine
-// fails with EBUSY until they are unexported.
+// cdevManagedPins are the BCM lines this process claims. Leftover
+// /sys/class/gpio exports keep them busy and RequestLine fails with EBUSY
+// until they are unexported.
 func cdevManagedPins() []uint8 {
 	return []uint8{
 		5, // power LED in main.go
@@ -72,7 +64,7 @@ func releaseLeftoverSysfs(chip *gpiocdev.Chip, pins []uint8) {
 	}
 }
 
-// CdevGpioInit opens the GPIO controller, replacing periph's host.Init.
+// CdevGpioInit opens the GPIO controller.
 func CdevGpioInit() error {
 	chip, err := cdevOpenChip()
 	if err != nil {
@@ -84,9 +76,8 @@ func CdevGpioInit() error {
 
 // cdevPin implements PiPin against a single GPIO character device line.
 //
-// A failed claim leaves line nil rather than aborting startup, matching how the
-// periph backend tolerates a pin it could not resolve. Every method guards for
-// it so a single bad pin cannot panic the controller.
+// A failed claim leaves line nil rather than aborting startup. Every method
+// guards for it so a single bad pin cannot panic the controller.
 type cdevPin struct {
 	gpio uint8
 	line *gpiocdev.Line

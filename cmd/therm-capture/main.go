@@ -1,13 +1,5 @@
 // therm-capture times the production 100 nF RC thermometers on a Pi.
 // Stop pool-controller first so two processes do not drive the same pins.
-//
-// Two backends are available so they can be compared on real hardware:
-//
-//	-driver cdev    the Linux GPIO character device, timing each charge from
-//	                the kernel's edge timestamp
-//	-driver periph  periph.io, timing each charge from a userspace clock
-//
-// The drivers claim the lines exclusively, so run them one at a time.
 package main
 
 import (
@@ -18,14 +10,10 @@ import (
 	"os"
 	"runtime"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/ebilling/pool-controller/internal/gpiocdev"
 	"github.com/ebilling/pool-controller/internal/rctime"
-	"periph.io/x/conn/v3/gpio"
-	"periph.io/x/conn/v3/gpio/gpioreg"
-	"periph.io/x/host/v3"
 )
 
 const (
@@ -57,30 +45,6 @@ type sample struct {
 type prober interface {
 	measure() (dt, config time.Duration, err error)
 	close()
-}
-
-// periphPin times the charge from a userspace clock, which includes however
-// long it took to schedule this process after the edge interrupt.
-type periphPin struct {
-	pin gpio.PinIO
-}
-
-func (p *periphPin) OutputLow()                       { _ = p.pin.Out(gpio.Low) }
-func (p *periphPin) InputRisingFloat()                { _ = p.pin.In(gpio.Float, gpio.RisingEdge) }
-func (p *periphPin) WaitForEdge(d time.Duration) bool { return p.pin.WaitForEdge(d) }
-func (p *periphPin) close()                           {}
-
-func (p *periphPin) measure() (time.Duration, time.Duration, error) {
-	dt, err := rctime.Discharge(p)
-	return dt, 0, err
-}
-
-func openPeriph(n uint8) (prober, error) {
-	pin := gpioreg.ByName(strconv.Itoa(int(n)))
-	if pin == nil {
-		return nil, fmt.Errorf("no GPIO %d (periph did not find the pin)", n)
-	}
-	return &periphPin{pin: pin}, nil
 }
 
 // cdevPin times the charge from the kernel's edge timestamp.
@@ -190,9 +154,7 @@ func stats(v []float64) (mean, median, stdev float64) {
 }
 
 // listLines reports the thermistor lines and every other line currently held,
-// which is how to tell whether something else on the system owns a pin. periph
-// bypasses this arbitration by writing the GPIO registers directly, so a pin
-// can look fine there and still be claimed by a kernel driver.
+// which is how to tell whether something else on the system owns a pin.
 func listLines(pump, roof uint8) error {
 	chip, err := gpiocdev.Default()
 	if err != nil {
@@ -270,20 +232,19 @@ func main() {
 	roofGPIO := flag.Uint("roof", defaultRoofGPIO, "BCM GPIO for roof thermistor")
 	only := flag.String("only", "both", "pump, roof, or both")
 	adjust := flag.Float64("adjust", defaultAdjust, "timing adjust from deployed config (real.conf is 1.75)")
-	driver := flag.String("driver", "cdev", "GPIO backend: cdev (kernel edge timestamps) or periph (userspace clock)")
 	list := flag.Bool("list", false, "report which GPIO lines are claimed and by whom, then exit")
 	unexport := flag.Bool("unexport-sysfs", false,
 		"release leftover /sys/class/gpio exports for the selected thermistor pins, then exit. "+
-			"Does not touch relay/LED pins. Needed after periph or pool-controller, which leave sysfs claims behind.")
+			"Does not touch relay/LED pins.")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "therm-capture: 100 nF RC timing dump. Stop pool-controller first.\n\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 
-	fmt.Fprintf(os.Stderr, "therm-capture cap=%d nF window=%s..%s go=%s %s/%s driver=%s\n",
+	fmt.Fprintf(os.Stderr, "therm-capture cap=%d nF window=%s..%s go=%s %s/%s\n",
 		rctime.NanoFarads, rctime.MinTime, rctime.MaxTime,
-		runtime.Version(), runtime.GOOS, runtime.GOARCH, *driver)
+		runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	fmt.Fprintf(os.Stderr, "Stop pool-controller before this tool; both would drive the same GPIO.\n")
 
 	if *unexport {
@@ -302,27 +263,14 @@ func main() {
 		return
 	}
 
-	var open func(uint8) (prober, error)
-	switch *driver {
-	case "cdev":
-		chip, err := gpiocdev.Default()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "GPIO character device init failed: %v\n", err)
-			os.Exit(1)
-		}
-		defer chip.Close()
-		fmt.Fprintf(os.Stderr, "using %s\n", chip)
-		open = func(n uint8) (prober, error) { return openCdev(chip, n) }
-	case "periph":
-		if _, err := host.Init(); err != nil {
-			fmt.Fprintf(os.Stderr, "GPIO init failed: %v\n", err)
-			os.Exit(1)
-		}
-		open = openPeriph
-	default:
-		fmt.Fprintf(os.Stderr, "-driver must be cdev or periph\n")
+	chip, err := gpiocdev.Default()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "GPIO character device init failed: %v\n", err)
 		os.Exit(1)
 	}
+	defer chip.Close()
+	fmt.Fprintf(os.Stderr, "using %s\n", chip)
+	open := func(n uint8) (prober, error) { return openCdev(chip, n) }
 
 	type ch struct {
 		name string
@@ -368,7 +316,7 @@ func main() {
 			break
 		}
 		for _, c := range chans {
-			s := takeSample(c.name, c.gpio, *driver, c.pin, *adjust)
+			s := takeSample(c.name, c.gpio, "cdev", c.pin, *adjust)
 			perCh[c.name] = append(perCh[c.name], s)
 			if err := enc.Encode(s); err != nil {
 				fmt.Fprintf(os.Stderr, "write json: %v\n", err)

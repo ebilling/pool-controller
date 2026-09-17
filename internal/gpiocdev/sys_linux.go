@@ -11,10 +11,7 @@ import (
 
 // These are the only platform-specific operations in the package. Every one of
 // them is a raw syscall: no fd is ever wrapped in an os.File, so the Go runtime
-// poller is never involved. That is deliberate. periph's gpioioctl driver hands
-// the line fd to os.NewFile and then calls SetReadDeadline, which fails with
-// "file type does not support deadline" whenever the runtime cannot register
-// the fd with epoll, and os.NewFile swallows that registration error.
+// poller is never involved.
 
 func sysOpen(path string) (int, error) {
 	return unix.Open(path, unix.O_RDWR|unix.O_CLOEXEC, 0)

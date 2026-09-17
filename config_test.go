@@ -96,17 +96,6 @@ func TestConfig_Simulate(t *testing.T) {
 	}
 }
 
-func TestConfig_GpioDriverDefault(t *testing.T) {
-	c := NewConfig(flag.NewFlagSet("gpio-default", flag.PanicOnError), nil)
-	if *c.gpioDriver != "cdev" {
-		t.Errorf("gpio-driver default: %q, want cdev", *c.gpioDriver)
-	}
-	c = flagTestSetup([]string{"-gpio-driver", "periph"})
-	if *c.gpioDriver != "periph" {
-		t.Errorf("gpio-driver: %q, want periph", *c.gpioDriver)
-	}
-}
-
 func TestConfig_Pidfile(t *testing.T) {
 	flag := "-pid"
 	value := "This is my Process ID path"

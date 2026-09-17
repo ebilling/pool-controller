@@ -1,19 +1,11 @@
 // Package gpiocdev drives Raspberry Pi GPIO through the Linux GPIO character
 // device (uAPI v2), with no cgo and no third-party driver.
 //
-// It exists because the RC thermometer needs an edge timestamp it can trust.
-// The two mechanisms available elsewhere both put userspace scheduling latency
-// inside the measurement:
-//
-//   - /sys/class/gpio edge polling reports only that an edge happened, so the
-//     elapsed time includes however long it took to wake this process. With the
-//     100 nF sensing capacitor a full charge is around 1 ms, so a late wakeup is
-//     a first-order error rather than noise.
-//   - periph's gpioioctl driver wraps the line fd in an os.File and calls
-//     SetReadDeadline. When the runtime cannot register the fd with epoll,
-//     os.NewFile discards the registration error and every later
-//     SetReadDeadline fails with "file type does not support deadline", so
-//     WaitForEdge returns false immediately and no reading ever succeeds.
+// The RC thermometer needs an edge timestamp it can trust. Polling
+// /sys/class/gpio only reports that an edge happened, so the elapsed time
+// includes however long it took to wake this process. With the 100 nF sensing
+// capacitor a full charge is around 1 ms, so a late wakeup is a first-order
+// error rather than noise.
 //
 // uAPI v2 line events carry a kernel timestamp taken in the GPIO interrupt
 // handler, which removes the wakeup from the measurement, and waiting with a
@@ -240,9 +232,9 @@ func (c *Chip) LineInfo(offset uint32) (LineInfo, error) {
 }
 
 // UnexportSysfs releases a leftover /sys/class/gpio export so the character
-// device can claim the line. periph and older pool-controller builds export
-// pins this way and do not always unexport on exit; the kernel keeps the
-// claim until reboot or this write.
+// device can claim the line. Older builds exported pins this way and did not
+// always unexport on exit; the kernel keeps the claim until reboot or this
+// write.
 func UnexportSysfs(offset uint32) error {
 	err := os.WriteFile("/sys/class/gpio/unexport",
 		[]byte(strconv.FormatUint(uint64(offset), 10)+"\n"), 0)

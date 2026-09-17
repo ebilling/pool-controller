@@ -38,17 +38,10 @@ func main() {
 		Fatal("Could not write pid file: %s", err.Error())
 	}
 
-	switch {
-	case *config.simulate:
+	if *config.simulate {
 		EnableSimulation()
 		Info("Simulation mode: pump=%0.1fC roof=%0.1fC (no real GPIO)",
 			*config.simPumpTemp, *config.simRoofTemp)
-	case *config.gpioDriver == "cdev":
-		EnableCdevGpio()
-	case *config.gpioDriver == "periph":
-		Info("GPIO: using periph.io")
-	default:
-		Fatal("Unknown -gpio-driver %q: want 'cdev' or 'periph'", *config.gpioDriver)
 	}
 
 	if err := GpioInit(); err != nil {

@@ -41,7 +41,7 @@ func simLogOutputs(n uint8) bool {
 	}
 }
 
-// EnableSimulation skips the Broadcom host driver and serves in-memory pins.
+// EnableSimulation skips the GPIO character device and serves in-memory pins.
 // Thermometer values are scripted separately via Config -simulate flags.
 func EnableSimulation() {
 	gpioInitFn = func() error { return nil }

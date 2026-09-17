@@ -9,15 +9,6 @@ require (
 	github.com/ziutek/rrd v0.0.4
 	golang.org/x/crypto v0.57.0
 	golang.org/x/sys v0.48.0
-	// Only used by -gpio-driver periph, the fallback path. Pinned because host
-	// v3.8.5 routes bcm283x.WaitForEdge through its gpioioctl driver, whose
-	// SetReadDeadline fails with "file type does not support deadline" on the
-	// Pi 3 (Raspbian 11, kernel 6.1), so every thermistor read times out.
-	// v3.8.2 still waits on edges with raw epoll via sysfs, which works.
-	// internal/gpiocdev is the replacement; once it has run in production long
-	// enough, drop both of these.
-	periph.io/x/conn/v3 v3.7.0
-	periph.io/x/host/v3 v3.8.2
 )
 
 require (

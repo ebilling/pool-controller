@@ -100,36 +100,19 @@ read. Mutating routes require HTTP Basic authentication, reject unsupported
 methods and oversized forms, and the HTTPS server has defensive read/write
 timeouts and a TLS 1.2 minimum.
 
-## GPIO drivers
+## GPIO
 
-`-gpio-driver` selects how the process talks to the GPIO pins.
+GPIO uses `internal/gpiocdev`, a small pure-Go driver for the Linux GPIO
+character device (uAPI v2). It waits for edges with a raw `poll(2)` and takes
+each thermistor charge time from the **kernel's** edge timestamp, recorded in
+the GPIO interrupt handler. That keeps this process's scheduling delay out of
+the measurement, which matters because a full charge through the 100 nF
+capacitor is only about 1 ms. No fd is wrapped in an `os.File`, so the Go
+runtime poller is never involved.
 
-- `cdev` (default) — `internal/gpiocdev`, a small pure-Go driver for the Linux
-  GPIO character device (uAPI v2). It waits for edges with a raw `poll(2)` and
-  takes each charge time from the **kernel's** edge timestamp, recorded in the
-  GPIO interrupt handler. That keeps this process's scheduling delay out of the
-  measurement, which matters because a full charge through the 100 nF capacitor
-  is only about 1 ms.
-- `periph` — the older `periph.io` path, timing charges from a userspace clock
-  read after the process wakes up. Kept as a fallback.
-
-`periph.io/x/host` is pinned to v3.8.2 for that fallback. From v3.8.3 on,
-`bcm283x.WaitForEdge` delegates to periph's `gpioioctl` driver, which hands the
-line descriptor to `os.NewFile` and then calls `SetReadDeadline`. When the Go
-runtime cannot register that descriptor with epoll, `os.NewFile` discards the
-registration error, so every later `SetReadDeadline` fails with:
-
-```
-GPIOLine.WaitForEdge() setReadDeadline() returned: file type does not support deadline
-```
-
-`WaitForEdge` then returns false immediately and no thermometer reading ever
-succeeds. `internal/gpiocdev` avoids this by never wrapping the descriptor in an
-`os.File`.
-
-On startup, `cdev` unexports leftover `/sys/class/gpio` claims on the pins this
-process uses (LED, thermistors, button, relays). The previous periph binary
-leaves those exports behind after stop, and chardev will not share them.
+On startup the controller unexports leftover `/sys/class/gpio` claims on the
+pins it uses (LED, thermistors, button, relays). Older binaries left those
+exports behind after stop, and chardev will not share them.
 
 ## Capture timings on the Pi (100 nF)
 
@@ -143,18 +126,10 @@ sudo ./therm-capture -seconds 30 -adjust 1.75 > capture.jsonl
 
 Default GPIOs are pump 15 and roof 14. `-adjust 1.75` matches deployed `real.conf`. Output is JSON lines on stdout and a duration summary on stderr.
 
-`-driver cdev|periph` picks the backend, so the two can be compared on the same
-hardware. Run them one at a time, since each claims the lines exclusively:
-
-```sh
-sudo ./therm-capture -n 200 -driver cdev   > cdev.jsonl
-sudo ./therm-capture -n 200 -driver periph > periph.jsonl
-```
-
-Each sample also carries `config_ns`: for `cdev` it is how long `SET_CONFIG`
-took (typically ~300 µs on a Pi 3). That is a diagnostic, not an error bar.
-The charge duration is clocked from *before* that ioctl, because on this SoC
-the pinmux happens at the start of the call. `periph` reports 0.
+Each sample also carries `config_ns`: how long `SET_CONFIG` took (typically
+~300 µs on a Pi 3). That is a diagnostic, not an error bar. The charge duration
+is clocked from *before* that ioctl, because on this SoC the pinmux happens at
+the start of the call.
 
 ## HomeKit pairing
 
