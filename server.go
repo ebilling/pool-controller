@@ -265,6 +265,11 @@ func (h *Handler) setRefresh(w http.ResponseWriter, r *http.Request, seconds int
 
 func (h *Handler) writeResponse(w http.ResponseWriter, content []byte, ctype string) {
 	w.Header().Set("Content-Type", ctype)
+	if w.Header().Get("Cache-Control") == "" {
+		// Every page here reports live state, down to whether HomeKit is
+		// paired, so a copy the browser kept is a wrong answer.
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(content)
 }

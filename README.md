@@ -179,11 +179,22 @@ configuration page, adds a line per pairing request, including the verdict on
 the controller's signature.
 
 HomeKit serves on `-homekit_port` (51826 by default) and announces that port
-over mDNS. A phone that accepts the setup code and then spins has found the
-announcement but cannot reach the port, so test it from the same network with
-`nc -z <pi> 51826` before looking any further. On a host with more than one
-network interface, `-homekit_iface` limits the announcement to one of them,
-which stops a phone from trying an address it has no route to.
+over mDNS with hap's own responder. Raspberry Pi OS also runs `avahi-daemon` on
+UDP 5353. Both processes bound to that port is why the Home app accepts the
+setup code and then spins with **no** pairing lines in the log: the phone never
+finds `_hap._tcp`. Stop and disable avahi so only `pool-controller` owns 5353:
+
+```sh
+sudo ss -ulnp | grep 5353
+sudo systemctl stop avahi-daemon
+sudo systemctl disable avahi-daemon
+```
+
+That drops `hostname.local` resolution; it does not affect HomeKit. If 5353 is
+clean and the log still has no `pair-setup` during an attempt, the phone cannot
+reach the port — test from the same Wi-Fi with `nc -z <pi> 51826`. On a host
+with more than one interface, `-homekit_iface` limits the announcement to one
+of them.
 
 On the first start after upgrading from `brutella/hc`, `hap` copies the
 accessory's keys and any paired controllers out of the `*.entity` files that

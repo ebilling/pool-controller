@@ -98,6 +98,17 @@ func TestDebugCheckboxTurnsDebugLoggingOn(t *testing.T) {
 	}
 }
 
+// The pairing page reports whether HomeKit is paired, which changes without
+// the page being asked to, so it must not be served from the browser's cache.
+func TestPairingPageIsNeverServedFromCache(t *testing.T) {
+	h := testSecureHandler(t)
+	rec := httptest.NewRecorder()
+	h.pairHandler(rec, httptest.NewRequest(http.MethodGet, "/pair", nil))
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", got)
+	}
+}
+
 func TestCleaningSettingsHaveTheirOwnSection(t *testing.T) {
 	h := testSecureHandler(t)
 	rec := httptest.NewRecorder()
