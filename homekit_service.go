@@ -45,6 +45,38 @@ func CaptureHomeKitLogs(debug bool) {
 	}
 }
 
+// loggedPairingStore is hap's file store, plus a line whenever a pairing is
+// written or forgotten. hap itself ignores the error from that write, which is
+// why a pairing can succeed in the Home app and still leave this accessory
+// unpaired on disk.
+type loggedPairingStore struct {
+	hap.Store
+}
+
+func (s loggedPairingStore) Set(key string, value []byte) error {
+	err := s.Store.Set(key, value)
+	if strings.HasSuffix(key, pairingSuffix) {
+		if err != nil {
+			Error("could not store HomeKit pairing %s: %s", key, err)
+		} else {
+			Info("stored HomeKit pairing %s", key)
+		}
+	}
+	return err
+}
+
+func (s loggedPairingStore) Delete(key string) error {
+	err := s.Store.Delete(key)
+	if strings.HasSuffix(key, pairingSuffix) {
+		if err != nil {
+			Error("could not forget HomeKit pairing %s: %s", key, err)
+		} else {
+			Info("forgot HomeKit pairing %s", key)
+		}
+	}
+	return err
+}
+
 // HomeKitService owns the HAP server: the mDNS announcement, the pairing
 // endpoints, and the accessory database kept in the data directory.
 type HomeKitService struct {
@@ -62,7 +94,8 @@ type HomeKitService struct {
 // the thermometers, and the relays as one device.
 func NewHomeKitService(dir, pin string, bridged ...*accessory.A) (*HomeKitService, error) {
 	bridge := accessory.NewBridge(AccessoryInfo("Pool Controller", mftr))
-	srv, err := hap.NewServer(hap.NewFsStore(dir), bridge.A, bridged...)
+	store := loggedPairingStore{Store: hap.NewFsStore(dir)}
+	srv, err := hap.NewServer(store, bridge.A, bridged...)
 	if err != nil {
 		return nil, err
 	}

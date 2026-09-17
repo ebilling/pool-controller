@@ -1,8 +1,12 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/brutella/hap"
 )
 
 func testHomeKitService(t *testing.T) *HomeKitService {
@@ -40,6 +44,18 @@ func TestHomeKitReportsWhereItIsAnnounced(t *testing.T) {
 	homekit.srv.Ifaces = []string{"nope0"}
 	if got, want := homekit.Announcement(), "no interface to announce on"; got != want {
 		t.Errorf("Announcement() = %q, want %q", got, want)
+	}
+}
+
+func TestLoggedPairingStoreReportsAWrite(t *testing.T) {
+	dir := t.TempDir()
+	store := loggedPairingStore{Store: hap.NewFsStore(dir)}
+	key := "controller" + pairingSuffix
+	if err := store.Set(key, []byte(`{"Name":"controller"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, key)); err != nil {
+		t.Fatalf("pairing was not written: %v", err)
 	}
 }
 
