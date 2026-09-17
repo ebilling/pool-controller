@@ -155,8 +155,18 @@ restarts the daemon, which is what makes the new state reach the network: `hap`
 decides discoverability while announcing itself and cannot be asked to
 re-evaluate it. The restart briefly stops the pumps.
 
-`-reset-homekit-pairings` deletes the pairings at startup instead, for when the
-web interface is not reachable. Occasional flags go in `/etc/default/pool-controller`,
+`-reset-homekit-pairings` does the same from the command line, for when the web
+interface is not reachable. It is maintenance rather than a way to start: it
+forgets the pairings and exits without becoming the daemon, so stop the service
+first and start it again afterwards.
+
+```sh
+sudo service pool-controller stop
+sudo pool-controller -data_dir=/var/cache/homekit -reset-homekit-pairings
+sudo service pool-controller start
+```
+
+Flags that the daemon itself should run with go in `/etc/default/pool-controller`,
 which `/etc/init.d/pool-controller` reads on every start:
 
 ```sh
@@ -167,12 +177,8 @@ sudo service pool-controller restart
 The startup log prints the arguments it was given, so `Args:` confirms what
 took effect. Keep flags here rather than in the init script: `install_init`
 overwrites that script, and an edit made there is lost on the next install.
-
-Only leave a flag in that file for as long as it is wanted. `-reset-homekit-pairings`
-in particular applies on *every* start, so a pairing made after it was added is
-forgotten by the next restart, and the accessory keeps coming back as
-unpaired. The startup log says `Forgot N HomeKit controller pairing(s)` each
-time it acts.
+The reset flags do not belong in this file; they exit instead of starting, so
+the service would never come up.
 
 Either path keeps the accessory's own identity (`uuid`) and key pair, so only
 the iOS pairings are dropped. Startup also logs whether any pairing remains.
@@ -183,8 +189,14 @@ seen. Reach for it when a controller or home hub still shows the old accessory:
 the id and the first key it was given are remembered together, so an accessory
 that keeps its id while its keys change can go on being displayed, with its
 last known values, by a controller that can no longer talk to it. The
-configuration and the recorded history in the same directory are kept. Like the
-flag above, take it back out once it has run.
+configuration and the recorded history in the same directory are kept. Remove
+the accessory in the Home app first, then:
+
+```sh
+sudo service pool-controller stop
+sudo pool-controller -data_dir=/var/cache/homekit -reset-homekit-identity
+sudo service pool-controller start
+```
 
 The Home app reports every failure as "unable to add accessory", so the reason
 comes from `hap`'s own log, which goes to syslog alongside everything else.

@@ -121,14 +121,16 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 	c.simRoofTemp = fs.Float64("sim-roof-temp", 45.0,
 		"Simulated roof temperature in Celsius (used with -simulate)")
 	c.resetPairings = fs.Bool("reset-homekit-pairings", false,
-		"Forget paired HomeKit controllers on startup. Use this after removing the "+
-			"accessory in the Home app: the pairing it leaves behind keeps the accessory "+
-			"undiscoverable, so the setup code spins forever.")
+		"Forget paired HomeKit controllers, then exit without starting the daemon. "+
+			"Use this after removing the accessory in the Home app: the pairing it "+
+			"leaves behind keeps the accessory undiscoverable, so the setup code "+
+			"spins forever. Stop the service first.")
 	c.resetIdentity = fs.Bool("reset-homekit-identity", false,
-		"Come back as an accessory HomeKit has never seen: new id, new keys, no "+
-			"pairings. Use this when a controller or home hub still shows the old "+
-			"accessory, since it remembers the id together with the first key it "+
-			"was given. Configuration and recorded history are kept.")
+		"Discard the accessory's id, keys and pairings, then exit without starting "+
+			"the daemon, so it returns as an accessory HomeKit has never seen. Use "+
+			"this when a controller or home hub still shows the old accessory, since "+
+			"it remembers the id together with the first key it was given. "+
+			"Configuration and recorded history are kept. Stop the service first.")
 	c.homekitPort = fs.Int("homekit_port", defaultHomeKitPort,
 		"TCP port HomeKit listens on and announces. 0 picks an unpredictable free "+
 			"port, which cannot be logged or reached through a firewall rule.")

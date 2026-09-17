@@ -9,6 +9,29 @@ import (
 	"syscall"
 )
 
+// resetHomeKit clears pairing state and exits. Stop the service first: the
+// running daemon holds the identity it read at startup, so a reset underneath
+// it would be overwritten as soon as it next paired.
+func resetHomeKit(config *Config) {
+	dir := *config.dataDirectory
+	if *config.resetIdentity {
+		removed, err := ResetHomeKitIdentity(dir)
+		if err != nil {
+			Fatal("Could not reset the HomeKit identity: %s", err.Error())
+		}
+		Info("Discarded %d HomeKit identity file(s). This accessory is now a device "+
+			"HomeKit has never seen and has to be added in the Home app again.", removed)
+	} else {
+		removed, err := ResetHomeKitPairings(dir)
+		if err != nil {
+			Fatal("Could not reset HomeKit pairings: %s", err.Error())
+		}
+		Info("Forgot %d HomeKit controller pairing(s)", removed)
+	}
+	Info("Reset done. Start the service again without the reset flag.")
+	os.Exit(0)
+}
+
 func main() {
 	fs := flag.NewFlagSet("pool-controller", flag.PanicOnError)
 	help := fs.Bool("h", false, "Display this usage message")
@@ -31,6 +54,14 @@ func main() {
 	// Recover saved values, edit conf to clean them
 	Info("%s", versionLine())
 	Info("Args: %s", os.Args[1:])
+
+	// The resets are maintenance, not a way to start: they do their work and
+	// exit. Running them in the daemon instead would discard the pairing on
+	// every boot for as long as the flag stayed in the service arguments, and
+	// would take over the pid file of the daemon already running.
+	if *config.resetIdentity || *config.resetPairings {
+		resetHomeKit(config)
+	}
 
 	// Write PID
 	err := ioutil.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
@@ -64,18 +95,6 @@ func main() {
 	// let it log next to everything else.
 	CaptureHomeKitLogs(doDebug)
 
-	// This has to run before the store is opened, since that is what reads the
-	// identity and would write a fresh one straight back.
-	if *config.resetIdentity {
-		removed, err := ResetHomeKitIdentity(*config.dataDirectory)
-		if err != nil {
-			Fatal("Could not reset the HomeKit identity: %s", err.Error())
-		}
-		Alert("Discarded %d HomeKit identity file(s). This accessory is now a new "+
-			"device and has to be added in the Home app again. Take the -reset-homekit-identity "+
-			"flag back out, or it will do this on every start.", removed)
-	}
-
 	homekit, err := NewHomeKitService(
 		*config.dataDirectory,
 		config.cfg.Pin,
@@ -99,14 +118,6 @@ func main() {
 		Error("Could not clear the files left by the previous HomeKit library: %s", err.Error())
 	} else if removed > 0 {
 		Info("Removed %d migrated file(s) written by the previous HomeKit library", removed)
-	}
-
-	if *config.resetPairings {
-		removed, err := ResetHomeKitPairings(*config.dataDirectory)
-		if err != nil {
-			Fatal("Could not reset HomeKit pairings: %s", err.Error())
-		}
-		Info("Forgot %d HomeKit controller pairing(s)", removed)
 	}
 
 	if homekit.IsPaired() {
