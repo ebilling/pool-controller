@@ -1,0 +1,22 @@
+---
+description: Pump policy — cleaning cadence, mixing, swim window, house PV
+alwaysApply: true
+---
+
+# Cleaning, mixing, swim window, house PV
+
+## Cleaning cadence
+
+- `Run period` is required **continuous sweep motor runtime** (default 2 hours). `SWEEP` and `MIXING` both count; `SWEEP`↔`MIXING` continues the interval if the sweep never stops. Shorter runs do not count.
+- Persist the timestamp when that continuous run completes. `Cleaning frequency` (days) is measured from that timestamp, not the main pump’s last stop.
+- Keep those fields under **Cleaning / Sweep**, not Solar.
+- Solar-only activity must not postpone or satisfy cleaning.
+
+## Daily windows
+
+- **11:00–13:00:** preferred time to run pumps (house PV). Mixing + pool solar belong here. If a 2-hour sweep is due, prefer completing it in this window rather than at 04:00.
+- **Until 14:00:** keep MIXING while pool solar is on so the hot skin goes to the bottom before swimming. A morning clean does not skip this; the sun rebuilds the layer.
+- **14:00–17:00 swim:** never auto-run the sweep (manual override stays immediate). Pump / pool solar without sweep is fine.
+- Destatify with MIXING before trusting the pump-side temperature; a pump-only sample is the hot skin.
+- Drop the sweep at 14:00 even if pool solar continues.
+- 04:00–06:00 is only a fallback if the 2-hour sweep did not complete during the PV window.

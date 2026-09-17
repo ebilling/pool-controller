@@ -24,7 +24,8 @@ var (
 	defaultPumpAdjustment = 2.5
 	defaultRoofAdjustment = 2.5
 	defaultFrequency      = 2
-	defaultRunTime        = 6
+	defaultRunTime        = 2
+	defaultManualRunTime  = 6
 	serverConfiguration   = "/server.conf"
 )
 
@@ -68,19 +69,22 @@ type PersistedConfig struct {
 	ThermostatMode ThermostatMode
 	// Deprecated: retained only to migrate configuration files written before
 	// ThermostatMode was introduced.
-	HeatDisabled   bool
-	CoolDisabled   bool
-	Auth           string
-	Pin            string
-	Target         float64
-	DeltaT         float64
-	Tolerance      float64
-	PumpAdjustment float64
-	RoofAdjustment float64
-	DailyFrequency float64 // days between automated runs
-	RunTime        float64 // hours when a pump is manually engaged it will run for this many hours
-	Mtime          time.Time
-	Ctime          time.Time
+	HeatDisabled          bool
+	CoolDisabled          bool
+	Auth                  string
+	Pin                   string
+	Target                float64
+	DeltaT                float64
+	Tolerance             float64
+	PumpAdjustment        float64
+	RoofAdjustment        float64
+	DailyFrequency        float64 // days after a qualifying continuous sweep before cleaning is due
+	RunTime               float64 // continuous sweep hours required to qualify as cleaning
+	ManualRunTime         float64 // hours before automatic control resumes after a manual request
+	LastCleaningCompleted time.Time
+	CleaningConfigVersion int
+	Mtime                 time.Time
+	Ctime                 time.Time
 }
 
 // NewConfig creates a config objects based on a given flagset and arguments.
@@ -133,10 +137,23 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		c.cfg.Tolerance = defaultTolerance
 		c.cfg.DailyFrequency = float64(defaultFrequency)
 		c.cfg.RunTime = float64(defaultRunTime)
+		c.cfg.ManualRunTime = float64(defaultManualRunTime)
+		c.cfg.CleaningConfigVersion = 1
 		c.cfg.ThermostatMode = ThermostatAuto
 		c.Save()
 	}
 	normalizeThermostatMode(c.cfg)
+	if c.cfg.CleaningConfigVersion < 1 {
+		// Older configuration files used RunTime for both cleaning and manual
+		// control, and its default was six hours. The new cleaning contract is
+		// a two-hour continuous sweep; retain six hours only for manual mode.
+		c.cfg.RunTime = float64(defaultRunTime)
+		c.cfg.ManualRunTime = float64(defaultManualRunTime)
+		c.cfg.CleaningConfigVersion = 1
+		c.Save()
+	} else if c.cfg.ManualRunTime <= 0 {
+		c.cfg.ManualRunTime = float64(defaultManualRunTime)
+	}
 	return &c
 }
 

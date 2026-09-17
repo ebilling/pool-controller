@@ -21,10 +21,11 @@ func baseControlInputs(now time.Time) controlInputs {
 		lastStart:      now.Add(-time.Hour),
 		lastStop:       now.Add(-48 * time.Hour),
 		sweepStart:     now.Add(-time.Hour),
+		lastCleaning:   now.Add(-12 * time.Hour),
 	}
 }
 
-func TestDailyRunStartsOnlyInMorningWindow(t *testing.T) {
+func TestCleaningStartsInPVWindowOrFallback(t *testing.T) {
 	day := time.Date(2026, time.September, 16, 0, 0, 0, 0, time.Local)
 	for _, tc := range []struct {
 		hour  int
@@ -34,45 +35,66 @@ func TestDailyRunStartsOnlyInMorningWindow(t *testing.T) {
 		{4, true},
 		{5, true},
 		{6, false},
+		{10, false},
+		{11, true},
+		{12, true},
+		{13, false},
 	} {
 		in := baseControlInputs(day.Add(time.Duration(tc.hour) * time.Hour))
+		in.lastCleaning = day.Add(-3 * 24 * time.Hour)
 		got := decideControl(in)
 		if (got.change && got.state == SWEEP) != tc.start {
-			t.Errorf("hour %d: decision=%+v, want daily start=%t", tc.hour, got, tc.start)
+			t.Errorf("hour %d: decision=%+v, want cleaning start=%t", tc.hour, got, tc.start)
 		}
 	}
 }
 
-func TestDailyRunFinishesAfterConfiguredRuntime(t *testing.T) {
-	now := time.Date(2026, time.September, 16, 7, 0, 0, 0, time.Local)
-	in := baseControlInputs(now)
-	in.state = SWEEP
-	in.lastStart = now.Add(-2 * time.Hour)
-
-	got := decideControl(in)
-	if !got.change || got.state != OFF {
-		t.Fatalf("decision=%+v, want OFF after daily runtime", got)
+func TestCleaningFrequencyStartsAtLastQualifyingSweep(t *testing.T) {
+	completed := time.Date(2026, time.September, 14, 12, 0, 0, 0, time.Local)
+	in := baseControlInputs(completed.Add(48*time.Hour - time.Second))
+	in.dailyFrequency = 2
+	in.lastCleaning = completed
+	if cleaningDue(in) {
+		t.Fatal("cleaning became due before two full days elapsed")
+	}
+	in.now = completed.Add(48 * time.Hour)
+	if !cleaningDue(in) {
+		t.Fatal("cleaning did not become due two days after completion")
 	}
 }
 
-func TestDailyRunContinuesPastWindowUntilRuntime(t *testing.T) {
+func TestSolarOnlyStopDoesNotPostponeCleaning(t *testing.T) {
+	now := time.Date(2026, time.September, 16, 11, 0, 0, 0, time.Local)
+	in := baseControlInputs(now)
+	in.lastCleaning = now.Add(-3 * 24 * time.Hour)
+	in.lastStop = now.Add(-20 * time.Minute)
+
+	got := decideControl(in)
+	if !got.change || got.state != SWEEP {
+		t.Fatalf("decision=%+v, want cleaning based on sweep completion, not main-pump stop", got)
+	}
+}
+
+func TestSweepContinuesUntilItQualifiesAsCleaning(t *testing.T) {
 	now := time.Date(2026, time.September, 16, 7, 0, 0, 0, time.Local)
 	in := baseControlInputs(now)
 	in.state = SWEEP
-	in.runTime = 6
-	in.lastStart = now.Add(-3 * time.Hour)
+	in.sweepStart = now.Add(-time.Hour)
+	in.lastCleaning = now.Add(-3 * 24 * time.Hour)
 
 	got := decideControl(in)
 	if got.change {
-		t.Fatalf("decision=%+v, daily run should continue past 06:00", got)
+		t.Fatalf("decision=%+v, sweep should remain continuous until it qualifies", got)
 	}
 }
 
 func TestMixingStopsWhenDemandEnds(t *testing.T) {
-	now := time.Now()
+	now := time.Date(2026, time.September, 16, 18, 0, 0, 0, time.Local)
 	in := baseControlInputs(now)
 	in.state = MIXING
 	in.lastStart = now.Add(-2 * time.Hour)
+	in.sweepStart = now.Add(-2 * time.Hour)
+	in.lastCleaning = now.Add(-time.Minute)
 
 	got := decideControl(in)
 	if !got.change || got.state != OFF {
@@ -81,12 +103,13 @@ func TestMixingStopsWhenDemandEnds(t *testing.T) {
 }
 
 func TestMixingContinuesWhileHeatingDemandExists(t *testing.T) {
-	now := time.Now()
+	now := time.Date(2026, time.September, 16, 12, 0, 0, 0, time.Local)
 	in := baseControlInputs(now)
 	in.state = MIXING
 	in.water = 20
 	in.roof = 40
 	in.lastStart = now.Add(-2 * time.Hour)
+	in.sweepStart = now.Add(-time.Hour)
 
 	got := decideControl(in)
 	if got.change {
@@ -98,6 +121,7 @@ func TestSolarDisableDoesNotDisableDailyCleaning(t *testing.T) {
 	now := time.Date(2026, time.September, 16, 4, 0, 0, 0, time.Local)
 	in := baseControlInputs(now)
 	in.solarDisabled = true
+	in.lastCleaning = now.Add(-3 * 24 * time.Hour)
 
 	got := decideControl(in)
 	if !got.change || got.state != SWEEP {
@@ -143,8 +167,44 @@ func TestSampleRunEngagesSolarWhenDemandSurvives(t *testing.T) {
 	in.roof = 40
 
 	got := decideControl(in)
-	if !got.change || got.state != MIXING {
+	if !got.change || got.state != SOLAR {
 		t.Fatalf("decision=%+v, want solar once the fresh reading agrees", got)
+	}
+}
+
+func TestSolarDemandStartsPreSwimMixingInPVWindow(t *testing.T) {
+	now := time.Date(2026, time.September, 16, 11, 0, 0, 0, time.Local)
+	in := baseControlInputs(now)
+	in.water = 20
+	in.roof = 40
+
+	got := decideControl(in)
+	if !got.change || got.state != MIXING {
+		t.Fatalf("decision=%+v, want MIXING before the swim window", got)
+	}
+}
+
+func TestPreSwimWindowDestatifiesAlreadyRunningSolar(t *testing.T) {
+	now := time.Date(2026, time.September, 16, 11, 0, 0, 0, time.Local)
+	in := baseControlInputs(now)
+	in.state = SOLAR
+	in.lastStart = now.Add(-time.Hour)
+
+	got := decideControl(in)
+	if !got.change || got.state != MIXING {
+		t.Fatalf("decision=%+v, want to mix the surface layer before swimming", got)
+	}
+}
+
+func TestPreSwimHotPumpSampleStartsSweepBeforeBeingTrusted(t *testing.T) {
+	now := time.Date(2026, time.September, 16, 11, 0, 0, 0, time.Local)
+	in := baseControlInputs(now)
+	in.state = PUMP
+	in.lastStart = now.Add(-poolSampleTime - time.Minute)
+
+	got := decideControl(in)
+	if !got.change || got.state != SWEEP {
+		t.Fatalf("decision=%+v, want to destatify an apparent hot surface reading", got)
 	}
 }
 
@@ -175,6 +235,23 @@ func TestSampleRunFinishesItsMinimumRunBeforeStopping(t *testing.T) {
 	}
 }
 
+func TestUselessSolarStopsAfterMinimumMotorRun(t *testing.T) {
+	now := time.Date(2026, time.September, 16, 18, 0, 0, 0, time.Local)
+	in := baseControlInputs(now)
+	in.state = SOLAR
+	in.lastStart = now.Add(-2 * time.Minute)
+
+	if got := decideControl(in); got.change {
+		t.Fatalf("decision=%+v, main pump has not completed its minimum run", got)
+	}
+
+	in.lastStart = now.Add(-minimumPumpRun - time.Minute)
+	got := decideControl(in)
+	if !got.change || got.state != OFF {
+		t.Fatalf("decision=%+v, useless solar should stop after five minutes", got)
+	}
+}
+
 // A minimum run does not bound how often a motor starts, so a cold start
 // waits out a rest period as well.
 func TestStartingAgainWaitsForTheRestPeriod(t *testing.T) {
@@ -199,7 +276,7 @@ func TestStartingAgainWaitsForTheRestPeriod(t *testing.T) {
 // Adding the sweep pump and moving the solar valve are not motor cycling, so
 // escalating is never held back.
 func TestEscalatingToMixingIsNotHeldBack(t *testing.T) {
-	now := time.Date(2026, time.September, 16, 14, 0, 0, 0, time.Local)
+	now := time.Date(2026, time.September, 16, 11, 30, 0, 0, time.Local)
 	in := baseControlInputs(now)
 	in.state = PUMP
 	in.lastStart = now.Add(-poolSampleTime - time.Minute)
@@ -213,24 +290,18 @@ func TestEscalatingToMixingIsNotHeldBack(t *testing.T) {
 	}
 }
 
-// MIXING starts the sweep pump long after the main one, so backing out of it
-// is timed against the sweep's own start.
-func TestBackingOutOfMixingWaitsForTheSweepPump(t *testing.T) {
+func TestSwimWindowDropsSweepButKeepsUsefulSolar(t *testing.T) {
 	now := time.Date(2026, time.September, 16, 14, 0, 0, 0, time.Local)
 	in := baseControlInputs(now)
 	in.state = MIXING
 	in.lastStart = now.Add(-3 * time.Hour)
-	in.sweepStart = now.Add(-2 * time.Minute)
+	in.sweepStart = now.Add(-3 * time.Hour)
+	in.water = 20
+	in.roof = 40
 
 	got := decideControl(in)
-	if got.change {
-		t.Fatalf("decision=%+v, want to wait out the sweep pump's minimum run", got)
-	}
-
-	in.sweepStart = now.Add(-minimumPumpRun - time.Minute)
-	got = decideControl(in)
-	if !got.change || got.state != OFF {
-		t.Fatalf("decision=%+v, want OFF once both pumps have run long enough", got)
+	if !got.change || got.state != SOLAR {
+		t.Fatalf("decision=%+v, want SOLAR with sweep removed at 14:00", got)
 	}
 }
 
@@ -253,7 +324,7 @@ func TestDisablingIgnoresMinimumRun(t *testing.T) {
 // roof sensor must not be read as a reason to keep heating, nor as a reason to
 // shut down: hold until it reads again.
 func TestStaleReadingsHoldTheCurrentState(t *testing.T) {
-	now := time.Date(2026, time.September, 16, 14, 0, 0, 0, time.Local)
+	now := time.Date(2026, time.September, 16, 18, 0, 0, 0, time.Local)
 	in := baseControlInputs(now)
 	in.state = MIXING
 	in.lastStart = now.Add(-2 * time.Hour)
@@ -284,10 +355,22 @@ func TestStaleReadingsStillAllowDailyCleaning(t *testing.T) {
 	in := baseControlInputs(now)
 	in.roofUpdated = now.Add(-maxReadingAge - time.Minute)
 	in.waterUpdated = now.Add(-maxReadingAge - time.Minute)
+	in.lastCleaning = now.Add(-3 * 24 * time.Hour)
 
 	got := decideControl(in)
 	if !got.change || got.state != SWEEP {
 		t.Fatalf("decision=%+v, want SWEEP regardless of probe health", got)
+	}
+}
+
+func TestCleaningNeverStartsInSwimWindow(t *testing.T) {
+	now := time.Date(2026, time.September, 16, 15, 0, 0, 0, time.Local)
+	in := baseControlInputs(now)
+	in.lastCleaning = now.Add(-3 * 24 * time.Hour)
+
+	got := decideControl(in)
+	if got.change {
+		t.Fatalf("decision=%+v, sweep must not start during the swim window", got)
 	}
 }
 

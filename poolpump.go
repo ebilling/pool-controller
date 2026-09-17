@@ -134,7 +134,7 @@ func (ppc *PoolPumpController) controlSnapshot() controlInputs {
 	return controlInputs{
 		now:            ppc.now(),
 		state:          ppc.switches.State(),
-		manual:         ppc.switches.ManualState(cfg.RunTime),
+		manual:         ppc.switches.ManualState(cfg.ManualRunTime),
 		disabled:       cfg.Disabled,
 		solarDisabled:  cfg.SolarDisabled,
 		heatDisabled:   heatDisabled,
@@ -151,20 +151,48 @@ func (ppc *PoolPumpController) controlSnapshot() controlInputs {
 		lastStart:      ppc.switches.GetStartTime(),
 		lastStop:       ppc.switches.GetStopTime(),
 		sweepStart:     ppc.switches.GetSweepStartTime(),
+		lastCleaning:   cfg.LastCleaningCompleted,
 	}
 }
 
-// RunPumpsIfNeeded - If the water is not within the tolerance limit of the target, and the roof
-// temperature would help get the temperature to be closer to the target, the pumps will be
-// turned on.  If the outdoor temperature is low or the pool is very cold, the sweep will also be
-// run to help mix the water as it approaches the target.
+// recordCleaningCompletion persists the instant at which the current
+// continuous sweep interval reaches the configured cleaning runtime. SWEEP
+// and MIXING use the same motor, and Relay keeps its start time across those
+// state transitions, so both contribute to one uninterrupted interval.
+func (ppc *PoolPumpController) recordCleaningCompletion() {
+	if !sweepRunning(ppc.switches.State()) {
+		return
+	}
+	cfg := ppc.config.cfg
+	sweepStart := ppc.switches.GetSweepStartTime()
+	if !cfg.LastCleaningCompleted.Before(sweepStart) {
+		return
+	}
+	completed := sweepStart.Add(cleaningRuntime(cfg.RunTime))
+	if ppc.now().Before(completed) {
+		return
+	}
+
+	previous := cfg.LastCleaningCompleted
+	cfg.LastCleaningCompleted = completed
+	if err := ppc.config.Save(); err != nil {
+		cfg.LastCleaningCompleted = previous
+		Error("Could not persist cleaning completion: %v", err)
+		return
+	}
+	Info("Continuous sweep cleaning completed at %s", completed.Format(time.RFC3339))
+}
+
+// RunPumpsIfNeeded records qualifying sweep work, then applies temperature,
+// cleaning, PV and swim-window policy to the relay state.
 func (ppc *PoolPumpController) RunPumpsIfNeeded() {
+	ppc.recordCleaningCompletion()
 	in := ppc.controlSnapshot()
 	decision := decideControl(in)
 	if decision.change {
 		Info("Automatic state change to %s: %s (pool %0.1fC, roof %0.1fC, target %0.1fC, deltaT %0.1fC)",
 			decision.state, decision.reason, in.water, in.roof, in.target, in.deltaT)
-		ppc.switches.SetState(decision.state, false, ppc.config.cfg.RunTime)
+		ppc.switches.SetState(decision.state, false, ppc.config.cfg.ManualRunTime)
 	}
 }
 
@@ -221,14 +249,14 @@ func (ppc *PoolPumpController) Start() error {
 		defer ppc.mu.Unlock()
 		switch ppc.switches.State() {
 		case OFF:
-			ppc.switches.SetState(PUMP, true, ppc.config.cfg.RunTime)
+			ppc.switches.SetState(PUMP, true, ppc.config.cfg.ManualRunTime)
 		case PUMP:
-			ppc.switches.SetState(SWEEP, true, ppc.config.cfg.RunTime)
+			ppc.switches.SetState(SWEEP, true, ppc.config.cfg.ManualRunTime)
 		case SOLAR:
-			ppc.switches.SetState(MIXING, true, ppc.config.cfg.RunTime)
+			ppc.switches.SetState(MIXING, true, ppc.config.cfg.ManualRunTime)
 		case DISABLED:
 		default:
-			ppc.switches.SetState(OFF, true, ppc.config.cfg.RunTime)
+			ppc.switches.SetState(OFF, true, ppc.config.cfg.ManualRunTime)
 		}
 	})
 	// Initialize RRDs
@@ -285,7 +313,7 @@ func (ppc *PoolPumpController) Status() string {
 			"Pool(%0.1f) Pump(%0.1f) Roof(%0.1f)",
 		ppc.switches.State(), ppc.button.pin.Read(), ppc.switches.solar.Status(),
 		ppc.switches.pump.Status(), ppc.switches.sweep.Status(),
-		ppc.switches.ManualState(ppc.config.cfg.RunTime), ppc.config.cfg.Target,
+		ppc.switches.ManualState(ppc.config.cfg.ManualRunTime), ppc.config.cfg.Target,
 		ppc.runningTemp.Temperature(), ppc.pumpTemp.Temperature(),
 		ppc.roofTemp.Temperature())
 }

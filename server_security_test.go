@@ -67,6 +67,28 @@ func TestPartialConfigPostDoesNotClearBooleans(t *testing.T) {
 	}
 }
 
+func TestCleaningSettingsHaveTheirOwnSection(t *testing.T) {
+	h := testSecureHandler(t)
+	rec := httptest.NewRecorder()
+	h.configHandler(rec, httptest.NewRequest(http.MethodGet, "/config", nil))
+	body := rec.Body.String()
+
+	solar := strings.Index(body, "<legend>Solar</legend>")
+	cleaning := strings.Index(body, "<legend>Cleaning / Sweep</legend>")
+	debug := strings.Index(body, "<legend>Debug and disables</legend>")
+	if solar < 0 || cleaning <= solar || debug <= cleaning {
+		t.Fatalf("configuration sections are missing or out of order")
+	}
+	if strings.Contains(body[solar:cleaning], `name="daily_freq"`) ||
+		strings.Contains(body[solar:cleaning], `name="run_time"`) {
+		t.Fatal("cleaning settings are still rendered under Solar")
+	}
+	if !strings.Contains(body[cleaning:debug], `name="daily_freq"`) ||
+		!strings.Contains(body[cleaning:debug], `name="run_time"`) {
+		t.Fatal("Cleaning / Sweep section is missing cadence settings")
+	}
+}
+
 func TestPairingPageOffersResetWhileStillPaired(t *testing.T) {
 	h := testSecureHandler(t)
 	dir := *h.ppc.config.dataDirectory

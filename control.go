@@ -3,9 +3,11 @@ package main
 import "time"
 
 const (
-	dailyWindowStartHour = 4
-	dailyWindowEndHour   = 6
-	minimumPumpCycle     = time.Hour
+	fallbackStartHour = 4
+	fallbackEndHour   = 6
+	pvStartHour       = 11
+	swimStartHour     = 14
+	swimEndHour       = 17
 	// minimumPumpRun is how long a pump motor keeps running once it starts.
 	// Short runs are what wear a motor out, so an automatic decision to stop
 	// one waits this out. Starting a second motor while the system is already
@@ -55,6 +57,7 @@ type controlInputs struct {
 	lastStart      time.Time
 	lastStop       time.Time
 	sweepStart     time.Time
+	lastCleaning   time.Time
 }
 
 type controlDecision struct {
@@ -104,16 +107,46 @@ func wantsHeating(in controlInputs) bool {
 		in.water < in.roof-in.deltaT
 }
 
-func dailyRunDue(in controlInputs) bool {
-	frequency := time.Duration(in.dailyFrequency * 24 * float64(time.Hour))
-	// A run normally finishes after the morning window. Permit the next run
-	// six hours early so a configured N-day cadence can start at 04:00 rather
-	// than slipping to the following day.
-	frequency -= 6 * time.Hour
-	if frequency < 12*time.Hour {
-		frequency = 12 * time.Hour
+func cleaningRuntime(hours float64) time.Duration {
+	return DurationFromHours(hours, 2.0)
+}
+
+func cleaningDue(in controlInputs) bool {
+	if in.lastCleaning.IsZero() {
+		return true
 	}
-	return in.now.Sub(in.lastStop) > frequency
+	frequency := time.Duration(in.dailyFrequency * 24 * float64(time.Hour))
+	return !in.now.Before(in.lastCleaning.Add(frequency))
+}
+
+func hourInRange(now time.Time, start, end int) bool {
+	return now.Hour() >= start && now.Hour() < end
+}
+
+func inSwimWindow(now time.Time) bool {
+	return hourInRange(now, swimStartHour, swimEndHour)
+}
+
+func inPreSwimMixWindow(now time.Time) bool {
+	return hourInRange(now, pvStartHour, swimStartHour)
+}
+
+func canStartPreSwimSweep(in controlInputs) bool {
+	cutoff := time.Date(in.now.Year(), in.now.Month(), in.now.Day(),
+		swimStartHour, 0, 0, 0, in.now.Location()).Add(-minimumPumpRun)
+	return in.now.Before(cutoff)
+}
+
+func inPreferredCleaningStartWindow(in controlInputs) bool {
+	start := time.Date(in.now.Year(), in.now.Month(), in.now.Day(),
+		pvStartHour, 0, 0, 0, in.now.Location())
+	cutoff := time.Date(in.now.Year(), in.now.Month(), in.now.Day(),
+		swimStartHour, 0, 0, 0, in.now.Location()).Add(-cleaningRuntime(in.runTime))
+	return !in.now.Before(start) && !in.now.After(cutoff)
+}
+
+func sweepCompletedThisRun(in controlInputs) bool {
+	return !in.lastCleaning.IsZero() && !in.lastCleaning.Before(in.sweepStart)
 }
 
 // pumpRunning reports whether the main pump circulates in a given state.
@@ -173,15 +206,32 @@ func decidePumpState(in controlInputs) controlDecision {
 		return changeState(OFF, "controller enabled")
 	}
 
-	// A non-manual SWEEP is the daily cleaning run. Once started, its stop is
-	// based only on its configured runtime; crossing the 06:00 window must not
-	// truncate it.
-	if in.state == SWEEP {
-		runtime := DurationFromHours(in.runTime, 1.0)
-		if in.now.Sub(in.lastStart) >= runtime {
-			return changeState(OFF, "daily cleaning complete")
+	cooling := wantsCooling(in)
+	heating := wantsHeating(in)
+
+	// Swimming wins over automatic cleaning and mixing. Preserve the main
+	// pump and solar valve when possible, but get the sweep out of the pool.
+	if inSwimWindow(in.now) && sweepRunning(in.state) {
+		if in.state == MIXING {
+			if cooling || heating || !readingsFresh(in) {
+				return changeState(SOLAR, "swim window: stopping sweep pump")
+			}
+			return changeState(OFF, "swim window: solar demand ended")
 		}
-		return keepState(in, "daily cleaning")
+		if cooling || heating {
+			return changeState(SOLAR, "swim window: stopping sweep pump")
+		}
+		if !readingsFresh(in) {
+			return changeState(PUMP, "swim window: stopping sweep pump")
+		}
+		return changeState(OFF, "swim window: stopping cleaning")
+	}
+
+	// Once equipment is running, an unreadable probe is not evidence that the
+	// current operation should change. Scheduled cleaning may still start
+	// while probes are stale because it does not depend on temperature.
+	if in.state > OFF && !readingsFresh(in) {
+		return keepState(in, "holding state until temperatures can be measured")
 	}
 
 	// A non-manual PUMP is the sampling run started below. Let it circulate
@@ -190,13 +240,54 @@ func decidePumpState(in controlInputs) controlDecision {
 		return keepState(in, "sampling pool temperature")
 	}
 
-	cooling := wantsCooling(in)
-	heating := wantsHeating(in)
+	// Solar already running at the start of the pre-swim window is exactly
+	// when the pump-side probe is most likely to be seeing the cover-heated
+	// surface layer. Start the sweep before believing that apparent bulk
+	// temperature, even if the transient reading says demand just ended.
+	if in.state == SOLAR && inPreSwimMixWindow(in.now) &&
+		canStartPreSwimSweep(in) {
+		return changeState(MIXING, "destatifying solar-heated surface water")
+	}
+
+	// A sweep in progress is one continuous cleaning/destatification run,
+	// whether the solar valve is open or not. Before swimming, use solar when
+	// it is useful and otherwise keep sweeping until the water is mixed well
+	// enough to trust and the run qualifies as cleaning.
+	if sweepRunning(in.state) {
+		if (cooling || heating) && inPreSwimMixWindow(in.now) {
+			if in.state != MIXING {
+				return changeState(MIXING, "pre-swim solar mixing")
+			}
+			return keepState(in, "pre-swim solar mixing")
+		}
+		if !sweepCompletedThisRun(in) {
+			if in.state != SWEEP {
+				return changeState(SWEEP, "destatifying pool before solar")
+			}
+			return keepState(in, "continuous sweep run")
+		}
+		if cooling || heating {
+			return changeState(SOLAR, "sweep complete; solar demand continues")
+		}
+		return changeState(OFF, "continuous sweep run complete")
+	}
+
+	// PUMP here is an automatic sample that was started because the previous
+	// bulk reading called for solar. During the pre-swim period, a hot result
+	// can just be the surface skin. Destatify before accepting "no demand."
+	if in.state == PUMP && inPreSwimMixWindow(in.now) &&
+		canStartPreSwimSweep(in) && !cooling && !heating {
+		return changeState(SWEEP, "destatifying before trusting pool temperature")
+	}
+
 	if cooling || heating {
 		// While the pumps are off, the water temperature is left over from the
 		// end of the last run and can be hours old. Circulate without solar
 		// first, so this is decided on what the pool reads now.
 		if in.state == OFF {
+			if inPreSwimMixWindow(in.now) && canStartPreSwimSweep(in) {
+				return changeState(MIXING, "pre-swim solar mixing")
+			}
 			reason := "sampling pool temperature before solar heating"
 			if cooling {
 				reason = "sampling pool temperature before solar cooling"
@@ -204,7 +295,7 @@ func decidePumpState(in controlInputs) controlDecision {
 			return changeState(PUMP, reason)
 		}
 		desired := SOLAR
-		if in.water < in.target-in.deltaT || in.water > in.target+in.tolerance {
+		if inPreSwimMixWindow(in.now) && canStartPreSwimSweep(in) {
 			desired = MIXING
 		}
 		if in.state != desired {
@@ -217,10 +308,10 @@ func decidePumpState(in controlInputs) controlDecision {
 		return keepState(in, "temperature demand continues")
 	}
 
-	if in.now.Hour() >= dailyWindowStartHour &&
-		in.now.Hour() < dailyWindowEndHour &&
-		dailyRunDue(in) {
-		return changeState(SWEEP, "daily cleaning due")
+	if cleaningDue(in) &&
+		(inPreferredCleaningStartWindow(in) ||
+			hourInRange(in.now, fallbackStartHour, fallbackEndHour)) {
+		return changeState(SWEEP, "continuous sweep cleaning due")
 	}
 
 	// Turning off is a decision about temperature, so it needs a temperature
@@ -239,8 +330,8 @@ func decidePumpState(in controlInputs) controlDecision {
 		return changeState(OFF, "pool temperature does not call for solar")
 	}
 
-	if in.state > OFF && in.now.Sub(in.lastStart) >= minimumPumpCycle {
+	if in.state > OFF {
 		return changeState(OFF, "temperature demand ended")
 	}
-	return keepState(in, "minimum pump cycle")
+	return keepState(in, "no automatic demand")
 }

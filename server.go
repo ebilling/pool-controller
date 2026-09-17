@@ -370,7 +370,7 @@ func (h *Handler) liveStatus() liveStatus {
 	h.ppc.mu.RLock()
 	defer h.ppc.mu.RUnlock()
 	control := "Auto"
-	if h.ppc.switches.ManualState(h.ppc.config.cfg.RunTime) {
+	if h.ppc.switches.ManualState(h.ppc.config.cfg.ManualRunTime) {
 		control = "Manual"
 	}
 	mode := thermostatModeName(h.ppc.config.cfg)
@@ -561,7 +561,7 @@ func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, cookie)
 	controlStr := "Auto"
-	if h.ppc.switches.ManualState(h.ppc.config.cfg.RunTime) {
+	if h.ppc.switches.ManualState(h.ppc.config.cfg.ManualRunTime) {
 		controlStr = "Manual"
 	}
 	thermostatMode := thermostatModeName(h.ppc.config.cfg)
@@ -838,6 +838,10 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return fmt.Sprintf(`<option value="%s"%s>%s</option>`, value, selected, label)
 	}
+	lastCleaning := "No qualifying sweep recorded yet"
+	if !c.cfg.LastCleaningCompleted.IsZero() {
+		lastCleaning = c.cfg.LastCleaningCompleted.Format("2006-01-02 15:04 MST")
+	}
 
 	body := `<form class="stack" action="/config" method="POST">
 <fieldset>
@@ -861,8 +865,12 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 ` + h.configRow("Target (°C)", "target", fmt.Sprintf("%0.2f", c.cfg.Target), "") + `
 ` + h.configRow("Tolerance (°C)", "tolerance", fmt.Sprintf("%0.2f", c.cfg.Tolerance), "") + `
 ` + h.configRow("Min delta (°C)", "mindelta", fmt.Sprintf("%0.2f", c.cfg.DeltaT), "") + `
-` + h.configRow("Daily run frequency (days)", "daily_freq", fmt.Sprintf("%0.2f", c.cfg.DailyFrequency), "") + `
-` + h.configRow("Run period (hours)", "run_time", fmt.Sprintf("%0.2f", c.cfg.RunTime), "") + `
+</fieldset>
+<fieldset>
+<legend>Cleaning / Sweep</legend>
+` + h.configRow("Cleaning frequency (days)", "daily_freq", fmt.Sprintf("%0.2f", c.cfg.DailyFrequency), "") + `
+` + h.configRow("Required continuous sweep runtime (hours)", "run_time", fmt.Sprintf("%0.2f", c.cfg.RunTime), "") + `
+<p>Last qualifying sweep: ` + html.EscapeString(lastCleaning) + `</p>
 </fieldset>
 <fieldset>
 <legend>Debug and disables</legend>

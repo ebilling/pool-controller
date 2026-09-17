@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -152,4 +155,60 @@ func TestRunPumpsIfNeeded(t *testing.T) {
 	t.Run("", func(t *testing.T) {
 	})
 
+}
+
+func TestRecordCleaningCompletionPersistsQualifyingMixing(t *testing.T) {
+	dir := t.TempDir()
+	persist := true
+	now := time.Date(2026, time.September, 16, 13, 0, 0, 0, time.Local)
+	start := now.Add(-2 * time.Hour)
+	sweep := newRelay(&TestPin{}, "", "")
+	sweep.startTime = start
+	sweep.on = true
+	config := &Config{
+		persist:       &persist,
+		dataDirectory: &dir,
+		cfg: &PersistedConfig{
+			RunTime:       2,
+			ManualRunTime: 6,
+		},
+	}
+	ppc := &PoolPumpController{
+		config: config,
+		switches: &Switches{
+			state: MIXING,
+			sweep: sweep,
+		},
+		now: func() time.Time { return now },
+	}
+
+	ppc.now = func() time.Time { return now.Add(-time.Second) }
+	ppc.recordCleaningCompletion()
+	if !config.cfg.LastCleaningCompleted.IsZero() {
+		t.Fatal("a short sweep interval counted as cleaning")
+	}
+
+	ppc.now = func() time.Time { return now }
+	ppc.recordCleaningCompletion()
+	if got := config.cfg.LastCleaningCompleted; !got.Equal(now) {
+		t.Fatalf("completion=%s, want %s", got, now)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, serverConfiguration))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved PersistedConfig
+	if err := json.Unmarshal(data, &saved); err != nil {
+		t.Fatal(err)
+	}
+	if !saved.LastCleaningCompleted.Equal(now) {
+		t.Fatalf("persisted completion=%s, want %s", saved.LastCleaningCompleted, now)
+	}
+
+	ppc.now = func() time.Time { return now.Add(time.Hour) }
+	ppc.recordCleaningCompletion()
+	if got := config.cfg.LastCleaningCompleted; !got.Equal(now) {
+		t.Fatalf("one continuous sweep recorded twice: %s", got)
+	}
 }

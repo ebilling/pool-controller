@@ -119,6 +119,29 @@ func TestConfig_Pidfile(t *testing.T) {
 	}
 }
 
+func TestLegacyRunTimeMigratesToCleaningAndManualDefaults(t *testing.T) {
+	oldName := serverConfiguration
+	serverConfiguration = "/server.conf"
+	defer func() { serverConfiguration = oldName }()
+
+	dir := t.TempDir()
+	if err := os.WriteFile(dir+serverConfiguration,
+		[]byte(`{"RunTime":6,"DailyFrequency":2,"ThermostatMode":"auto"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	c := NewConfig(flag.NewFlagSet("legacy-cleaning", flag.PanicOnError),
+		[]string{"-p", "-data_dir", dir})
+	if c.cfg.RunTime != 2 {
+		t.Fatalf("cleaning runtime=%v, want migrated two-hour requirement", c.cfg.RunTime)
+	}
+	if c.cfg.ManualRunTime != 6 {
+		t.Fatalf("manual runtime=%v, want legacy six-hour timeout", c.cfg.ManualRunTime)
+	}
+	if c.cfg.CleaningConfigVersion != 1 {
+		t.Fatalf("cleaning config version=%d, want 1", c.cfg.CleaningConfigVersion)
+	}
+}
+
 func TestConfigSave(t *testing.T) {
 	serverConfiguration = fmt.Sprintf("/test-server-%d.conf", rand.Uint32())
 	testpin := "This-is-my-test-pin"

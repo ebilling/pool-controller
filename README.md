@@ -14,6 +14,92 @@ go build -ldflags "-X main.version=$(git rev-parse --short=12 HEAD)"
 VERSION=$(git rev-parse --short=12 HEAD) docker compose build
 ```
 
+## Operating model
+
+The controller drives a main circulation pump, a sweep/cleaner pump, and the
+solar valve. Its automatic states are:
+
+- `PUMP` — circulation only
+- `SWEEP` — circulation plus the sweep pump
+- `SOLAR` — circulation through the roof panels
+- `MIXING` — solar plus the sweep pump
+
+The water probe is beside the equipment, not in the pool. While circulation is
+off, the displayed pool temperature is deliberately held at the last reading
+taken with water moving. A pump-only reading immediately after startup can
+describe water that was standing in the pipes—or the very hot skin under the
+pool cover—rather than the bulk pool.
+
+Heating starts when the held pool temperature is below the target minus the
+tolerance and the roof is at least `Min delta` hotter. Cooling is the inverse:
+the pool must be above target plus tolerance and hotter than the roof by the
+configured delta. Outside the pre-swim period, an automatic solar request first
+circulates without solar for three minutes and then re-evaluates the fresh
+reading.
+
+### House-PV and swim schedule
+
+The schedule is designed for house solar production from 11:00–13:00 and a
+usual swim period from 14:00–17:00:
+
+- **11:00–14:00:** useful pool solar runs as `MIXING`. The sweep pushes the hot
+  surface layer down before swimming, and the resulting temperature is a
+  better measurement of the whole pool.
+- **14:00–17:00:** automatic control never runs the sweep. At 14:00 it changes
+  `MIXING` to `SOLAR` when solar is still useful, or stops when demand has
+  ended. Manual HomeKit and button requests remain immediate.
+- A new sweep is not started so close to 14:00 that its five-minute minimum run
+  would overlap the swim window.
+
+### Cleaning cadence
+
+Cleaning is based on actual continuous sweep-motor work, not on the main
+pump's last stop:
+
+- `Required continuous sweep runtime` defaults to two hours. `SWEEP` and
+  `MIXING` both count, including transitions between them while the sweep motor
+  never stops. Shorter runs do not qualify.
+- The instant that interval completes is persisted as
+  `LastCleaningCompleted`.
+- `Cleaning frequency` is measured in days from that completion. Solar-only
+  activity neither satisfies nor postpones cleaning.
+- A due cleaning is preferentially started after 11:00, early enough to finish
+  before the 14:00 swim window. 04:00–06:00 remains the fallback when no
+  qualifying sweep occurred during the PV/pre-swim period.
+
+These settings are under **Cleaning / Sweep** on the configuration page. A
+legacy config without `LastCleaningCompleted` is due for a qualifying sweep;
+its existing frequency and runtime values are retained. Manual control has a
+separate six-hour timeout, so changing the cleaning runtime no longer changes
+when automatic control resumes.
+
+### Motor and sensor safeguards
+
+Automatic stops give each motor at least five minutes of runtime, and an
+automatic cold start waits until the pumps have rested for fifteen minutes.
+Starting the sweep while circulation is already running is allowed immediately
+because it starts a different motor. Safety disable and manual requests bypass
+these timing gates.
+
+Thermometer values include the timestamp and error status of their last sample.
+Stale readings cannot initiate temperature-driven activity. If a probe fails
+while equipment is already running, the controller holds that relay state until
+it gets a trustworthy measurement instead of treating the cached value as a
+reason to stop. Clock-driven cleaning can still start with stale probes.
+
+## Web interface
+
+The status page updates its cards and graph images in place; it no longer
+reloads the entire page on every refresh. Temperature graphs contain only
+values this controller actually collects, while old RRD data-source names are
+retained for file compatibility.
+
+Configuration uses one persisted thermostat mode (`Off`, `Heat only`, `Cool
+only`, or `Auto`). Older `HeatDisabled`/`CoolDisabled` files are migrated when
+read. Mutating routes require HTTP Basic authentication, reject unsupported
+methods and oversized forms, and the HTTPS server has defensive read/write
+timeouts and a TLS 1.2 minimum.
+
 ## GPIO drivers
 
 `-gpio-driver` selects how the process talks to the GPIO pins.
