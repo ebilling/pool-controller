@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func testHomeKitService(t *testing.T) *HomeKitService {
 	t.Helper()
@@ -21,6 +24,22 @@ func TestHomeKitListensWhereItSaysItDoes(t *testing.T) {
 	homekit.ListenOn(defaultHomeKitPort)
 	if got, want := homekit.Address(), ":51826"; got != want {
 		t.Errorf("Address() = %q, want %q", got, want)
+	}
+}
+
+func TestHomeKitReportsWhereItIsAnnounced(t *testing.T) {
+	homekit := testHomeKitService(t)
+	got := homekit.Announcement()
+	if strings.HasPrefix(got, "unknown: ") {
+		t.Skipf("this host will not list its interfaces: %s", got)
+	}
+	if strings.Contains(got, "127.0.0.1") {
+		t.Errorf("Announcement() offers the loopback address: %q", got)
+	}
+
+	homekit.srv.Ifaces = []string{"nope0"}
+	if got, want := homekit.Announcement(), "no interface to announce on"; got != want {
+		t.Errorf("Announcement() = %q, want %q", got, want)
 	}
 }
 

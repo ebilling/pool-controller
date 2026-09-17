@@ -116,8 +116,8 @@ func main() {
 	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
 	homekit.Start()
-	Info("HomeKit listening on %s, setup code: %s",
-		homekit.Address(), formatSetupCode(config.cfg.Pin))
+	Info("HomeKit listening on %s, setup code: %s, announced on %s",
+		homekit.Address(), formatSetupCode(config.cfg.Pin), homekit.Announcement())
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)

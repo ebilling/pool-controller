@@ -101,6 +101,57 @@ func (h *HomeKitService) Address() string {
 	return h.srv.Addr
 }
 
+// Announcement describes the addresses the accessory offers over mDNS. A phone
+// picks one of them, so an address it cannot route to, from a second network or
+// a container bridge, is enough to leave the Home app waiting with nothing in
+// the log to show for it.
+func (h *HomeKitService) Announcement() string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "unknown: " + err.Error()
+	}
+	var out []string
+	for _, iface := range ifaces {
+		if !announces(iface) || !h.announcesOn(iface.Name) {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ip, ok := addr.(*net.IPNet)
+			if !ok || ip.IP.To4() == nil {
+				continue
+			}
+			out = append(out, iface.Name+"="+ip.IP.String())
+		}
+	}
+	if len(out) == 0 {
+		return "no interface to announce on"
+	}
+	return strings.Join(out, " ")
+}
+
+// announces reports whether mDNS can reach anyone through this interface.
+func announces(iface net.Interface) bool {
+	return iface.Flags&net.FlagUp != 0 &&
+		iface.Flags&net.FlagLoopback == 0 &&
+		iface.Flags&net.FlagMulticast != 0
+}
+
+func (h *HomeKitService) announcesOn(name string) bool {
+	if len(h.srv.Ifaces) == 0 {
+		return true
+	}
+	for _, only := range h.srv.Ifaces {
+		if only == name {
+			return true
+		}
+	}
+	return false
+}
+
 // Start serves HomeKit in the background until Stop is called.
 func (h *HomeKitService) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
