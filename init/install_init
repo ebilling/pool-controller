@@ -2,30 +2,26 @@
 
 key="/etc/ssl/private/pool-controller.key"
 cert="/etc/ssl/certs/pool-controller.crt"
+name="pool-controller"
+bin="/home/pi/go/bin/$name"
+unit="$name.service"
 
-setup()
-{
-    echo "installing binary $2 as $1"
-    rm -f /etc/init.d/$1 /etc/rc*.d/???$1
-    cp -f $1 /etc/init.d/.
-    chmod 0755 /etc/init.d/$1
-    chown root:root /etc/init.d/$1
-    ln -f -s $2 /usr/local/bin/$1
-    ln -f -s /etc/init.d/$1 /etc/rc0.d/K01$1
-    ln -f -s /etc/init.d/$1 /etc/rc1.d/K01$1
-    ln -f -s /etc/init.d/$1 /etc/rc2.d/S$3$1
-    ln -f -s /etc/init.d/$1 /etc/rc3.d/S$3$1
-    ln -f -s /etc/init.d/$1 /etc/rc4.d/S$3$1
-    ln -f -s /etc/init.d/$1 /etc/rc5.d/S$3$1
-    ln -f -s /etc/init.d/$1 /etc/rc6.d/K01$1
-}
+useradd -U -M -s /bin/false homekit 2>/dev/null || true
+ln -f -s $bin /usr/local/bin/$name
 
-useradd -U -M -s /bin/false homekit
-cp -f daemonize /usr/local/bin/.
+# This host runs systemd. The SysV script in this directory is leftover and
+# is not what starts the daemon; leave it in git but do not install it, or
+# systemd would generate a second unit that fights this one.
+if [ -f /etc/init.d/$name ]; then
+    rm -f /etc/init.d/$name /etc/rc*.d/???$name
+fi
 
-setup "pool-controller" "/home/pi/go/bin/pool-controller" "99"
-
+echo "installing $unit"
+cp -f $unit /etc/systemd/system/$unit
+chmod 0644 /etc/systemd/system/$unit
+chown root:root /etc/systemd/system/$unit
 systemctl daemon-reload
+systemctl enable $name
 
 if [ ! -f $cert ]; then
     openssl req -newkey rsa:4096 -nodes -keyout $key -x509 -days 3650 -out $cert

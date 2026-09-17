@@ -166,19 +166,19 @@ sudo pool-controller -data_dir=/var/cache/homekit -reset-homekit-pairings
 sudo service pool-controller start
 ```
 
-Flags that the daemon itself should run with go in `/etc/default/pool-controller`,
-which `/etc/init.d/pool-controller` reads on every start:
+The daemon is a native systemd unit (`/etc/systemd/system/pool-controller.service`),
+not the SysV script in `init/pool-controller`. Flags that the daemon should run
+with go in `/etc/default/pool-controller`. After changing the unit file itself,
+`systemctl daemon-reload` is required; changing only `EXTRA_ARGS` needs a restart.
 
 ```sh
 echo 'EXTRA_ARGS="-debug"' | sudo tee /etc/default/pool-controller
-sudo service pool-controller restart
+sudo systemctl restart pool-controller
 ```
 
 The startup log prints the arguments it was given, so `Args:` confirms what
-took effect. Keep flags here rather than in the init script: `install_init`
-overwrites that script, and an edit made there is lost on the next install.
-The reset flags do not belong in this file; they exit instead of starting, so
-the service would never come up.
+took effect. The reset flags do not belong in this file: they exit instead of
+starting, so `Restart=always` would loop.
 
 Either path keeps the accessory's own identity (`uuid`) and key pair, so only
 the iOS pairings are dropped. Startup also logs whether any pairing remains.

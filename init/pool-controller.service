@@ -1,0 +1,13 @@
+[Unit]
+Description=Pool Controller Service
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/pool-controller
+ExecStart=/usr/local/bin/pool-controller -p -data_dir=/var/cache/homekit -pid=/tmp/pool-controller.pid $EXTRA_ARGS
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
