@@ -67,6 +67,37 @@ func TestPartialConfigPostDoesNotClearBooleans(t *testing.T) {
 	}
 }
 
+// The Debug checkbox submits the value the form renders for it, so the handler
+// has to recognise that one rather than the browser's default for a valueless
+// checkbox.
+func TestDebugCheckboxTurnsDebugLoggingOn(t *testing.T) {
+	h := testSecureHandler(t)
+	DisableDebug()
+	t.Cleanup(DisableDebug)
+
+	form := url.Values{"posted": {"true"}, "_present_debug": {"true"}, "debug": {"true"}}
+	req := httptest.NewRequest(http.MethodPost, "/config", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatal(err)
+	}
+	h.processForm(req, h.ppc.config)
+	if !doDebug {
+		t.Fatal("ticking Debug left debug logging off")
+	}
+
+	form = url.Values{"posted": {"true"}, "_present_debug": {"true"}}
+	req = httptest.NewRequest(http.MethodPost, "/config", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatal(err)
+	}
+	h.processForm(req, h.ppc.config)
+	if doDebug {
+		t.Fatal("clearing Debug left debug logging on")
+	}
+}
+
 func TestCleaningSettingsHaveTheirOwnSection(t *testing.T) {
 	h := testSecureHandler(t)
 	rec := httptest.NewRecorder()

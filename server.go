@@ -801,15 +801,16 @@ func (h *Handler) processForm(r *http.Request, c *Config) {
 		c.Save()
 	}
 
-	// Don't persist this one
+	// Don't persist this one. The checkbox submits the value the form gives
+	// it, "true", and not the "on" a browser sends for a checkbox with no
+	// value of its own.
 	posted := getFormValue(r, "posted", "")
 	if posted == "true" && getFormValue(r, "_present_debug", "") == "true" {
-		value := getFormValue(r, "debug", "")
-		if value == "on" {
+		if getFormValue(r, "debug", "false") == "true" {
 			EnableDebug()
-			Debug("Enabling Debug: value(%s) posted(%s)", value, posted)
+			Info("Debug logging is on")
 		} else {
-			Debug("Disabling Debug: value(%s) posted(%s)", value, posted)
+			Info("Debug logging is off")
 			DisableDebug()
 		}
 	}
