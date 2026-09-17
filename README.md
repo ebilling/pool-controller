@@ -156,11 +156,17 @@ decides discoverability while announcing itself and cannot be asked to
 re-evaluate it. The restart briefly stops the pumps.
 
 `-reset-homekit-pairings` deletes the pairings at startup instead, for when the
-web interface is not reachable:
+web interface is not reachable. Occasional flags go in `/etc/default/pool-controller`,
+which `/etc/init.d/pool-controller` reads on every start:
 
 ```sh
-sudo systemctl restart pool-controller   # after adding the flag to the unit
+echo 'EXTRA_ARGS="-reset-homekit-pairings"' | sudo tee /etc/default/pool-controller
+sudo service pool-controller restart
 ```
+
+The startup log prints the arguments it was given, so `Args:` confirms what
+took effect. Keep flags here rather than in the init script: `install_init`
+overwrites that script, and an edit made there is lost on the next install.
 
 Either path keeps the accessory's own identity (`uuid`) and key pair, so only
 the iOS pairings are dropped. Startup also logs whether any pairing remains.

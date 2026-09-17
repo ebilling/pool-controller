@@ -19,6 +19,15 @@ data_dir="/var/cache/homekit"
 pidfile="/tmp/$name.pid"
 args="-p -data_dir=$data_dir -pid=$pidfile"
 bindir="/usr/local/bin"
+defaults="/etc/default/$name"
+
+# Occasional flags such as -debug or -homekit_iface belong in $defaults as
+# EXTRA_ARGS, not in this script: install_init overwrites this copy, and an
+# edit made here is lost on the next install.
+if [ -r "$defaults" ]; then
+    . "$defaults"
+    args="$args $EXTRA_ARGS"
+fi
 
 #Redirect all output syslog
 exec 1> >(logger -t $name -p daemon.info) 2>&1
