@@ -153,6 +153,12 @@ func (p *Switches) GetStopTime() time.Time {
 	return p.pump.GetStopTime()
 }
 
+// GetSweepStartTime returns the start time of the sweep pump, which runs
+// independently of the main pump and needs its own minimum run
+func (p *Switches) GetSweepStartTime() time.Time {
+	return p.sweep.GetStartTime()
+}
+
 // Enable re-enables the pumps after having been disabled
 func (p *Switches) Enable() {
 	p.mu.Lock()

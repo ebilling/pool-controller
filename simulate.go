@@ -112,6 +112,7 @@ type SimulatedThermometer struct {
 	name      string
 	temp      float64
 	updateErr error
+	updated   time.Time
 	accessory *accessory.Thermometer
 }
 
@@ -121,6 +122,7 @@ func NewSimulatedThermometer(name, manufacturer string, temp float64) *Simulated
 	t := &SimulatedThermometer{
 		name:      name,
 		temp:      temp,
+		updated:   time.Now(),
 		accessory: acc,
 	}
 	acc.TempSensor.CurrentTemperature.SetValue(temp)
@@ -138,7 +140,14 @@ func (t *SimulatedThermometer) Update() error {
 		return t.updateErr
 	}
 	t.accessory.TempSensor.CurrentTemperature.SetValue(t.temp)
+	t.updated = time.Now()
 	return nil
+}
+
+// ReadingStatus reports a simulated probe as healthy unless a failure was
+// scripted for it.
+func (t *SimulatedThermometer) ReadingStatus() (time.Time, error) {
+	return t.updated, t.updateErr
 }
 
 func (t *SimulatedThermometer) Calibrate(float64) error {

@@ -89,6 +89,30 @@ func TestGpioRelay(t *testing.T) {
 	})
 }
 
+// Every state change that keeps a pump running re-asserts its relay, so the
+// start time has to mark the edge, not the last request. The minimum run
+// times are measured from it.
+func TestRelayTimesOnlyMoveOnEdges(t *testing.T) {
+	relay := newRelay(&TestPin{}, "", "")
+
+	relay.TurnOn()
+	start := relay.GetStartTime()
+	relay.TurnOn()
+	if got := relay.GetStartTime(); !got.Equal(start) {
+		t.Errorf("re-asserting a running relay moved its start time: %s != %s", got, start)
+	}
+
+	relay.TurnOff()
+	stop := relay.GetStopTime()
+	relay.TurnOff()
+	if got := relay.GetStopTime(); !got.Equal(stop) {
+		t.Errorf("re-asserting a stopped relay moved its stop time: %s != %s", got, stop)
+	}
+	if got := relay.GetStartTime(); !got.Equal(start) {
+		t.Errorf("stopping moved the start time: %s != %s", got, start)
+	}
+}
+
 func TestSolarValveIgnoresDuplicatePosition(t *testing.T) {
 	reverse := &TestPin{}
 	valve := &SolarValve{
@@ -113,6 +137,9 @@ func TestSolarValveIgnoresDuplicatePosition(t *testing.T) {
 	valve.mtx.Unlock()
 }
 
+// started and stopped describe the main pump's relay edges. A state change
+// that keeps it circulating re-asserts the relay without starting the motor
+// again, so its times stay put.
 func pumpTest(t *testing.T, pumps *Switches, state State,
 	pumpState, sweepState, solarState GpioState,
 	started, stopped, manual bool, startTime, stopTime time.Time) {
@@ -190,7 +217,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(SWEEP, false, 1.0)
 		pumpTest(t, pumps, SWEEP, High, High, Low,
-			true, false, false, startTime, stopTime)
+			false, false, false, startTime, stopTime)
 	})
 
 	t.Run("StartPumpAfterSweep", func(t *testing.T) {
@@ -198,7 +225,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(PUMP, false, 1.0)
 		pumpTest(t, pumps, PUMP, High, Low, Low,
-			true, false, false, startTime, stopTime)
+			false, false, false, startTime, stopTime)
 	})
 
 	t.Run("StartSolar", func(t *testing.T) {
@@ -206,7 +233,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(SOLAR, false, 1.0)
 		pumpTest(t, pumps, SOLAR, High, Low, High,
-			true, false, false, startTime, stopTime)
+			false, false, false, startTime, stopTime)
 	})
 
 	t.Run("StartSolarMixing", func(t *testing.T) {
@@ -214,7 +241,7 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(MIXING, false, 1.0)
 		pumpTest(t, pumps, MIXING, High, High, High,
-			true, false, false, startTime, stopTime)
+			false, false, false, startTime, stopTime)
 	})
 
 	t.Run("StartManualPump", func(t *testing.T) {
@@ -222,10 +249,10 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(PUMP, true, 1.0)
 		pumpTest(t, pumps, PUMP, High, Low, Low,
-			true, false, true, startTime, stopTime)
+			false, false, true, startTime, stopTime)
 		pumps.SetState(SOLAR, false, 1.0)
 		pumpTest(t, pumps, PUMP, High, Low, Low,
-			true, false, true, startTime, stopTime)
+			false, false, true, startTime, stopTime)
 
 	})
 
@@ -234,10 +261,10 @@ func TestGpioSwitchesBasic(t *testing.T) {
 		stopTime = pumps.GetStopTime()
 		pumps.SetState(SWEEP, true, 1.0)
 		pumpTest(t, pumps, SWEEP, High, High, Low,
-			true, false, true, startTime, stopTime)
+			false, false, true, startTime, stopTime)
 		pumps.SetState(SOLAR, false, 1.0)
 		pumpTest(t, pumps, SWEEP, High, High, Low,
-			true, false, true, startTime, stopTime)
+			false, false, true, startTime, stopTime)
 	})
 
 	t.Run("StopAllManual", func(t *testing.T) {
@@ -256,8 +283,9 @@ func TestGpioSwitchesBasic(t *testing.T) {
 			startTime = pumps.GetStartTime()
 			stopTime = pumps.GetStopTime()
 			pumps.Disable()
+			// The pumps were already stopped, so disabling is not a stop.
 			pumpTest(t, pumps, DISABLED, Low, Low, Low,
-				false, true, true, startTime, stopTime)
+				false, false, true, startTime, stopTime)
 		})
 
 		t.Run("StartPump", func(t *testing.T) {
@@ -282,14 +310,14 @@ func TestGpioSwitchesBasic(t *testing.T) {
 			stopTime = pumps.GetStopTime()
 			pumps.Disable()
 			pumpTest(t, pumps, DISABLED, Low, Low, Low,
-				false, true, true, startTime, stopTime)
+				false, false, true, startTime, stopTime)
 		})
 		t.Run("Enabled", func(t *testing.T) {
 			startTime = pumps.GetStartTime()
 			stopTime = pumps.GetStopTime()
 			pumps.Enable()
 			pumpTest(t, pumps, OFF, Low, Low, Low,
-				false, true, true, startTime, stopTime)
+				false, false, true, startTime, stopTime)
 		})
 	})
 }

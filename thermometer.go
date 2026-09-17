@@ -18,6 +18,11 @@ type Thermometer interface {
 	Update() error
 	Calibrate(float64) error
 	Accessory() *accessory.A
+	// ReadingStatus reports when this thermometer last took a reading and the
+	// error from its most recent attempt. Temperature keeps returning the last
+	// good value when sampling fails, so callers that act on a reading have to
+	// ask how old it is.
+	ReadingStatus() (time.Time, error)
 }
 
 // SelectiveThermometer filters out certain data from a Thermometer to produce a better reading
@@ -69,6 +74,13 @@ func (t *SelectiveThermometer) Update() error {
 // Accessory returns the Apple HomeKit accessory
 func (t *SelectiveThermometer) Accessory() *accessory.A {
 	return t.accessory.A
+}
+
+// ReadingStatus reports the status of the thermometer being filtered. This one
+// holds its value on purpose whenever the filter rejects a reading, so the
+// probe behind it is the only meaningful health signal.
+func (t *SelectiveThermometer) ReadingStatus() (time.Time, error) {
+	return t.thermometer.ReadingStatus()
 }
 
 // GpioThermometer is used to measure the temperature of a given resistive thermometer

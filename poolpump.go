@@ -111,43 +111,27 @@ func (ppc *PoolPumpController) Update() error {
 // (probably at night), running the pumps with solar on would help bring the water
 // down to the target temperature.
 func (ppc *PoolPumpController) shouldCool() bool {
-	cfg := ppc.config.cfg
-	_, coolDisabled := thermostatDisables(configuredThermostatMode(cfg))
-	return wantsCooling(controlInputs{
-		solarDisabled: cfg.SolarDisabled,
-		coolDisabled:  coolDisabled,
-		water:         ppc.runningTemp.Temperature(),
-		roof:          ppc.roofTemp.Temperature(),
-		target:        cfg.Target,
-		tolerance:     cfg.Tolerance,
-		deltaT:        cfg.DeltaT,
-	})
+	return wantsCooling(ppc.controlSnapshot())
 }
 
 // A return value of 'True' indicates that the pool is too cool and the roof is hot, running
 // the pumps with solar on would help bring the water up to the target temperature.
 func (ppc *PoolPumpController) shouldWarm() bool {
-	cfg := ppc.config.cfg
-	heatDisabled, _ := thermostatDisables(configuredThermostatMode(cfg))
-	return wantsHeating(controlInputs{
-		solarDisabled: cfg.SolarDisabled,
-		heatDisabled:  heatDisabled,
-		water:         ppc.runningTemp.Temperature(),
-		roof:          ppc.roofTemp.Temperature(),
-		target:        cfg.Target,
-		tolerance:     cfg.Tolerance,
-		deltaT:        cfg.DeltaT,
-	})
+	return wantsHeating(ppc.controlSnapshot())
 }
 
-// RunPumpsIfNeeded - If the water is not within the tolerance limit of the target, and the roof
-// temperature would help get the temperature to be closer to the target, the pumps will be
-// turned on.  If the outdoor temperature is low or the pool is very cold, the sweep will also be
-// run to help mix the water as it approaches the target.
-func (ppc *PoolPumpController) RunPumpsIfNeeded() {
+// controlSnapshot captures everything the control policy is allowed to look at.
+//
+// The water temperature comes from runningTemp, which only accepts readings
+// while the pumps circulate, because the probe sits by the pump rather than in
+// the pool. Its freshness is therefore the freshness of the probe behind it,
+// not of the value, which is held on purpose between runs.
+func (ppc *PoolPumpController) controlSnapshot() controlInputs {
 	cfg := ppc.config.cfg
 	heatDisabled, coolDisabled := thermostatDisables(configuredThermostatMode(cfg))
-	decision := decideControl(controlInputs{
+	waterUpdated, _ := ppc.runningTemp.ReadingStatus()
+	roofUpdated, _ := ppc.roofTemp.ReadingStatus()
+	return controlInputs{
 		now:            ppc.now(),
 		state:          ppc.switches.State(),
 		manual:         ppc.switches.ManualState(cfg.RunTime),
@@ -157,6 +141,8 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		coolDisabled:   coolDisabled,
 		water:          ppc.runningTemp.Temperature(),
 		roof:           ppc.roofTemp.Temperature(),
+		waterUpdated:   waterUpdated,
+		roofUpdated:    roofUpdated,
 		target:         cfg.Target,
 		tolerance:      cfg.Tolerance,
 		deltaT:         cfg.DeltaT,
@@ -164,10 +150,21 @@ func (ppc *PoolPumpController) RunPumpsIfNeeded() {
 		runTime:        cfg.RunTime,
 		lastStart:      ppc.switches.GetStartTime(),
 		lastStop:       ppc.switches.GetStopTime(),
-	})
+		sweepStart:     ppc.switches.GetSweepStartTime(),
+	}
+}
+
+// RunPumpsIfNeeded - If the water is not within the tolerance limit of the target, and the roof
+// temperature would help get the temperature to be closer to the target, the pumps will be
+// turned on.  If the outdoor temperature is low or the pool is very cold, the sweep will also be
+// run to help mix the water as it approaches the target.
+func (ppc *PoolPumpController) RunPumpsIfNeeded() {
+	in := ppc.controlSnapshot()
+	decision := decideControl(in)
 	if decision.change {
-		Info("Automatic state change to %s: %s", decision.state, decision.reason)
-		ppc.switches.SetState(decision.state, false, cfg.RunTime)
+		Info("Automatic state change to %s: %s (pool %0.1fC, roof %0.1fC, target %0.1fC, deltaT %0.1fC)",
+			decision.state, decision.reason, in.water, in.roof, in.target, in.deltaT)
+		ppc.switches.SetState(decision.state, false, ppc.config.cfg.RunTime)
 	}
 }
 
@@ -197,13 +194,20 @@ func (ppc *PoolPumpController) runLoop() {
 		case <-ticker.C:
 			ppc.mu.Lock()
 			ppc.SyncAdjustments()
-			if err := ppc.Update(); err != nil {
-				Error("Sensor update failed; retaining current relay state: %s", err)
-				ppc.mu.Unlock()
-				continue
+			err := ppc.Update()
+			if err != nil {
+				Error("Sensor update failed: %s", err)
 			}
+			// Decide either way. The policy knows how old each reading is, so
+			// it can hold the relays where they are while a probe is
+			// unreadable, and still start a scheduled cleaning run, which does
+			// not depend on temperature.
 			ppc.RunPumpsIfNeeded()
-			ppc.UpdateRrd()
+			if err == nil {
+				// Leave a gap in the graphs rather than plotting a temperature
+				// that was not measured.
+				ppc.UpdateRrd()
+			}
 			Debug(ppc.Status())
 			ppc.mu.Unlock()
 		}

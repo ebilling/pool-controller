@@ -6,6 +6,23 @@ const (
 	dailyWindowStartHour = 4
 	dailyWindowEndHour   = 6
 	minimumPumpCycle     = time.Hour
+	// minimumPumpRun is how long a pump motor keeps running once it starts.
+	// Short runs are what wear a motor out, so an automatic decision to stop
+	// one waits this out; starting one is never held back.
+	minimumPumpRun = 15 * time.Minute
+	// poolSampleTime is how long to circulate without solar before trusting
+	// the water temperature. The probe sits by the pump, not in the pool, so
+	// its reading only describes the pool once flow has replaced what was
+	// standing in the pipes.
+	poolSampleTime = 3 * time.Minute
+	// maxReadingAge is how old a temperature may be and still justify running
+	// the pumps. A thermometer keeps reporting its last good value when
+	// sampling fails, so a probe that dies on a hot afternoon would otherwise
+	// hold a roof temperature that calls for solar all night. The control loop
+	// samples every few seconds; this is a long stretch of failures. The status
+	// page flags a stale reading sooner than this, so a probe going bad is
+	// visible before it changes what the pumps do.
+	maxReadingAge = 2 * time.Minute
 )
 
 // controlInputs is an immutable snapshot of everything needed to choose the
@@ -21,6 +38,8 @@ type controlInputs struct {
 	coolDisabled   bool
 	water          float64
 	roof           float64
+	waterUpdated   time.Time
+	roofUpdated    time.Time
 	target         float64
 	tolerance      float64
 	deltaT         float64
@@ -28,6 +47,7 @@ type controlInputs struct {
 	runTime        float64
 	lastStart      time.Time
 	lastStop       time.Time
+	sweepStart     time.Time
 }
 
 type controlDecision struct {
@@ -57,14 +77,22 @@ func changeState(state State, reason string) controlDecision {
 	return controlDecision{state: state, change: true, reason: reason}
 }
 
+// readingsFresh reports whether both probes produced a reading recently enough
+// to act on. Without this, a temperature the controller can no longer measure
+// still looks like a reason to run the pumps.
+func readingsFresh(in controlInputs) bool {
+	return in.now.Sub(in.roofUpdated) <= maxReadingAge &&
+		in.now.Sub(in.waterUpdated) <= maxReadingAge
+}
+
 func wantsCooling(in controlInputs) bool {
-	return !in.solarDisabled && !in.coolDisabled &&
+	return !in.solarDisabled && !in.coolDisabled && readingsFresh(in) &&
 		in.water > in.target+in.tolerance &&
 		in.water > in.roof+in.deltaT
 }
 
 func wantsHeating(in controlInputs) bool {
-	return !in.solarDisabled && !in.heatDisabled &&
+	return !in.solarDisabled && !in.heatDisabled && readingsFresh(in) &&
 		in.water < in.target-in.tolerance &&
 		in.water < in.roof-in.deltaT
 }
@@ -81,7 +109,41 @@ func dailyRunDue(in controlInputs) bool {
 	return in.now.Sub(in.lastStop) > frequency
 }
 
+// pumpRunning reports whether the main pump circulates in a given state.
+func pumpRunning(s State) bool {
+	return s == PUMP || s == SWEEP || s == SOLAR || s == MIXING
+}
+
+// sweepRunning reports whether the sweep pump, a second motor, runs in a
+// given state.
+func sweepRunning(s State) bool {
+	return s == SWEEP || s == MIXING
+}
+
+// limitPumpCycling holds back an automatic change that would stop a motor
+// that has not run long enough yet. Each pump is timed separately, because
+// MIXING starts the sweep pump well after the main one, and a change that
+// only adds a pump or moves the solar valve passes straight through.
+func limitPumpCycling(in controlInputs, d controlDecision) controlDecision {
+	if !d.change || d.state == DISABLED {
+		return d
+	}
+	if pumpRunning(in.state) && !pumpRunning(d.state) &&
+		in.now.Sub(in.lastStart) < minimumPumpRun {
+		return keepState(in, "pump has not run long enough to stop")
+	}
+	if sweepRunning(in.state) && !sweepRunning(d.state) &&
+		in.now.Sub(in.sweepStart) < minimumPumpRun {
+		return keepState(in, "sweep pump has not run long enough to stop")
+	}
+	return d
+}
+
 func decideControl(in controlInputs) controlDecision {
+	return limitPumpCycling(in, decidePumpState(in))
+}
+
+func decidePumpState(in controlInputs) controlDecision {
 	if in.disabled {
 		if in.state != DISABLED {
 			return changeState(DISABLED, "controller disabled")
@@ -106,9 +168,25 @@ func decideControl(in controlInputs) controlDecision {
 		return keepState(in, "daily cleaning")
 	}
 
+	// A non-manual PUMP is the sampling run started below. Let it circulate
+	// before its reading is used, then fall through and decide again.
+	if in.state == PUMP && in.now.Sub(in.lastStart) < poolSampleTime {
+		return keepState(in, "sampling pool temperature")
+	}
+
 	cooling := wantsCooling(in)
 	heating := wantsHeating(in)
 	if cooling || heating {
+		// While the pumps are off, the water temperature is left over from the
+		// end of the last run and can be hours old. Circulate without solar
+		// first, so this is decided on what the pool reads now.
+		if in.state == OFF {
+			reason := "sampling pool temperature before solar heating"
+			if cooling {
+				reason = "sampling pool temperature before solar cooling"
+			}
+			return changeState(PUMP, reason)
+		}
 		desired := SOLAR
 		if in.water < in.target-in.deltaT || in.water > in.target+in.tolerance {
 			desired = MIXING
@@ -127,6 +205,22 @@ func decideControl(in controlInputs) controlDecision {
 		in.now.Hour() < dailyWindowEndHour &&
 		dailyRunDue(in) {
 		return changeState(SWEEP, "daily cleaning due")
+	}
+
+	// Turning off is a decision about temperature, so it needs a temperature
+	// worth believing. Hold the current state until the probes read again
+	// rather than acting on a value the controller can no longer measure.
+	if !readingsFresh(in) {
+		return keepState(in, "holding state until temperatures can be measured")
+	}
+
+	// The sampling run has served its purpose: the demand check above has now
+	// seen a current reading and found nothing to do. It was a measurement
+	// rather than a demand-driven run, so it does not wait out the minimum
+	// cycle. The fresh reading it produced is what keeps this from starting
+	// over immediately.
+	if in.state == PUMP {
+		return changeState(OFF, "pool temperature does not call for solar")
 	}
 
 	if in.state > OFF && in.now.Sub(in.lastStart) >= minimumPumpCycle {

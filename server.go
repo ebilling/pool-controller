@@ -352,14 +352,11 @@ type liveStatus struct {
 	Updated    string  `json:"updated"`
 }
 
+// sensorStatus describes a probe for the status page. It flags a stale reading
+// sooner than the control policy acts on one, so a probe going bad shows up
+// here before it changes what the pumps do.
 func sensorStatus(t Thermometer, now time.Time) (bool, string) {
-	reporter, ok := t.(interface {
-		ReadingStatus() (time.Time, error)
-	})
-	if !ok {
-		return true, "OK"
-	}
-	updated, err := reporter.ReadingStatus()
+	updated, err := t.ReadingStatus()
 	if err != nil {
 		return false, err.Error()
 	}

@@ -17,6 +17,7 @@ type Relay struct {
 	stopTime  time.Time
 	accessory *accessory.Switch
 	enabled   bool
+	on        bool
 }
 
 // SolarValve controls two relays at the same time.
@@ -109,7 +110,14 @@ func (r *Relay) TurnOn() {
 	defer r.mu.Unlock()
 	Trace("TurnOn %s", r.name)
 	r.pin.Output(High)
-	r.startTime = time.Now()
+	// Only an off-to-on edge is a start. Every state change that keeps the
+	// pump circulating re-asserts this relay, and that must not look like the
+	// motor started again, or the minimum run and rest times would never be
+	// measured from when it actually began.
+	if !r.on {
+		r.startTime = time.Now()
+		r.on = true
+	}
 	if r.accessory != nil {
 		r.accessory.Switch.On.SetValue(true)
 	}
@@ -121,7 +129,10 @@ func (r *Relay) TurnOff() {
 	defer r.mu.Unlock()
 	Trace("TurnOff %s", r.name)
 	r.pin.Output(Low)
-	r.stopTime = time.Now()
+	if r.on {
+		r.stopTime = time.Now()
+		r.on = false
+	}
 	if r.accessory != nil {
 		r.accessory.Switch.On.SetValue(false)
 	}

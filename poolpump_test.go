@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"testing"
+	"time"
 
 	"github.com/brutella/hap/accessory"
 )
@@ -12,6 +13,7 @@ type FakeThermometer struct {
 	temp           float64
 	updateError    error
 	calibrateError error
+	updated        time.Time
 	acc            *accessory.Thermometer
 }
 
@@ -26,6 +28,15 @@ func (t *FakeThermometer) Update() error {
 }
 func (t *FakeThermometer) Calibrate(float64) error {
 	return t.calibrateError
+}
+
+// ReadingStatus reports a reading taken just now unless a test sets a time,
+// so tests about temperature policy do not all have to think about freshness.
+func (t *FakeThermometer) ReadingStatus() (time.Time, error) {
+	if t.updated.IsZero() {
+		return time.Now(), t.updateError
+	}
+	return t.updated, t.updateError
 }
 func (t *FakeThermometer) Accessory() *accessory.A {
 	if t.acc == nil {
