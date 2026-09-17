@@ -64,6 +64,18 @@ func main() {
 	// let it log next to everything else.
 	CaptureHomeKitLogs(doDebug)
 
+	// This has to run before the store is opened, since that is what reads the
+	// identity and would write a fresh one straight back.
+	if *config.resetIdentity {
+		removed, err := ResetHomeKitIdentity(*config.dataDirectory)
+		if err != nil {
+			Fatal("Could not reset the HomeKit identity: %s", err.Error())
+		}
+		Alert("Discarded %d HomeKit identity file(s). This accessory is now a new "+
+			"device and has to be added in the Home app again. Take the -reset-homekit-identity "+
+			"flag back out, or it will do this on every start.", removed)
+	}
+
 	homekit, err := NewHomeKitService(
 		*config.dataDirectory,
 		config.cfg.Pin,

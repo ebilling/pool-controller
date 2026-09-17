@@ -52,6 +52,7 @@ type Config struct {
 	simPumpTemp    *float64
 	simRoofTemp    *float64
 	resetPairings  *bool
+	resetIdentity  *bool
 	homekitPort    *int
 	homekitIface   *string
 	debug          *bool
@@ -123,6 +124,11 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		"Forget paired HomeKit controllers on startup. Use this after removing the "+
 			"accessory in the Home app: the pairing it leaves behind keeps the accessory "+
 			"undiscoverable, so the setup code spins forever.")
+	c.resetIdentity = fs.Bool("reset-homekit-identity", false,
+		"Come back as an accessory HomeKit has never seen: new id, new keys, no "+
+			"pairings. Use this when a controller or home hub still shows the old "+
+			"accessory, since it remembers the id together with the first key it "+
+			"was given. Configuration and recorded history are kept.")
 	c.homekitPort = fs.Int("homekit_port", defaultHomeKitPort,
 		"TCP port HomeKit listens on and announces. 0 picks an unpredictable free "+
 			"port, which cannot be logged or reached through a firewall rule.")

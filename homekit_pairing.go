@@ -43,6 +43,42 @@ func ResetHomeKitPairings(dir string) (int, error) {
 	return len(controllers), nil
 }
 
+// identityFiles are what make this accessory the device HomeKit remembers:
+// "uuid" is the id it advertises, "keypair" the long term keys it proves that
+// id with, and the rest is hap's own bookkeeping about the published
+// accessories.
+var identityFiles = []string{"uuid", "keypair", "schema", "configHash", "version"}
+
+// ResetHomeKitIdentity makes the accessory come back as a device HomeKit has
+// never seen: a new id and new keys, with every pairing dropped.
+//
+// Keeping the id while the keys change is the state to avoid. A controller, or
+// a home hub acting for one, remembers the id together with the key it was
+// first given, so it can go on showing the accessory and its last known values
+// while no longer being able to talk to it. Only the configuration and the
+// recorded history in the same directory are left alone.
+func ResetHomeKitIdentity(dir string) (int, error) {
+	removed, err := ResetHomeKitPairings(dir)
+	if err != nil {
+		return removed, err
+	}
+	legacy, err := RemoveLegacyPairings(dir)
+	removed += legacy
+	if err != nil {
+		return removed, err
+	}
+	for _, name := range identityFiles {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return removed, err
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 // RemoveLegacyPairings deletes the files left behind by hc. Only call it once
 // hap has opened the store, because deleting them first throws away the
 // accessory's long term keys and every pairing hap would have migrated, which

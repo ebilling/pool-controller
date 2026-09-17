@@ -177,6 +177,15 @@ time it acts.
 Either path keeps the accessory's own identity (`uuid`) and key pair, so only
 the iOS pairings are dropped. Startup also logs whether any pairing remains.
 
+`-reset-homekit-identity` goes further and discards `uuid`, `keypair` and hap's
+bookkeeping as well, so the accessory returns as a device HomeKit has never
+seen. Reach for it when a controller or home hub still shows the old accessory:
+the id and the first key it was given are remembered together, so an accessory
+that keeps its id while its keys change can go on being displayed, with its
+last known values, by a controller that can no longer talk to it. The
+configuration and the recorded history in the same directory are kept. Like the
+flag above, take it back out once it has run.
+
 The Home app reports every failure as "unable to add accessory", so the reason
 comes from `hap`'s own log, which goes to syslog alongside everything else.
 `pairing is not allowed` means a pairing is still on disk and the setup code

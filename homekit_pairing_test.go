@@ -122,6 +122,41 @@ func TestRemoveLegacyPairingsOnlyTakesEntityFiles(t *testing.T) {
 	}
 }
 
+func TestResetHomeKitIdentityMakesANewDevice(t *testing.T) {
+	dir := t.TempDir()
+	writeAccessoryIdentity(t, dir)
+	writePairing(t, dir, "controller")
+	conf := filepath.Join(dir, "server.conf")
+	if err := os.WriteFile(conf, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	rrd := filepath.Join(dir, "temperature.rrd")
+	if err := os.WriteFile(rrd, []byte("rrd"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := ResetHomeKitIdentity(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, gone := range append(identityFiles, hex.EncodeToString([]byte("controller"))+pairingSuffix) {
+		if _, err := os.Stat(filepath.Join(dir, gone)); !os.IsNotExist(err) {
+			t.Errorf("%s survived the identity reset: %v", gone, err)
+		}
+	}
+	for _, keep := range []string{conf, rrd} {
+		if _, err := os.Stat(keep); err != nil {
+			t.Errorf("%s should be preserved: %v", filepath.Base(keep), err)
+		}
+	}
+}
+
+func TestResetHomeKitIdentityIsSafeToRepeat(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := ResetHomeKitIdentity(dir); err != nil {
+		t.Fatalf("resetting an empty directory should not fail: %v", err)
+	}
+}
+
 // A controller paired against hc stays paired across the upgrade: hap copies
 // the old files into its own when it opens the store, and clearing them out
 // afterwards must not undo that.
