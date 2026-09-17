@@ -47,9 +47,29 @@ check_data_dir() {
     cd $data_dir
 }
 
+running_pid() {
+    if [ -f $pidfile ]; then
+	pid=`cat $pidfile`
+	if [ -n "$pid" ] && kill -0 $pid 2>/dev/null; then
+	    echo $pid
+	    return 0
+	fi
+    fi
+    # The pid file is missing or stale. Match on the exact name: the kernel
+    # names a thread irq/<n>-pool-controller, which a loose match would pick up
+    # and hand to kill, so nothing gets stopped at all.
+    pgrep -x $name || true
+}
+
 start_proc() {
     check_data_dir
-    cd $rundir
+    pid=`running_pid`
+    if [ -n "$pid" ]; then
+	# A second copy cannot bind the ports the first one holds, so it would
+	# quit and leave the old arguments running.
+	echo "Starting $name: already running as pid $pid"
+	return 0
+    fi
     if $daemonize $bin $args; then
 	echo "Starting $name: Success"
     else
@@ -58,14 +78,23 @@ start_proc() {
 }
 
 stop_proc() {
-    if [ -f $pidfile ]; then
-	pid=`cat $pidfile`
-    else
-	pid=`pgrep $name`
+    pid=`running_pid`
+    if [ -z "$pid" ]; then
+	echo "Stopping $name: not running"
+	return 0
     fi
 
     if kill -2 $pid; then
-	echo "Stopping $name: Success"
+	# Wait for it to let go of its ports, so a restart does not race it.
+	for _ in 1 2 3 4 5 6 7 8 9 10; do
+	    kill -0 $pid 2>/dev/null || break
+	    sleep 1
+	done
+	if kill -0 $pid 2>/dev/null; then
+	    echo "Stopping $name: still running as pid $pid"
+	else
+	    echo "Stopping $name: Success"
+	fi
     else
 	echo "Stopping $name: Failed"
     fi
