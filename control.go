@@ -8,8 +8,15 @@ const (
 	minimumPumpCycle     = time.Hour
 	// minimumPumpRun is how long a pump motor keeps running once it starts.
 	// Short runs are what wear a motor out, so an automatic decision to stop
-	// one waits this out; starting one is never held back.
-	minimumPumpRun = 15 * time.Minute
+	// one waits this out. Starting a second motor while the system is already
+	// running is not a cycle and is never held back. This has to stay longer
+	// than poolSampleTime, or a sampling run could stop before its reading is
+	// worth anything.
+	minimumPumpRun = 5 * time.Minute
+	// minimumPumpRest is how long everything stays off before an automatic
+	// decision starts a motor again. A minimum run alone does not bound how
+	// often a motor starts, which is the wear that matters; this does.
+	minimumPumpRest = 15 * time.Minute
 	// poolSampleTime is how long to circulate without solar before trusting
 	// the water temperature. The probe sits by the pump, not in the pool, so
 	// its reading only describes the pool once flow has replaced what was
@@ -120,13 +127,22 @@ func sweepRunning(s State) bool {
 	return s == SWEEP || s == MIXING
 }
 
-// limitPumpCycling holds back an automatic change that would stop a motor
-// that has not run long enough yet. Each pump is timed separately, because
-// MIXING starts the sweep pump well after the main one, and a change that
-// only adds a pump or moves the solar valve passes straight through.
+// limitPumpCycling paces the motors. It holds back an automatic change that
+// would stop a motor that has not run long enough yet, or start everything
+// again too soon after a stop. Each pump is timed separately, because MIXING
+// starts the sweep pump well after the main one.
+//
+// Adding a motor to a system that is already running is not a cycle, so it
+// passes straight through, as does moving the solar valve. Only automatic
+// decisions arrive here: a request from the button or from HomeKit is applied
+// directly and stays immediate.
 func limitPumpCycling(in controlInputs, d controlDecision) controlDecision {
 	if !d.change || d.state == DISABLED {
 		return d
+	}
+	if !pumpRunning(in.state) && pumpRunning(d.state) &&
+		in.now.Sub(in.lastStop) < minimumPumpRest {
+		return keepState(in, "pumps have not rested long enough to start")
 	}
 	if pumpRunning(in.state) && !pumpRunning(d.state) &&
 		in.now.Sub(in.lastStart) < minimumPumpRun {

@@ -175,6 +175,27 @@ func TestSampleRunFinishesItsMinimumRunBeforeStopping(t *testing.T) {
 	}
 }
 
+// A minimum run does not bound how often a motor starts, so a cold start
+// waits out a rest period as well.
+func TestStartingAgainWaitsForTheRestPeriod(t *testing.T) {
+	now := time.Date(2026, time.September, 16, 14, 0, 0, 0, time.Local)
+	in := baseControlInputs(now)
+	in.water = 20
+	in.roof = 40
+	in.lastStop = now.Add(-2 * time.Minute)
+
+	got := decideControl(in)
+	if got.change {
+		t.Fatalf("decision=%+v, want to let the pumps rest first", got)
+	}
+
+	in.lastStop = now.Add(-minimumPumpRest - time.Minute)
+	got = decideControl(in)
+	if !got.change || got.state != PUMP {
+		t.Fatalf("decision=%+v, want a sample once the pumps have rested", got)
+	}
+}
+
 // Adding the sweep pump and moving the solar valve are not motor cycling, so
 // escalating is never held back.
 func TestEscalatingToMixingIsNotHeldBack(t *testing.T) {
