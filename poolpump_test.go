@@ -4,7 +4,7 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/brutella/hc/accessory"
+	"github.com/brutella/hap/accessory"
 )
 
 type FakeThermometer struct {
@@ -27,12 +27,11 @@ func (t *FakeThermometer) Update() error {
 func (t *FakeThermometer) Calibrate(float64) error {
 	return t.calibrateError
 }
-func (t *FakeThermometer) Accessory() *accessory.Accessory {
+func (t *FakeThermometer) Accessory() *accessory.A {
 	if t.acc == nil {
-		t.acc = accessory.NewTemperatureSensor(AccessoryInfo(t.name, "Unit Testing Intl"),
-			0.0, -20.0, 100.0, 1.0)
+		t.acc = NewTemperatureSensorAccessory(t.name, "Unit Testing Intl")
 	}
-	return t.acc.Accessory
+	return t.acc.A
 }
 
 type TestRunPumps struct {

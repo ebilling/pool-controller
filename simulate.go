@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/brutella/hc/accessory"
+	"github.com/brutella/hap/accessory"
 )
 
 func simPinName(n uint8) string {
@@ -117,7 +117,7 @@ type SimulatedThermometer struct {
 
 // NewSimulatedThermometer returns a thermometer that does not touch GPIO.
 func NewSimulatedThermometer(name, manufacturer string, temp float64) *SimulatedThermometer {
-	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), temp, -20.0, 100.0, 1.0)
+	acc := NewTemperatureSensorAccessory(name, manufacturer)
 	t := &SimulatedThermometer{
 		name:      name,
 		temp:      temp,
@@ -130,7 +130,7 @@ func NewSimulatedThermometer(name, manufacturer string, temp float64) *Simulated
 func (t *SimulatedThermometer) Name() string { return t.name }
 
 func (t *SimulatedThermometer) Temperature() float64 {
-	return t.accessory.TempSensor.CurrentTemperature.GetValue()
+	return t.accessory.TempSensor.CurrentTemperature.Value()
 }
 
 func (t *SimulatedThermometer) Update() error {
@@ -145,8 +145,8 @@ func (t *SimulatedThermometer) Calibrate(float64) error {
 	return nil
 }
 
-func (t *SimulatedThermometer) Accessory() *accessory.Accessory {
-	return t.accessory.Accessory
+func (t *SimulatedThermometer) Accessory() *accessory.A {
+	return t.accessory.A
 }
 
 func (t *SimulatedThermometer) SetTemperature(temp float64) {

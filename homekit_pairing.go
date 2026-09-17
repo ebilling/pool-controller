@@ -1,66 +1,33 @@
 package main
 
 import (
-	"encoding/hex"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
-// HomeKit pairing state lives in the data directory as "<hex(name)>.entity"
-// files written by brutella/hc. One of them is this accessory's own identity,
-// named after the id recorded in "uuid"; every other one is an iOS controller
-// that completed pairing.
+// HomeKit pairing state lives in the data directory as "<hex(name)>.pairing"
+// files, one per paired iOS controller. This accessory's own identity is kept
+// apart from those, in "uuid" and "keypair", so every pairing file can be
+// removed without the accessory becoming a different device.
 //
-// hc derives mDNS discoverability from that set: an accessory holding a
-// controller pairing advertises sf=0, and hc only re-evaluates the flag when it
-// handles a pair or unpair request. Removing the accessory in the Home app
-// while this process is stopped or unreachable therefore leaves a pairing
-// behind that nothing will ever delete, and the accessory stays undiscoverable
-// across restarts.
-const (
-	entitySuffix    = ".entity"
-	accessoryIDFile = "uuid"
-)
+// An accessory that holds a pairing advertises itself as not discoverable, and
+// hap refreshes that mDNS flag when it adds or removes a pairing itself. A
+// pairing removed behind its back, as the reset below does, therefore only
+// takes effect once the server announces itself again.
+const pairingSuffix = ".pairing"
 
-func accessoryID(dir string) string {
-	b, err := os.ReadFile(filepath.Join(dir, accessoryIDFile))
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(b))
-}
+// legacyPairingSuffix is how brutella/hc, the library this controller used
+// before, named both controller pairings and the accessory's own identity.
+const legacyPairingSuffix = ".entity"
 
-// controllerPairings returns the entity files for paired controllers, excluding
-// this accessory's own identity.
+// controllerPairings returns the pairing file of every paired controller.
 func controllerPairings(dir string) ([]string, error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*"+entitySuffix))
-	if err != nil {
-		return nil, err
-	}
-	self := accessoryID(dir)
-	controllers := make([]string, 0, len(paths))
-	for _, path := range paths {
-		name, ok := entityFileName(path)
-		if !ok || (self != "" && name == self) {
-			continue
-		}
-		controllers = append(controllers, path)
-	}
-	return controllers, nil
-}
-
-func entityFileName(path string) (string, bool) {
-	raw, err := hex.DecodeString(strings.TrimSuffix(filepath.Base(path), entitySuffix))
-	if err != nil {
-		return "", false
-	}
-	return string(raw), true
+	return filepath.Glob(filepath.Join(dir, "*"+pairingSuffix))
 }
 
 // ResetHomeKitPairings forgets every paired controller while keeping this
-// accessory's own key pair, so the next start advertises as discoverable and
-// the setup code works again.
+// accessory's own identity, so it advertises as discoverable again and the
+// setup code pairs from scratch.
 func ResetHomeKitPairings(dir string) (int, error) {
 	controllers, err := controllerPairings(dir)
 	if err != nil {
@@ -72,4 +39,21 @@ func ResetHomeKitPairings(dir string) (int, error) {
 		}
 	}
 	return len(controllers), nil
+}
+
+// RemoveLegacyPairings deletes the pairing files left behind by hc. They are
+// unreadable to hap, so they neither keep a controller paired nor stop the
+// accessory from being discoverable; they only make the pairing state on disk
+// ambiguous. Returns the number of files removed.
+func RemoveLegacyPairings(dir string) (int, error) {
+	paths, err := filepath.Glob(filepath.Join(dir, "*"+legacyPairingSuffix))
+	if err != nil {
+		return 0, err
+	}
+	for i, path := range paths {
+		if err := os.Remove(path); err != nil {
+			return i, err
+		}
+	}
+	return len(paths), nil
 }

@@ -72,32 +72,41 @@ the pinmux happens at the start of the call. `periph` reports 0.
 
 ## HomeKit pairing
 
-The pairing page serves the `X-HM://` setup payload as a QR code; the bare
-setup code is not a payload the Home app recognizes. The payload comes from the
-transport at startup and is logged as `HomeKit setup payload`.
+The accessories are published as one bridge through `brutella/hap`. The pairing
+page renders the `X-HM://` setup payload as a scannable code with the setup
+digits under it, the way Apple prints a setup label; the bare setup code is not
+a payload the Home app recognizes. The payload is built from the setup code, the
+bridge category and the setup id, and is logged at startup as
+`HomeKit setup payload`.
 
-Removing the accessory in the Home app only deletes Apple's side of the
-pairing. If this process is stopped or unreachable at the time, it never handles
-the unpair request and keeps the controller's key in `<data_dir>/*.entity`.
-`brutella/hc` then advertises `sf=0` ("already paired", not discoverable) on
-every later start, so the Home app either will not offer the accessory or
-accepts the setup code and spins forever. Discoverability is not a mode you can
-turn on; it is derived from that stored pairing set.
+An accessory that holds a pairing advertises `sf=0` ("already paired", not
+discoverable). Discoverability is not a mode that can be switched on: it is
+derived from the pairings stored in `<data_dir>/*.pairing`. Removing the
+accessory in the Home app deletes Apple's side of the pairing, and `hap` deletes
+its own side and re-announces itself — but only if it handles that request. If
+this process is stopped or unreachable at the time, the pairing stays on disk
+and the accessory never offers itself again, so the Home app either will not
+list it or accepts the setup code and spins forever.
 
-The pairing page reports this state, and while a stale pairing is present it
-offers a **Forget paired controllers** button. That deletes the stored
-controller keys and delivers an unpair event to the running transport, so the
-accessory starts advertising as discoverable immediately — no restart needed.
+The pairing page reports this state, and while a pairing is present it offers a
+**Forget paired controllers** button. That deletes the stored pairings and
+restarts the daemon, which is what makes the new state reach the network: `hap`
+decides discoverability while announcing itself and cannot be asked to
+re-evaluate it. The restart briefly stops the pumps.
 
-`-reset-homekit-pairings` does the same thing at startup, for when the web
-interface is not reachable:
+`-reset-homekit-pairings` deletes the pairings at startup instead, for when the
+web interface is not reachable:
 
 ```sh
 sudo systemctl restart pool-controller   # after adding the flag to the unit
 ```
 
-Either path keeps the accessory's own identity and key pair, so only the iOS
-pairings are dropped. Startup also logs whether any pairings remain.
+Either path keeps the accessory's own identity (`uuid`) and key pair, so only
+the iOS pairings are dropped. Startup also logs whether any pairing remains.
+
+Note that the first start after upgrading from `brutella/hc` clears the pairing
+files that library wrote (`*.entity`) and pairs from scratch, because the two
+libraries do not share a pairing format.
 
 ## Docker (simulation)
 

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/brutella/hc/accessory"
+	"github.com/brutella/hap/accessory"
 	"github.com/ebilling/pool-controller/internal/rctime"
 )
 
@@ -17,7 +17,7 @@ type Thermometer interface {
 	Temperature() float64
 	Update() error
 	Calibrate(float64) error
-	Accessory() *accessory.Accessory
+	Accessory() *accessory.A
 }
 
 // SelectiveThermometer filters out certain data from a Thermometer to produce a better reading
@@ -31,7 +31,7 @@ type SelectiveThermometer struct {
 // NewSelectiveThermometer creates a SelectiveThermometer
 func NewSelectiveThermometer(name string, manufacturer string, thermometer Thermometer,
 	filter func() bool) *SelectiveThermometer {
-	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), 0.0, -20.0, 100.0, 1.0)
+	acc := NewTemperatureSensorAccessory(name, manufacturer)
 	thermometer.Update()
 	acc.TempSensor.CurrentTemperature.SetValue(thermometer.Temperature())
 	return &SelectiveThermometer{
@@ -54,7 +54,7 @@ func (t *SelectiveThermometer) Calibrate(a float64) error {
 
 // Temperature returns the current temperature
 func (t *SelectiveThermometer) Temperature() float64 {
-	return t.accessory.TempSensor.CurrentTemperature.GetValue()
+	return t.accessory.TempSensor.CurrentTemperature.Value()
 }
 
 // Update attempts to update the thermometer temperature
@@ -67,8 +67,8 @@ func (t *SelectiveThermometer) Update() error {
 }
 
 // Accessory returns the Apple HomeKit accessory
-func (t *SelectiveThermometer) Accessory() *accessory.Accessory {
-	return t.accessory.Accessory
+func (t *SelectiveThermometer) Accessory() *accessory.A {
+	return t.accessory.A
 }
 
 // GpioThermometer is used to measure the temperature of a given resistive thermometer
@@ -107,7 +107,7 @@ func us(t time.Duration) float64 {
 }
 
 func newGpioThermometer(name string, manufacturer string, pin PiPin) *GpioThermometer {
-	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer), 0.0, -20.0, 100.0, 1.0)
+	acc := NewTemperatureSensorAccessory(name, manufacturer)
 	th := GpioThermometer{
 		name:        name,
 		mutex:       sync.Mutex{},
@@ -142,8 +142,8 @@ func (t *GpioThermometer) Name() string {
 }
 
 // Accessory returns the Apple HomeKit accessory related to the GpioThermometer
-func (t *GpioThermometer) Accessory() *accessory.Accessory {
-	return t.accessory.Accessory
+func (t *GpioThermometer) Accessory() *accessory.A {
+	return t.accessory.A
 }
 
 func (t *GpioThermometer) getDischargeTime() time.Duration {
@@ -225,7 +225,7 @@ func (t *GpioThermometer) inRange(dischargeTime time.Duration) bool {
 
 // Temperature returns the current temperature of the GpioThermometer
 func (t *GpioThermometer) Temperature() float64 {
-	return t.accessory.TempSensor.CurrentTemperature.GetValue()
+	return t.accessory.TempSensor.CurrentTemperature.Value()
 }
 
 // ReadingStatus reports when a reading last succeeded and the most recent

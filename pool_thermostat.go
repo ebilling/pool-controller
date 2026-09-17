@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/brutella/hc/accessory"
-	"github.com/brutella/hc/characteristic"
+	"github.com/brutella/hap/accessory"
+	"github.com/brutella/hap/characteristic"
 )
 
 const (
@@ -21,14 +21,11 @@ type PoolThermostat struct {
 
 // NewPoolThermostat publishes the pool as a HomeKit thermostat.
 func NewPoolThermostat(ppc *PoolPumpController) *PoolThermostat {
-	target := ppc.config.cfg.Target
-	acc := accessory.NewThermostat(
-		AccessoryInfo("Pool", mftr),
-		target,
-		thermostatMinC,
-		thermostatMaxC,
-		thermostatStepC,
-	)
+	acc := accessory.NewThermostat(AccessoryInfo("Pool", mftr))
+	acc.Thermostat.TargetTemperature.SetValue(ppc.config.cfg.Target)
+	acc.Thermostat.TargetTemperature.SetMinValue(thermostatMinC)
+	acc.Thermostat.TargetTemperature.SetMaxValue(thermostatMaxC)
+	acc.Thermostat.TargetTemperature.SetStepValue(thermostatStepC)
 	acc.Thermostat.CurrentTemperature.SetMinValue(0)
 	acc.Thermostat.CurrentTemperature.SetMaxValue(100)
 	acc.Thermostat.TemperatureDisplayUnits.SetValue(characteristic.TemperatureDisplayUnitsFahrenheit)
@@ -40,8 +37,8 @@ func NewPoolThermostat(ppc *PoolPumpController) *PoolThermostat {
 }
 
 // Accessory is the HomeKit accessory to add to the HAP bridge.
-func (t *PoolThermostat) Accessory() *accessory.Accessory {
-	return t.acc.Accessory
+func (t *PoolThermostat) Accessory() *accessory.A {
+	return t.acc.A
 }
 
 func (t *PoolThermostat) onTargetTemperature(celsius float64) {

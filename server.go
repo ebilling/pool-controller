@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -179,6 +180,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.qrHandler(w, r)
+		return
+	case "/qr.svg":
+		if !allowMethods(w, r, http.MethodGet) || !h.requireAuth(w, r) {
+			return
+		}
+		h.qrSVGHandler(w, r)
 		return
 	case "/pumps":
 		if !allowMethods(w, r, http.MethodGet) {
@@ -406,9 +413,7 @@ func (h *Handler) statusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) pin() string {
-	var p1, p2, p3 string
-	fmt.Sscanf(h.ppc.config.cfg.Pin, "%3s%2s%3s", &p1, &p2, &p3)
-	return fmt.Sprintf("%3s-%2s-%3s", p1, p2, p3)
+	return formatSetupCode(h.ppc.config.cfg.Pin)
 }
 
 func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
@@ -419,21 +424,36 @@ func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) pairBody(notice string) string {
 	body := `<div class="card">
-<h2>HomeKit pairing</h2>
-<p class="pin">` + html.EscapeString(h.pin()) + `</p>`
+<h2>HomeKit pairing</h2>`
 	if payload := h.setupPayload(); payload != "" {
 		body += `
-<img class="qr" src="/qr" width="256" height="256" alt="HomeKit pairing QR code">
-<p class="legend">Setup payload: ` + html.EscapeString(payload) + `</p>`
+<p class="lead">Scan this code in the Home app, or tap Add Accessory and enter it by hand.</p>` +
+			setupLabelHTML(h.pin(), payload)
 	} else {
 		body += `
-<p class="legend">The HomeKit transport has not reported a setup payload yet.</p>`
+<p class="pin">` + html.EscapeString(h.pin()) + `</p>
+<p class="legend">HomeKit has not reported a setup payload yet, so there is no code
+to scan. Enter the digits above by hand in the Home app.</p>`
 	}
 	if notice != "" {
 		body += "\n" + notice
 	}
 	return body + h.pairingStateHTML() + `
 </div>`
+}
+
+// setupLabelHTML renders the setup code the way Apple prints it: the scannable
+// code above the digits, so either one can be used from the same label.
+func setupLabelHTML(code, payload string) string {
+	return `
+<div class="setup-label">
+<svg class="setup-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 10.6V21h7v-5.5h5V21h7V10.6z"/></svg>
+<img class="setup-qr" src="/qr.svg" width="220" height="220" alt="HomeKit setup code">
+<p class="setup-code">` + html.EscapeString(code) + `</p>
+</div>
+<p class="legend"><a class="setup-link" href="` + html.EscapeString(payload) + `">Open in the Home app</a>
+if you are reading this page on the iPhone you want to pair.</p>
+<p class="legend">Setup payload: <code>` + html.EscapeString(payload) + `</code></p>`
 }
 
 func (h *Handler) pairingStateHTML() string {
@@ -449,7 +469,8 @@ func (h *Handler) pairingStateHTML() string {
 	return fmt.Sprintf(`
 <p class="legend">Paired with %d controller(s), so HomeKit advertises this accessory as
 not discoverable and new setup attempts will hang. If you already removed it from the
-Home app, forget the pairings to make it discoverable again.</p>
+Home app, forget the pairings to make it discoverable again. That restarts the
+controller, which briefly stops the pumps.</p>
 <form class="stack" action="/resetPairings" method="POST">
 <input type="submit" value="Forget paired controllers">
 </form>`, len(controllers))
@@ -468,8 +489,9 @@ func (h *Handler) resetPairingsHandler(w http.ResponseWriter, r *http.Request) {
 				html.EscapeString(err.Error()) + `</p>`
 		} else {
 			Alert("Forgot %d HomeKit controller pairing(s) requested from the web interface", removed)
-			notice = fmt.Sprintf(`<p class="legend">Forgot %d pairing(s). This accessory is
-discoverable again, so add it in the Home app using the code above.</p>`, removed)
+			notice = fmt.Sprintf(`<p class="legend">Forgot %d pairing(s) and restarted the
+controller so it advertises itself again. Give it a few seconds, then add it in the
+Home app using the code above.</p>`, removed)
 		}
 	}
 	h.ppc.mu.RLock()
@@ -483,12 +505,52 @@ func (h *Handler) qrHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Pairing payload unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	png, err := qrcode.Encode(payload, qrcode.Medium, 256)
+	png, err := qrcode.Encode(payload, qrcode.Medium, 512)
 	if err != nil {
 		http.Error(w, "Could not generate pairing code", http.StatusInternalServerError)
 		return
 	}
 	h.writeResponse(w, []byte(png), "image/png")
+}
+
+// qrSVGHandler serves the setup code as vector art, which stays sharp at the
+// size the pairing page draws it and when a phone camera zooms into it.
+func (h *Handler) qrSVGHandler(w http.ResponseWriter, r *http.Request) {
+	payload := h.setupPayload()
+	if payload == "" {
+		http.Error(w, "Pairing payload unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	svg, err := qrCodeSVG(payload)
+	if err != nil {
+		http.Error(w, "Could not generate pairing code", http.StatusInternalServerError)
+		return
+	}
+	h.writeResponse(w, svg, "image/svg+xml")
+}
+
+// qrCodeSVG draws the QR modules as a single path, one unit per module, and
+// leaves scaling to the viewBox.
+func qrCodeSVG(payload string) ([]byte, error) {
+	code, err := qrcode.New(payload, qrcode.Medium)
+	if err != nil {
+		return nil, err
+	}
+	bitmap := code.Bitmap()
+	var svg strings.Builder
+	fmt.Fprintf(&svg, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" `+
+		`shape-rendering="crispEdges" role="img" aria-label="HomeKit setup code">`,
+		len(bitmap), len(bitmap))
+	svg.WriteString(`<rect width="100%" height="100%" fill="#ffffff"/><path fill="#000000" d="`)
+	for y, row := range bitmap {
+		for x, dark := range row {
+			if dark {
+				fmt.Fprintf(&svg, "M%d %dh1v1h-1z", x, y)
+			}
+		}
+	}
+	svg.WriteString(`"/></svg>`)
+	return []byte(svg.String()), nil
 }
 
 func (h *Handler) rootHandler(w http.ResponseWriter, r *http.Request) {

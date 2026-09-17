@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/brutella/hc/accessory"
+	"github.com/brutella/hap/accessory"
 )
 
 // Relay controls the behavior of a particular relay in the system.
@@ -40,6 +40,16 @@ func AccessoryInfo(name string, manufacturer string) accessory.Info {
 	return info
 }
 
+// NewTemperatureSensorAccessory publishes a thermometer to HomeKit over the
+// range this controller can actually measure.
+func NewTemperatureSensorAccessory(name, manufacturer string) *accessory.Thermometer {
+	acc := accessory.NewTemperatureSensor(AccessoryInfo(name, manufacturer))
+	acc.TempSensor.CurrentTemperature.SetMinValue(-20.0)
+	acc.TempSensor.CurrentTemperature.SetMaxValue(100.0)
+	acc.TempSensor.CurrentTemperature.SetStepValue(0.1)
+	return acc
+}
+
 func timeStr(t time.Time) string {
 	return fmt.Sprintf("%02d:%02d:%02d.%09d",
 		t.Hour(), t.Minute(), t.Second(), t.Nanosecond())
@@ -66,11 +76,11 @@ func newRelay(pin PiPin, name string, manufacturer string) *Relay {
 }
 
 // Accessory returns the Apple HomeKit accessory associated with the relay
-func (r *Relay) Accessory() *accessory.Accessory {
+func (r *Relay) Accessory() *accessory.A {
 	if r == nil || r.accessory == nil {
 		return nil
 	}
-	return r.accessory.Accessory
+	return r.accessory.A
 }
 
 // Name returns the name of the Relay
@@ -239,8 +249,8 @@ func (s *SolarValve) Status() string {
 }
 
 // Accessory returns the accessory of the SolarValve
-func (s *SolarValve) Accessory() *accessory.Accessory {
-	return s.accessory.Accessory
+func (s *SolarValve) Accessory() *accessory.A {
+	return s.accessory.A
 }
 
 func (s *SolarValve) isOn() bool {

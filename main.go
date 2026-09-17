@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-
-	"github.com/brutella/hc"
-	"github.com/brutella/hc/event"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -64,8 +63,13 @@ func main() {
 		Fatal("Could not start pool controller: %s", err.Error())
 	}
 
-	// Discoverability is decided when the transport is constructed, so forget
-	// stale controller pairings before that happens.
+	if removed, err := RemoveLegacyPairings(*config.dataDirectory); err != nil {
+		Error("Could not clear pairings left by the previous HomeKit library: %s", err.Error())
+	} else if removed > 0 {
+		Alert("Removed %d pairing file(s) written by the previous HomeKit library. "+
+			"Add this accessory in the Home app using the setup code.", removed)
+	}
+
 	if *config.resetPairings {
 		removed, err := ResetHomeKitPairings(*config.dataDirectory)
 		if err != nil {
@@ -74,69 +78,51 @@ func main() {
 		Info("Forgot %d HomeKit controller pairing(s)", removed)
 	}
 
-	hcConfig := hc.Config{
-		Pin:         config.cfg.Pin,
-		StoragePath: *config.dataDirectory,
-	}
-
-	transport, err := hc.NewIPTransport(
-		hcConfig,
+	homekit, err := NewHomeKitService(
+		*config.dataDirectory,
+		config.cfg.Pin,
 		ppc.thermostat.Accessory(),
 		ppc.pumpTemp.Accessory(),
 		ppc.roofTemp.Accessory(),
 		ppc.switches.pump.Accessory(),
 		ppc.switches.sweep.Accessory(),
 		ppc.switches.solar.Accessory())
-
 	if err != nil {
-		Fatal("Could not start IP Transport: %s", err.Error())
+		Fatal("Could not start HomeKit: %s", err.Error())
 	}
 
-	if paired, err := controllerPairings(*config.dataDirectory); err != nil {
-		Error("Could not read HomeKit pairing state: %s", err.Error())
-	} else if len(paired) > 0 {
-		Alert("HomeKit is paired with %d controller(s), so this accessory is not "+
-			"discoverable. If it was removed from the Home app, restart with "+
-			"-reset-homekit-pairings.", len(paired))
+	if homekit.IsPaired() {
+		Info("HomeKit is paired, so this accessory is not discoverable. Forget the " +
+			"pairing from the web interface, or restart with -reset-homekit-pairings, " +
+			"if it was already removed from the Home app.")
 	} else {
-		Info("HomeKit has no controller pairings; accessory is discoverable")
+		Info("HomeKit has no pairing; accessory is discoverable")
 	}
 
-	// The server serves the pairing QR code, so it needs the setup payload that
-	// only the transport can produce.
+	// The web interface shows the pairing code, so it needs the setup payload.
 	server := NewServer(AnyHost, *config.httpPort, ppc)
-	if uri, err := transport.XHMURI(); err != nil {
+	if uri, err := homekit.SetupPayload(); err != nil {
 		Error("Could not build HomeKit setup payload: %s", err.Error())
 	} else {
 		server.SetPairingURI(uri)
 		Info("HomeKit setup payload: %s", uri)
 	}
-	server.SetPairingReset(func() (int, error) {
-		removed, err := ResetHomeKitPairings(*config.dataDirectory)
-		if err != nil {
-			return removed, err
-		}
-		// hc recomputes the mDNS discoverable flag from the pairing database,
-		// but only while handling an unpair event. Deliver one so the accessory
-		// starts advertising itself again without a restart.
-		transport.Handle(event.DeviceUnpaired{})
-		return removed, nil
-	})
+	server.SetPairingReset(homekit.ResetPairings)
 	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
-	hc.OnTermination(func() {
-		Debug("Stopping Controller")
-		ppc.Stop()
-		Debug("Stopping Server")
-		server.Stop()
-		Debug("Stopping Transport")
-		<-transport.Stop()
-		Debug("All services sent shutdown signal!")
-	})
-	Info("Homekit Pin: %s", hcConfig.Pin)
+	homekit.Start()
+	Info("HomeKit setup code: %s", formatSetupCode(config.cfg.Pin))
 
-	// Starting transport blocks until the daemon is killed
-	transport.Start()
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	Info("Received signal %s, shutting down", <-signals)
+
+	Debug("Stopping Controller")
+	ppc.Stop()
+	Debug("Stopping Server")
+	server.Stop()
+	Debug("Stopping HomeKit")
+	homekit.Stop()
 
 	PowerLed.Output(Low)
 	Info("Exiting")

@@ -145,6 +145,43 @@ input[type=submit], button {
 }
 .pin { font-size: 1.4rem; letter-spacing: 0.12em; font-variant-numeric: tabular-nums; }
 .qr { display: block; margin: 0.75rem 0 0; border-radius: 8px; }
+/* Apple prints the setup code as a light label carrying the scannable code
+   above the digits. Keep it light regardless of the page theme, because a
+   dark or tinted code is not reliably scannable. */
+.setup-label {
+  display: inline-grid;
+  justify-items: center;
+  gap: 0.35rem;
+  margin: 0.25rem 0 1rem;
+  padding: 1rem 1.25rem 0.85rem;
+  border-radius: 18px;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+}
+.setup-glyph { width: 1.5rem; height: 1.5rem; fill: #111; }
+.setup-qr {
+  display: block;
+  width: 220px;
+  height: 220px;
+  max-width: 60vw;
+}
+.setup-code {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+.setup-link { color: var(--accent); }
+code {
+  font-size: 0.78rem;
+  word-break: break-all;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.1rem 0.3rem;
+}
 `
 
 const liveRefreshScript = `<script>

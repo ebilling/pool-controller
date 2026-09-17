@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brutella/hc/accessory"
+	"github.com/brutella/hap/accessory"
 	"github.com/stretchr/testify/assert"
 )
 

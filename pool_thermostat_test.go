@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/brutella/hc/characteristic"
+	"github.com/brutella/hap/characteristic"
 )
 
 func TestThermostatModeMapping(t *testing.T) {

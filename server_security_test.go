@@ -1,14 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 func testSecureHandler(t *testing.T) *Handler {
@@ -69,11 +70,8 @@ func TestPartialConfigPostDoesNotClearBooleans(t *testing.T) {
 func TestPairingPageOffersResetWhileStillPaired(t *testing.T) {
 	h := testSecureHandler(t)
 	dir := *h.ppc.config.dataDirectory
-	if err := os.WriteFile(filepath.Join(dir, accessoryIDFile), []byte("AA:BB:CC:DD:EE:FF"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	writeEntity(t, dir, "AA:BB:CC:DD:EE:FF")
-	writeEntity(t, dir, "stale-controller")
+	writeAccessoryIdentity(t, dir)
+	writePairing(t, dir, "stale-controller")
 
 	body := h.pairBody("")
 	if !strings.Contains(body, `action="/resetPairings"`) {
@@ -139,6 +137,91 @@ func TestPairingQRUsesHomeKitSetupPayload(t *testing.T) {
 	}
 	if got := rec.Header().Get("Content-Type"); got != "image/png" {
 		t.Fatalf("qr content type %q, want image/png", got)
+	}
+}
+
+func TestPairingQRServesScalableSetupCode(t *testing.T) {
+	server := NewServer(LocalHost, 0, &PoolPumpController{})
+	req := httptest.NewRequest(http.MethodGet, "/qr.svg", nil)
+
+	rec := httptest.NewRecorder()
+	server.handler.qrSVGHandler(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("svg without a setup payload returned %d, want 503", rec.Code)
+	}
+
+	server.SetPairingURI("X-HM://0024K0Y3WHOME")
+	rec = httptest.NewRecorder()
+	server.handler.qrSVGHandler(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("svg returned %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "image/svg+xml" {
+		t.Fatalf("svg content type %q, want image/svg+xml", got)
+	}
+
+	body := rec.Body.String()
+	// A viewBox sized in modules, with no pixel size on the svg element, is
+	// what lets the page scale the code without blurring it.
+	code, err := qrcode.New("X-HM://0024K0Y3WHOME", qrcode.Medium)
+	if err != nil {
+		t.Fatal(err)
+	}
+	modules := len(code.Bitmap())
+	if want := fmt.Sprintf(`viewBox="0 0 %d %d"`, modules, modules); !strings.Contains(body, want) {
+		t.Errorf("svg is not sized in QR modules, wanted %s in:\n%s", want, body)
+	}
+	if openTag, _, _ := strings.Cut(body, ">"); strings.Contains(openTag, "width=") {
+		t.Errorf("svg pins a pixel size instead of scaling: %s", openTag)
+	}
+	if !strings.Contains(body, `<path fill="#000000" d="M`) {
+		t.Errorf("svg draws no QR modules: %s", body)
+	}
+}
+
+// The code has to differ with the payload, or every accessory would show the
+// same unusable label.
+func TestQRCodeSVGEncodesItsPayload(t *testing.T) {
+	first, err := qrCodeSVG("X-HM://0024K0Y3WHOME")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := qrCodeSVG("X-HM://00526Q9UFERIC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(first) == string(second) {
+		t.Fatal("different setup payloads produced the same code")
+	}
+}
+
+func TestPairingPageShowsModernSetupLabel(t *testing.T) {
+	h := testSecureHandler(t)
+	h.ppc.config.cfg.Pin = "10293847"
+	h.pairingURI = "X-HM://00526Q9UFERIC"
+
+	body := h.pairBody("")
+	for _, want := range []string{
+		`src="/qr.svg"`,                        // scannable code
+		`<p class="setup-code">102-93-847</p>`, // digits, as printed on a label
+		`href="X-HM://00526Q9UFERIC"`,          // tapping it opens the Home app
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("pairing page is missing %s:\n%s", want, body)
+		}
+	}
+}
+
+func TestPairingPageWithoutPayloadStillShowsTheCode(t *testing.T) {
+	h := testSecureHandler(t)
+	h.ppc.config.cfg.Pin = "10293847"
+
+	body := h.pairBody("")
+	if !strings.Contains(body, "102-93-847") {
+		t.Errorf("pairing page hides the setup code when no payload is known:\n%s", body)
+	}
+	if strings.Contains(body, "/qr.svg") {
+		t.Errorf("pairing page offers an empty code image:\n%s", body)
 	}
 }
 
