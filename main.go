@@ -56,20 +56,12 @@ func main() {
 		Fatal("Could not start pool controller: %s", err.Error())
 	}
 
-	if removed, err := RemoveLegacyPairings(*config.dataDirectory); err != nil {
-		Error("Could not clear pairings left by the previous HomeKit library: %s", err.Error())
-	} else if removed > 0 {
-		Alert("Removed %d pairing file(s) written by the previous HomeKit library. "+
-			"Add this accessory in the Home app using the setup code.", removed)
+	if *config.debug {
+		EnableDebug()
 	}
-
-	if *config.resetPairings {
-		removed, err := ResetHomeKitPairings(*config.dataDirectory)
-		if err != nil {
-			Fatal("Could not reset HomeKit pairings: %s", err.Error())
-		}
-		Info("Forgot %d HomeKit controller pairing(s)", removed)
-	}
+	// HomeKit refuses a pairing for reasons only the library knows about, so
+	// let it log next to everything else.
+	CaptureHomeKitLogs(doDebug)
 
 	homekit, err := NewHomeKitService(
 		*config.dataDirectory,
@@ -82,6 +74,26 @@ func main() {
 		ppc.switches.solar.Accessory())
 	if err != nil {
 		Fatal("Could not start HomeKit: %s", err.Error())
+	}
+	homekit.ListenOn(*config.homekitPort)
+	if err := homekit.AnnounceOn(*config.homekitIface); err != nil {
+		Fatal("Could not announce HomeKit on %s: %s", *config.homekitIface, err.Error())
+	}
+
+	// Opening the store above carried the accessory keys and any pairings out
+	// of the files the previous HomeKit library wrote, so they can go now.
+	if removed, err := RemoveLegacyPairings(*config.dataDirectory); err != nil {
+		Error("Could not clear the files left by the previous HomeKit library: %s", err.Error())
+	} else if removed > 0 {
+		Info("Removed %d migrated file(s) written by the previous HomeKit library", removed)
+	}
+
+	if *config.resetPairings {
+		removed, err := ResetHomeKitPairings(*config.dataDirectory)
+		if err != nil {
+			Fatal("Could not reset HomeKit pairings: %s", err.Error())
+		}
+		Info("Forgot %d HomeKit controller pairing(s)", removed)
 	}
 
 	if homekit.IsPaired() {
@@ -104,7 +116,8 @@ func main() {
 	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
 	homekit.Start()
-	Info("HomeKit setup code: %s", formatSetupCode(config.cfg.Pin))
+	Info("HomeKit listening on %s, setup code: %s",
+		homekit.Address(), formatSetupCode(config.cfg.Pin))
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)

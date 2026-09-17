@@ -18,6 +18,7 @@ var (
 	defaultDataDir        = "/var/cache/homekit"
 	defaultPidFile        = "/tmp/pool-controller.pid"
 	defaultPin            = "74023718"
+	defaultHomeKitPort    = 51826
 	defaultTarget         = 30.0
 	defaultDeltaT         = 12.0
 	defaultTolerance      = 0.5
@@ -51,6 +52,9 @@ type Config struct {
 	simPumpTemp    *float64
 	simRoofTemp    *float64
 	resetPairings  *bool
+	homekitPort    *int
+	homekitIface   *string
+	debug          *bool
 
 	// Internal
 	pidfile *string
@@ -119,6 +123,15 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		"Forget paired HomeKit controllers on startup. Use this after removing the "+
 			"accessory in the Home app: the pairing it leaves behind keeps the accessory "+
 			"undiscoverable, so the setup code spins forever.")
+	c.homekitPort = fs.Int("homekit_port", defaultHomeKitPort,
+		"TCP port HomeKit listens on and announces. 0 picks an unpredictable free "+
+			"port, which cannot be logged or reached through a firewall rule.")
+	c.homekitIface = fs.String("homekit_iface", "",
+		"Announce HomeKit on this network interface only. Leave empty for all of "+
+			"them; naming one helps when a phone keeps reaching for an address it "+
+			"cannot route to.")
+	c.debug = fs.Bool("debug", false,
+		"Log debug messages, including every step of a HomeKit pairing.")
 	fs.Parse(args)
 	err := c.Read()
 	if err != nil {

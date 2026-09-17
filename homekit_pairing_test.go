@@ -96,8 +96,6 @@ func TestResetHomeKitPairingsLeavesUnrelatedFiles(t *testing.T) {
 	}
 }
 
-// The pairing files hc wrote are unreadable to hap, so they are cleared out at
-// startup to keep the pairing state on disk unambiguous.
 func TestRemoveLegacyPairingsOnlyTakesEntityFiles(t *testing.T) {
 	dir := t.TempDir()
 	identity := writeAccessoryIdentity(t, dir)
@@ -121,5 +119,32 @@ func TestRemoveLegacyPairingsOnlyTakesEntityFiles(t *testing.T) {
 		if _, err := os.Stat(keep); err != nil {
 			t.Errorf("%s should be preserved: %v", filepath.Base(keep), err)
 		}
+	}
+}
+
+// A controller paired against hc stays paired across the upgrade: hap copies
+// the old files into its own when it opens the store, and clearing them out
+// afterwards must not undo that.
+func TestStartupKeepsAControllerPairedByTheOldLibrary(t *testing.T) {
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, hex.EncodeToString([]byte("controller"))+legacyPairingSuffix)
+	entity := `{"Name":"controller","PublicKey":"cHVibGljLWtleQ=="}`
+	if err := os.WriteFile(legacy, []byte(entity), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	homekit, err := NewHomeKitService(dir, defaultPin,
+		NewTemperatureSensorAccessory("Pool", mftr).A)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed, err := RemoveLegacyPairings(dir); err != nil {
+		t.Fatal(err)
+	} else if removed != 1 {
+		t.Fatalf("removed %d legacy files, want 1", removed)
+	}
+
+	if !homekit.IsPaired() {
+		t.Error("the migrated pairing was lost, so the accessory has to be added again")
 	}
 }

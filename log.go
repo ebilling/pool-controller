@@ -82,11 +82,13 @@ func isRoutineTLSHandshake(msg string) bool {
 // EnableDebug - enables all calls to {#Debug()} that follow to go to syslog.
 func EnableDebug() {
 	doDebug = true
+	CaptureHomeKitLogs(doDebug)
 }
 
 // DisableDebug - disables all calls to {#Debug()} that follow.  No output will go syslog.
 func DisableDebug() {
 	doDebug = false
+	CaptureHomeKitLogs(doDebug)
 }
 
 func captureLine(format string) string {

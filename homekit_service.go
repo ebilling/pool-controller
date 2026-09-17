@@ -2,19 +2,46 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/brutella/hap"
 	"github.com/brutella/hap/accessory"
+	haplog "github.com/brutella/hap/log"
 )
 
 // setupID names the printed setup label. It has to stay stable across restarts
 // because it is hashed into the "sh" mDNS record, which the Home app compares
 // against the label it just scanned.
 const setupID = "HOME"
+
+// hapLogWriter turns hap's log output into one syslog line per message.
+type hapLogWriter func(string) error
+
+func (w hapLogWriter) Write(p []byte) (int, error) {
+	if err := w(strings.TrimRight(string(p), "\n")); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+// CaptureHomeKitLogs routes hap's own messages to syslog. Its info lines carry
+// the reason a pairing was refused or failed, which the Home app only ever
+// reports as "unable to add accessory". The debug lines follow each pairing
+// step and are noisy, so they need debug logging turned on.
+func CaptureHomeKitLogs(debug bool) {
+	haplog.Info.SetOutput(hapLogWriter(syslogWriter.Info))
+	if debug {
+		haplog.Debug.SetOutput(hapLogWriter(syslogWriter.Debug))
+	} else {
+		haplog.Debug.Disable()
+	}
+}
 
 // HomeKitService owns the HAP server: the mDNS announcement, the pairing
 // endpoints, and the accessory database kept in the data directory.
@@ -40,6 +67,38 @@ func NewHomeKitService(dir, pin string, bridged ...*accessory.A) (*HomeKitServic
 	srv.Pin = pin
 	srv.SetupId = setupID
 	return &HomeKitService{srv: srv, dir: dir, category: bridge.A.Type}, nil
+}
+
+// ListenOn fixes the port HomeKit serves and announces. A port of zero leaves
+// the choice to the kernel, which makes the accessory impossible to reach on
+// purpose, since nothing outside the mDNS announcement knows where it went.
+func (h *HomeKitService) ListenOn(port int) {
+	if port > 0 {
+		h.srv.Addr = fmt.Sprintf(":%d", port)
+	}
+}
+
+// AnnounceOn restricts the mDNS announcement to one interface. With every
+// interface announced, a phone is free to pick an address it cannot route to,
+// and the pairing then stalls with nothing to show for it.
+func (h *HomeKitService) AnnounceOn(iface string) error {
+	if iface == "" {
+		return nil
+	}
+	if _, err := net.InterfaceByName(iface); err != nil {
+		return err
+	}
+	h.srv.Ifaces = []string{iface}
+	return nil
+}
+
+// Address is where HomeKit serves, for the log. It is only known ahead of time
+// if the port was fixed.
+func (h *HomeKitService) Address() string {
+	if h.srv.Addr == "" {
+		return "an unpredictable port"
+	}
+	return h.srv.Addr
 }
 
 // Start serves HomeKit in the background until Stop is called.

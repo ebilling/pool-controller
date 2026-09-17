@@ -165,9 +165,24 @@ sudo systemctl restart pool-controller   # after adding the flag to the unit
 Either path keeps the accessory's own identity (`uuid`) and key pair, so only
 the iOS pairings are dropped. Startup also logs whether any pairing remains.
 
-Note that the first start after upgrading from `brutella/hc` clears the pairing
-files that library wrote (`*.entity`) and pairs from scratch, because the two
-libraries do not share a pairing format.
+The Home app reports every failure as "unable to add accessory", so the reason
+comes from `hap`'s own log, which goes to syslog alongside everything else.
+`pairing is not allowed` means a pairing is still on disk and the setup code
+will not be accepted until it is forgotten. `-debug`, or **Debug** on the
+configuration page, adds a line per pairing request, including the verdict on
+the controller's signature.
+
+HomeKit serves on `-homekit_port` (51826 by default) and announces that port
+over mDNS. A phone that accepts the setup code and then spins has found the
+announcement but cannot reach the port, so test it from the same network with
+`nc -z <pi> 51826` before looking any further. On a host with more than one
+network interface, `-homekit_iface` limits the announcement to one of them,
+which stops a phone from trying an address it has no route to.
+
+On the first start after upgrading from `brutella/hc`, `hap` copies the
+accessory's keys and any paired controllers out of the `*.entity` files that
+library wrote, and those files are then deleted. A controller paired before the
+upgrade stays paired, so the accessory keeps its identity in the Home app.
 
 ## Docker (simulation)
 
@@ -186,5 +201,7 @@ Useful flags (passed after the image entrypoint):
 - `-simulate` — skip `host.Init()`, use in-memory pins, script thermometer readings, log relay outputs
 - `-sim-pump-temp` / `-sim-roof-temp` — Celsius values for the scripted sensors
 - `-http_port` — HTTPS listen port inside the container (default 443)
+- `-homekit_port` / `-homekit_iface` — where HomeKit listens and which interface it announces on
+- `-debug` — debug logging, including each HomeKit pairing request
 
 HomeKit pairing from an iPhone needs multicast. `docker compose` publishes only TCP 8443 by default; use host networking if you are testing discovery.

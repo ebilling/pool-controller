@@ -17,7 +17,9 @@ import (
 const pairingSuffix = ".pairing"
 
 // legacyPairingSuffix is how brutella/hc, the library this controller used
-// before, named both controller pairings and the accessory's own identity.
+// before, named both controller pairings and the accessory's own identity. hap
+// reads those files once, when it first opens the store, and copies what they
+// hold into "keypair" and the pairing files above.
 const legacyPairingSuffix = ".entity"
 
 // controllerPairings returns the pairing file of every paired controller.
@@ -41,10 +43,11 @@ func ResetHomeKitPairings(dir string) (int, error) {
 	return len(controllers), nil
 }
 
-// RemoveLegacyPairings deletes the pairing files left behind by hc. They are
-// unreadable to hap, so they neither keep a controller paired nor stop the
-// accessory from being discoverable; they only make the pairing state on disk
-// ambiguous. Returns the number of files removed.
+// RemoveLegacyPairings deletes the files left behind by hc. Only call it once
+// hap has opened the store, because deleting them first throws away the
+// accessory's long term keys and every pairing hap would have migrated, which
+// forces the accessory to be added again as a new device. Returns the number
+// of files removed.
 func RemoveLegacyPairings(dir string) (int, error) {
 	paths, err := filepath.Glob(filepath.Join(dir, "*"+legacyPairingSuffix))
 	if err != nil {
