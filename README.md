@@ -84,16 +84,20 @@ every later start, so the Home app either will not offer the accessory or
 accepts the setup code and spins forever. Discoverability is not a mode you can
 turn on; it is derived from that stored pairing set.
 
-To recover, forget the stale controllers and restart:
+The pairing page reports this state, and while a stale pairing is present it
+offers a **Forget paired controllers** button. That deletes the stored
+controller keys and delivers an unpair event to the running transport, so the
+accessory starts advertising as discoverable immediately — no restart needed.
+
+`-reset-homekit-pairings` does the same thing at startup, for when the web
+interface is not reachable:
 
 ```sh
-sudo systemctl stop pool-controller
-sudo pool-controller -reset-homekit-pairings   # or add the flag to the unit once
+sudo systemctl restart pool-controller   # after adding the flag to the unit
 ```
 
-The accessory keeps its own identity and key pair, so only the iOS pairings are
-dropped. Startup logs whether any pairings remain, and the pairing page shows
-the same state.
+Either path keeps the accessory's own identity and key pair, so only the iOS
+pairings are dropped. Startup also logs whether any pairings remain.
 
 ## Docker (simulation)
 

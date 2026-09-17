@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,16 +14,17 @@ import (
 func testSecureHandler(t *testing.T) *Handler {
 	t.Helper()
 	persist := false
-	cfg := &Config{cfg: &PersistedConfig{}, persist: &persist}
+	dir := t.TempDir()
+	cfg := &Config{cfg: &PersistedConfig{}, persist: &persist, dataDirectory: &dir}
 	cfg.SetAuth("secret")
 	return &Handler{ppc: &PoolPumpController{config: cfg}}
 }
 
 func TestMutatingRoutesRequireAuthentication(t *testing.T) {
 	h := testSecureHandler(t)
-	for _, path := range []string{"/config", "/calibrate", "/runCalibration", "/pair", "/qr"} {
+	for _, path := range []string{"/config", "/calibrate", "/runCalibration", "/pair", "/qr", "/resetPairings"} {
 		method := http.MethodGet
-		if path == "/runCalibration" {
+		if path == "/runCalibration" || path == "/resetPairings" {
 			method = http.MethodPost
 		}
 		rec := httptest.NewRecorder()
@@ -60,6 +63,61 @@ func TestPartialConfigPostDoesNotClearBooleans(t *testing.T) {
 	h.processForm(req, h.ppc.config)
 	if !h.ppc.config.cfg.Disabled || !h.ppc.config.cfg.SolarDisabled {
 		t.Fatal("partial form cleared an omitted boolean setting")
+	}
+}
+
+func TestPairingPageOffersResetWhileStillPaired(t *testing.T) {
+	h := testSecureHandler(t)
+	dir := *h.ppc.config.dataDirectory
+	if err := os.WriteFile(filepath.Join(dir, accessoryIDFile), []byte("AA:BB:CC:DD:EE:FF"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	writeEntity(t, dir, "AA:BB:CC:DD:EE:FF")
+	writeEntity(t, dir, "stale-controller")
+
+	body := h.pairBody("")
+	if !strings.Contains(body, `action="/resetPairings"`) {
+		t.Fatal("pairing page should offer a reset while a stale pairing blocks discovery")
+	}
+
+	if _, err := ResetHomeKitPairings(dir); err != nil {
+		t.Fatal(err)
+	}
+	if body := h.pairBody(""); strings.Contains(body, `action="/resetPairings"`) {
+		t.Fatal("reset should not be offered once no controllers are paired")
+	}
+}
+
+func TestResetPairingsHandlerRunsResetAction(t *testing.T) {
+	h := testSecureHandler(t)
+	called := 0
+	h.pairingReset = func() (int, error) {
+		called++
+		return 2, nil
+	}
+
+	rec := httptest.NewRecorder()
+	h.resetPairingsHandler(rec, httptest.NewRequest(http.MethodPost, "/resetPairings", nil))
+	if called != 1 {
+		t.Fatalf("reset action called %d times, want 1", called)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("reset returned %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Forgot 2 pairing(s)") {
+		t.Fatalf("reset page did not report the result: %s", rec.Body.String())
+	}
+}
+
+func TestResetPairingsHandlerReportsMissingTransport(t *testing.T) {
+	h := testSecureHandler(t)
+	rec := httptest.NewRecorder()
+	h.resetPairingsHandler(rec, httptest.NewRequest(http.MethodPost, "/resetPairings", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("reset returned %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "transport is not running") {
+		t.Fatalf("missing transport not reported: %s", rec.Body.String())
 	}
 }
 

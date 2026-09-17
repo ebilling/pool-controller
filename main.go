@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/brutella/hc"
+	"github.com/brutella/hc/event"
 )
 
 func main() {
@@ -110,6 +111,17 @@ func main() {
 		server.SetPairingURI(uri)
 		Info("HomeKit setup payload: %s", uri)
 	}
+	server.SetPairingReset(func() (int, error) {
+		removed, err := ResetHomeKitPairings(*config.dataDirectory)
+		if err != nil {
+			return removed, err
+		}
+		// hc recomputes the mDNS discoverable flag from the pairing database,
+		// but only while handling an unpair event. Deliver one so the accessory
+		// starts advertising itself again without a restart.
+		transport.Handle(event.DeviceUnpaired{})
+		return removed, nil
+	})
 	server.Start(*config.sslCertificate, *config.sslPrivateKey)
 
 	hc.OnTermination(func() {

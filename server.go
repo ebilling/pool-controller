@@ -19,8 +19,9 @@ import (
 type Handler struct {
 	ppc *PoolPumpController
 
-	pairingMu  sync.RWMutex
-	pairingURI string
+	pairingMu    sync.RWMutex
+	pairingURI   string
+	pairingReset func() (int, error)
 }
 
 // HostType is used to specify how to listen
@@ -92,6 +93,21 @@ func (h *Handler) setupPayload() string {
 	h.pairingMu.RLock()
 	defer h.pairingMu.RUnlock()
 	return h.pairingURI
+}
+
+// SetPairingReset installs the action behind the pairing page's reset button.
+// It must forget stored controller pairings and make the running transport
+// re-advertise itself as discoverable.
+func (s *Server) SetPairingReset(reset func() (int, error)) {
+	s.handler.pairingMu.Lock()
+	defer s.handler.pairingMu.Unlock()
+	s.handler.pairingReset = reset
+}
+
+func (h *Handler) pairingResetter() func() (int, error) {
+	h.pairingMu.RLock()
+	defer h.pairingMu.RUnlock()
+	return h.pairingReset
 }
 
 func startServer(s *Server, cert, key string) {
@@ -193,6 +209,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.runCalibrationHandler(w, r)
+		return
+	case "/resetPairings":
+		if !allowMethods(w, r, http.MethodPost) || !h.requireAuth(w, r) {
+			return
+		}
+		h.resetPairingsHandler(w, r)
 		return
 	case "/calibrate":
 		if !allowMethods(w, r, http.MethodGet) || !h.requireAuth(w, r) {
@@ -392,6 +414,10 @@ func (h *Handler) pin() string {
 func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
 	h.ppc.mu.RLock()
 	defer h.ppc.mu.RUnlock()
+	h.writeResponse(w, []byte(page("HomeKit pairing", h.pairBody(""))), "text/html")
+}
+
+func (h *Handler) pairBody(notice string) string {
 	body := `<div class="card">
 <h2>HomeKit pairing</h2>
 <p class="pin">` + html.EscapeString(h.pin()) + `</p>`
@@ -403,9 +429,11 @@ func (h *Handler) pairHandler(w http.ResponseWriter, r *http.Request) {
 		body += `
 <p class="legend">The HomeKit transport has not reported a setup payload yet.</p>`
 	}
-	body += h.pairingStateHTML() + `
+	if notice != "" {
+		body += "\n" + notice
+	}
+	return body + h.pairingStateHTML() + `
 </div>`
-	h.writeResponse(w, []byte(page("HomeKit pairing", body)), "text/html")
 }
 
 func (h *Handler) pairingStateHTML() string {
@@ -421,7 +449,32 @@ func (h *Handler) pairingStateHTML() string {
 	return fmt.Sprintf(`
 <p class="legend">Paired with %d controller(s), so HomeKit advertises this accessory as
 not discoverable and new setup attempts will hang. If you already removed it from the
-Home app, restart with -reset-homekit-pairings to forget them.</p>`, len(controllers))
+Home app, forget the pairings to make it discoverable again.</p>
+<form class="stack" action="/resetPairings" method="POST">
+<input type="submit" value="Forget paired controllers">
+</form>`, len(controllers))
+}
+
+func (h *Handler) resetPairingsHandler(w http.ResponseWriter, r *http.Request) {
+	var notice string
+	switch reset := h.pairingResetter(); {
+	case reset == nil:
+		notice = `<p class="legend">Pairing reset is unavailable: the HomeKit transport is not running.</p>`
+	default:
+		removed, err := reset()
+		if err != nil {
+			Error("Could not reset HomeKit pairings: %s", err.Error())
+			notice = `<p class="legend">Could not forget pairings: ` +
+				html.EscapeString(err.Error()) + `</p>`
+		} else {
+			Alert("Forgot %d HomeKit controller pairing(s) requested from the web interface", removed)
+			notice = fmt.Sprintf(`<p class="legend">Forgot %d pairing(s). This accessory is
+discoverable again, so add it in the Home app using the code above.</p>`, removed)
+		}
+	}
+	h.ppc.mu.RLock()
+	defer h.ppc.mu.RUnlock()
+	h.writeResponse(w, []byte(page("HomeKit pairing", h.pairBody(notice))), "text/html")
 }
 
 func (h *Handler) qrHandler(w http.ResponseWriter, r *http.Request) {
