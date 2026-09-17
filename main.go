@@ -58,6 +58,7 @@ func main() {
 
 	if *config.debug {
 		EnableDebug()
+		Info("Debug logging is on; HomeKit pairing requests will appear at info")
 	}
 	// HomeKit refuses a pairing for reasons only the library knows about, so
 	// let it log next to everything else.

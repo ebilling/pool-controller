@@ -32,12 +32,14 @@ func (w hapLogWriter) Write(p []byte) (int, error) {
 
 // CaptureHomeKitLogs routes hap's own messages to syslog. Its info lines carry
 // the reason a pairing was refused or failed, which the Home app only ever
-// reports as "unable to add accessory". The debug lines follow each pairing
-// step and are noisy, so they need debug logging turned on.
+// reports as "unable to add accessory". The per-request lines are debug in the
+// library, but they are written at info here when debug logging is on: syslog
+// debug is dropped by the default journal, which is why a pairing can look like
+// silence even though the accessory answered.
 func CaptureHomeKitLogs(debug bool) {
 	haplog.Info.SetOutput(hapLogWriter(syslogWriter.Info))
 	if debug {
-		haplog.Debug.SetOutput(hapLogWriter(syslogWriter.Debug))
+		haplog.Debug.SetOutput(hapLogWriter(syslogWriter.Info))
 	} else {
 		haplog.Debug.Disable()
 	}
