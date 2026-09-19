@@ -741,6 +741,50 @@ func processThermostatModeUpdate(r *http.Request, cfg *PersistedConfig) bool {
 	return true
 }
 
+func processTemperatureUnitUpdate(r *http.Request, cfg *PersistedConfig) bool {
+	value := TemperatureUnit(getFormValue(r, "temperature_unit", string(configuredTemperatureUnit(cfg))))
+	switch value {
+	case TemperatureCelsius, TemperatureFahrenheit:
+	default:
+		return false
+	}
+	if cfg.TemperatureUnit == value {
+		return false
+	}
+	cfg.TemperatureUnit = value
+	return true
+}
+
+func temperatureForDisplay(celsius float64, unit TemperatureUnit, delta bool) float64 {
+	if unit != TemperatureFahrenheit {
+		return celsius
+	}
+	if delta {
+		return celsius * 9 / 5
+	}
+	return toFarenheit(celsius)
+}
+
+func processTemperatureUpdate(r *http.Request, formname string, ptr *float64, unit TemperatureUnit, delta bool) bool {
+	value := getFormValue(r, formname, "")
+	if value == fmt.Sprintf("%0.2f", temperatureForDisplay(*ptr, unit, delta)) {
+		return false
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return false
+	}
+	if unit == TemperatureFahrenheit {
+		if delta {
+			parsed *= 5.0 / 9.0
+		} else {
+			parsed = (parsed - 32) * 5.0 / 9.0
+		}
+	}
+	*ptr = parsed
+	return true
+}
+
 func (h *Handler) configBoolRow(name, inputName string, value bool) string {
 	checked := ""
 	if value {
@@ -772,13 +816,16 @@ func (h *Handler) processForm(r *http.Request, c *Config) {
 		h.ppc.SyncAdjustments()
 		foundone = true
 	}
-	if processFloatUpdate(r, "target", &c.cfg.Target) {
+	if processTemperatureUnitUpdate(r, c.cfg) {
 		foundone = true
 	}
-	if processFloatUpdate(r, "tolerance", &c.cfg.Tolerance) {
+	if processTemperatureUpdate(r, "target", &c.cfg.Target, c.cfg.TemperatureUnit, false) {
 		foundone = true
 	}
-	if processFloatUpdate(r, "mindelta", &c.cfg.DeltaT) {
+	if processTemperatureUpdate(r, "tolerance", &c.cfg.Tolerance, c.cfg.TemperatureUnit, true) {
+		foundone = true
+	}
+	if processTemperatureUpdate(r, "mindelta", &c.cfg.DeltaT, c.cfg.TemperatureUnit, true) {
 		foundone = true
 	}
 	if getFormValue(r, "_present_disabled", "") == "true" &&
@@ -848,6 +895,15 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 	if !c.cfg.LastCleaningCompleted.IsZero() {
 		lastCleaning = c.cfg.LastCleaningCompleted.Format("2006-01-02 15:04 MST")
 	}
+	unit := configuredTemperatureUnit(c.cfg)
+	unitOption := func(value TemperatureUnit, label string) string {
+		selected := ""
+		if unit == value {
+			selected = " selected"
+		}
+		return fmt.Sprintf(`<option value="%s"%s>%s</option>`, value, selected, label)
+	}
+	unitLabel := string(unit)
 
 	body := `<form class="stack" action="/config" method="POST">
 <fieldset>
@@ -868,9 +924,13 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 		modeOption(ThermostatCool, "Cool only") +
 		modeOption(ThermostatAuto, "Auto") + `
 </select></label>
-` + h.configRow("Target (°C)", "target", fmt.Sprintf("%0.2f", c.cfg.Target), "") + `
-` + h.configRow("Tolerance (°C)", "tolerance", fmt.Sprintf("%0.2f", c.cfg.Tolerance), "") + `
-` + h.configRow("Min delta (°C)", "mindelta", fmt.Sprintf("%0.2f", c.cfg.DeltaT), "") + `
+<label>Temperature unit<select name="temperature_unit" id="temperature-unit">
+` + unitOption(TemperatureCelsius, "Celsius (°C)") +
+		unitOption(TemperatureFahrenheit, "Fahrenheit (°F)") + `
+</select></label>
+` + h.configRow("Target (°"+unitLabel+")", "target", fmt.Sprintf("%0.2f", temperatureForDisplay(c.cfg.Target, unit, false)), "") + `
+` + h.configRow("Tolerance (°"+unitLabel+")", "tolerance", fmt.Sprintf("%0.2f", temperatureForDisplay(c.cfg.Tolerance, unit, true)), "") + `
+` + h.configRow("Min delta (°"+unitLabel+")", "mindelta", fmt.Sprintf("%0.2f", temperatureForDisplay(c.cfg.DeltaT, unit, true)), "") + `
 </fieldset>
 <fieldset>
 <legend>Cleaning / Sweep</legend>
@@ -887,7 +947,30 @@ func (h *Handler) configHandler(w http.ResponseWriter, r *http.Request) {
 </fieldset>
 <input type="hidden" name="posted" value="true">
 <input type="submit" value="Save">
-</form>`
+</form>
+<script>
+(function () {
+  var unit = document.getElementById("temperature-unit");
+  var previous = unit.value;
+  unit.addEventListener("change", function () {
+    ["target", "tolerance", "mindelta"].forEach(function (name) {
+      var input = document.querySelector('input[name="' + name + '"]');
+      var value = parseFloat(input.value);
+      if (!Number.isFinite(value)) return;
+      var delta = name !== "target";
+      if (previous === "C" && unit.value === "F") {
+        value = delta ? value * 9 / 5 : value * 9 / 5 + 32;
+      } else if (previous === "F" && unit.value === "C") {
+        value = delta ? value * 5 / 9 : (value - 32) * 5 / 9;
+      }
+      input.value = value.toFixed(2);
+      input.parentElement.firstChild.textContent =
+        input.parentElement.firstChild.textContent.replace(/°[CF]/, "°" + unit.value);
+    });
+    previous = unit.value;
+  });
+})();
+</script>`
 
 	h.writeResponse(w, []byte(page("Configuration", body)), "text/html")
 }

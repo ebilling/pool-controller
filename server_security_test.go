@@ -131,6 +131,54 @@ func TestCleaningSettingsHaveTheirOwnSection(t *testing.T) {
 	}
 }
 
+func TestConfigurationCanDisplayFahrenheitWhileStoringCelsius(t *testing.T) {
+	h := testSecureHandler(t)
+	h.ppc.config.cfg.TemperatureUnit = TemperatureFahrenheit
+	h.ppc.config.cfg.Target = 30
+	h.ppc.config.cfg.Tolerance = 0.5
+	h.ppc.config.cfg.DeltaT = 12
+
+	rec := httptest.NewRecorder()
+	h.configHandler(rec, httptest.NewRequest(http.MethodGet, "/config", nil))
+	body := rec.Body.String()
+	for _, want := range []string{
+		`<option value="F" selected>Fahrenheit (°F)</option>`,
+		`Target (°F)<input name="target" value="86.00"`,
+		`Tolerance (°F)<input name="tolerance" value="0.90"`,
+		`Min delta (°F)<input name="mindelta" value="21.60"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("Fahrenheit configuration is missing %q", want)
+		}
+	}
+}
+
+func TestFahrenheitConfigurationPostConvertsValuesToCelsius(t *testing.T) {
+	h := testSecureHandler(t)
+	form := url.Values{
+		"posted":           {"true"},
+		"temperature_unit": {"F"},
+		"target":           {"86"},
+		"tolerance":        {"1.8"},
+		"mindelta":         {"18"},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/config", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatal(err)
+	}
+
+	h.processForm(req, h.ppc.config)
+	cfg := h.ppc.config.cfg
+	if cfg.TemperatureUnit != TemperatureFahrenheit {
+		t.Errorf("temperature unit = %q, want F", cfg.TemperatureUnit)
+	}
+	if cfg.Target != 30 || cfg.Tolerance != 1 || cfg.DeltaT != 10 {
+		t.Errorf("stored temperatures = target %g, tolerance %g, delta %g; want 30, 1, 10 °C",
+			cfg.Target, cfg.Tolerance, cfg.DeltaT)
+	}
+}
+
 func TestPairingPageOffersResetWhileStillPaired(t *testing.T) {
 	h := testSecureHandler(t)
 	dir := *h.ppc.config.dataDirectory

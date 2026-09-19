@@ -39,6 +39,13 @@ const (
 	ThermostatAuto ThermostatMode = "auto"
 )
 
+type TemperatureUnit string
+
+const (
+	TemperatureCelsius    TemperatureUnit = "C"
+	TemperatureFahrenheit TemperatureUnit = "F"
+)
+
 // Config holds various configuration entries for the system.
 type Config struct {
 	// Commandline only
@@ -67,10 +74,11 @@ type Config struct {
 // PersistedConfig is the portion of the configuration that can be altered and saved from the UI
 type PersistedConfig struct {
 	// Updatable
-	Disabled       bool
-	ButtonDisabled bool
-	SolarDisabled  bool
-	ThermostatMode ThermostatMode
+	Disabled        bool
+	ButtonDisabled  bool
+	SolarDisabled   bool
+	ThermostatMode  ThermostatMode
+	TemperatureUnit TemperatureUnit
 	// Deprecated: retained only to migrate configuration files written before
 	// ThermostatMode was introduced.
 	HeatDisabled          bool
@@ -156,9 +164,11 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		c.cfg.ManualRunTime = float64(defaultManualRunTime)
 		c.cfg.CleaningConfigVersion = 1
 		c.cfg.ThermostatMode = ThermostatAuto
+		c.cfg.TemperatureUnit = TemperatureCelsius
 		c.Save()
 	}
 	normalizeThermostatMode(c.cfg)
+	normalizeTemperatureUnit(c.cfg)
 	if c.cfg.CleaningConfigVersion < 1 {
 		// Older configuration files used RunTime for both cleaning and manual
 		// control, and its default was six hours. The new cleaning contract is
@@ -171,6 +181,17 @@ func NewConfig(fs *flag.FlagSet, args []string) *Config {
 		c.cfg.ManualRunTime = float64(defaultManualRunTime)
 	}
 	return &c
+}
+
+func normalizeTemperatureUnit(cfg *PersistedConfig) {
+	cfg.TemperatureUnit = configuredTemperatureUnit(cfg)
+}
+
+func configuredTemperatureUnit(cfg *PersistedConfig) TemperatureUnit {
+	if cfg.TemperatureUnit == TemperatureFahrenheit {
+		return TemperatureFahrenheit
+	}
+	return TemperatureCelsius
 }
 
 func normalizeThermostatMode(cfg *PersistedConfig) {

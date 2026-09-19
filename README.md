@@ -100,6 +100,33 @@ read. Mutating routes require HTTP Basic authentication, reject unsupported
 methods and oversized forms, and the HTTPS server has defensive read/write
 timeouts and a TLS 1.2 minimum.
 
+### HTTPS certificates
+
+`scripts/generate-tls-certs.sh` creates a P-256 EC certificate authority and
+server certificate. See [`scripts/README.md`](scripts/README.md) for complete
+controller, macOS, iPhone, and iPad installation instructions. Generate the CA
+once, then repeat `--dns` and `--ip` for every name or address used to open the
+controller:
+
+```sh
+bash scripts/generate-tls-certs.sh ca
+bash scripts/generate-tls-certs.sh host \
+  --dns pool-controller.local --dns pool.example.net \
+  --ip 192.168.1.25 --ip fd00::25
+```
+
+The CA key is encrypted by default and prompts for its password when creating
+or signing certificates. The host key is unencrypted so the service can start
+unattended. Install only `tls/ca.crt` as a trusted root on client devices; keep
+`tls/ca.key` private. Configure the daemon with:
+
+```sh
+-ssl_cert=/path/to/tls/pool-controller.crt -ssl_key=/path/to/tls/pool-controller.key
+```
+
+Run the `host` command again with `--force` when its SAN names or addresses
+change. Use `--ca-cert` and `--ca-key` if the CA files are stored elsewhere.
+
 ## GPIO
 
 GPIO uses `internal/gpiocdev`, a small pure-Go driver for the Linux GPIO
