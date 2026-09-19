@@ -80,15 +80,15 @@ nav.links a:hover { text-decoration: underline; }
   font-size: 0.9rem;
   color: var(--muted);
 }
-.toolbar input {
+.toolbar input, .toolbar select {
   font: inherit;
-  width: 6.5rem;
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--card);
   color: var(--ink);
 }
+.toolbar input { width: 6.5rem; }
 .chart img {
   display: block;
   width: 100%;
@@ -186,6 +186,22 @@ code {
 
 const liveRefreshScript = `<script>
 (function () {
+  var lastStatus = null;
+  var unitSelector = document.getElementById("status-temperature-unit");
+
+  function selectedUnit() {
+    return unitSelector && unitSelector.value === "C" ? "C" : "F";
+  }
+  function displayTemperature(celsius, unit) {
+    var value = unit === "F" ? celsius * 9 / 5 + 32 : celsius;
+    return value.toFixed(1) + " °" + unit;
+  }
+  function renderTemperatures(status) {
+    var unit = selectedUnit();
+    setText("metric-target", displayTemperature(status.target_c, unit));
+    setText("metric-pool", displayTemperature(status.pool_c, unit));
+    setText("metric-roof", displayTemperature(status.roof_c, unit));
+  }
   function bumpGraphs() {
     document.querySelectorAll(".chart img").forEach(function (img) {
       var u = new URL(img.src, location.origin);
@@ -213,14 +229,24 @@ const liveRefreshScript = `<script>
       setPill("pill-thermostat", "Thermostat", s.thermostat, s.thermostat !== "Off");
       setPill("pill-control", "Control", s.control, s.control === "Manual");
       setPill("pill-sensors", "Sensors", s.sensor_info, s.sensors_ok);
-      setText("metric-target", s.target_f.toFixed(1) + " °F");
-      setText("metric-pool", s.pool_f.toFixed(1) + " °F");
-      setText("metric-roof", s.roof_f.toFixed(1) + " °F");
+      lastStatus = s;
+      renderTemperatures(s);
       setText("updated", "Updated " + s.updated);
     }).catch(function () {});
   }
+  if (unitSelector) {
+    try {
+      var storedUnit = localStorage.getItem("pool-temperature-unit");
+      if (storedUnit === "C" || storedUnit === "F") unitSelector.value = storedUnit;
+    } catch (_) {}
+    unitSelector.addEventListener("change", function () {
+      try { localStorage.setItem("pool-temperature-unit", selectedUnit()); } catch (_) {}
+      if (lastStatus) renderTemperatures(lastStatus);
+    });
+  }
   setInterval(bumpGraphs, 20000);
   setInterval(bumpStatus, 5000);
+  bumpStatus();
 })();
 </script>
 `

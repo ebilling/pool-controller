@@ -1,6 +1,7 @@
 /.tmp/
+/tls/
 /therm-capture
 *.jsonl
 therm.log
 *.tgz
-
+.DS_Store

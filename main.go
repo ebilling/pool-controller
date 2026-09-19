@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 )
 
@@ -64,7 +64,7 @@ func main() {
 	}
 
 	// Write PID
-	err := ioutil.WriteFile(*config.pidfile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
+	err := os.WriteFile(*config.pidfile, []byte(strconv.Itoa(os.Getpid())), 0644)
 	if err != nil {
 		Fatal("Could not write pid file: %s", err.Error())
 	}
