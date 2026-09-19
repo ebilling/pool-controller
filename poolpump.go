@@ -68,7 +68,9 @@ func NewPoolPumpController(config *Config) *PoolPumpController {
 		ppc.roofTemp = NewSimulatedThermometer("Roof", mftr, *config.simRoofTemp)
 	} else {
 		ppc.pumpTemp = NewGpioThermometer("Pump", mftr, waterGpio)
-		ppc.roofTemp = NewGpioThermometer("Roof", mftr, roofGpio)
+		roofTemp := NewGpioThermometer("Roof", mftr, roofGpio)
+		roofTemp.ClampShortPulsesAsHot()
+		ppc.roofTemp = roofTemp
 	}
 	ppc.SyncAdjustments()
 	ppc.runningTemp = RunningWaterThermometer(ppc.pumpTemp, ppc.switches)

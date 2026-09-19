@@ -86,18 +86,20 @@ func (t *SelectiveThermometer) ReadingStatus() (time.Time, error) {
 // GpioThermometer is used to measure the temperature of a given resistive thermometer
 // using a capacitor.
 type GpioThermometer struct {
-	name        string
-	mutex       sync.Mutex
-	updateMutex sync.Mutex
-	stateMutex  sync.RWMutex
-	pin         PiPin
-	edge        rctime.EdgePin
-	microfarads float64
-	adjust      float64
-	updated     time.Time
-	lastErr     error
-	history     History
-	accessory   *accessory.Thermometer
+	name                  string
+	mutex                 sync.Mutex
+	updateMutex           sync.Mutex
+	stateMutex            sync.RWMutex
+	pin                   PiPin
+	edge                  rctime.EdgePin
+	microfarads           float64
+	adjust                float64
+	updated               time.Time
+	lastErr               error
+	clampShortPulsesAsHot bool
+	shortPulseClampActive bool
+	history               History
+	accessory             *accessory.Thermometer
 }
 
 // NewGpioThermometer returns a GpioThermometer
@@ -146,6 +148,16 @@ func (t *GpioThermometer) Adjustment() float64 {
 	t.stateMutex.RLock()
 	defer t.stateMutex.RUnlock()
 	return t.adjust
+}
+
+// ClampShortPulsesAsHot treats a sustained set of pulses below the supported
+// timing window as a temperature above the measurable range. This is suitable
+// for the roof probe, where an NTC thermistor's pulse gets shorter as it gets
+// hotter and knowing "hot enough" is sufficient to control solar heating.
+func (t *GpioThermometer) ClampShortPulsesAsHot() {
+	t.stateMutex.Lock()
+	t.clampShortPulsesAsHot = true
+	t.stateMutex.Unlock()
 }
 
 // Name returns the name of the GpioThermometer
@@ -256,6 +268,31 @@ func (t *GpioThermometer) recordError(err error) error {
 	return err
 }
 
+func (t *GpioThermometer) shouldClampShortPulses() bool {
+	t.stateMutex.RLock()
+	defer t.stateMutex.RUnlock()
+	return t.clampShortPulsesAsHot
+}
+
+func (t *GpioThermometer) recordShortPulseClamp(shortPulses, attempts int) error {
+	temp := t.getTemp(t.getOhms(rctime.MinTime))
+	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
+
+	t.stateMutex.Lock()
+	wasActive := t.shortPulseClampActive
+	t.shortPulseClampActive = true
+	t.updated = time.Now()
+	t.lastErr = nil
+	t.stateMutex.Unlock()
+
+	if !wasActive {
+		Warn("%s thermometer is above its measurable range: clamping to %0.1fC "+
+			"after %d of %d pulses were shorter than %s",
+			t.name, temp, shortPulses, attempts, rctime.MinTime)
+	}
+	return nil
+}
+
 // Update updates the current temperature of the GpioThermometer
 func (t *GpioThermometer) Update() error {
 	t.updateMutex.Lock()
@@ -263,15 +300,36 @@ func (t *GpioThermometer) Update() error {
 
 	var dischargeTime time.Duration
 	h := NewHistory(5)
-	for i := 0; h.Len() < 5 && i < 20; i++ {
+	shortPulses := 0
+	attempts := 0
+	for ; h.Len() < 5 && attempts < 20; attempts++ {
 		dischargeTime = t.getDischargeTime()
-		if t.inRange(dischargeTime) {
-			t.history.PushDuration(dischargeTime)
+		if dischargeTime > 0 && dischargeTime < rctime.MinTime {
+			shortPulses++
+		} else if t.inRange(dischargeTime) {
 			h.PushDuration(dischargeTime)
 		}
 	}
 	if h.Len() < 5 {
-		return t.recordError(fmt.Errorf("only %d valid temperature samples out of 20 attempts", h.Len()))
+		if t.shouldClampShortPulses() && shortPulses >= 10 {
+			return t.recordShortPulseClamp(shortPulses, attempts)
+		}
+		return t.recordError(fmt.Errorf(
+			"only %d valid temperature samples out of %d attempts (%d pulses shorter than %s)",
+			h.Len(), attempts, shortPulses, rctime.MinTime))
+	}
+
+	t.stateMutex.RLock()
+	wasClamped := t.shortPulseClampActive
+	t.stateMutex.RUnlock()
+	if wasClamped {
+		// Samples taken while saturated are deliberately not added to the
+		// statistical history. Start a new baseline when measurable pulses
+		// return so the old, cooler baseline does not reject the recovery.
+		t.history = *NewHistory(100)
+	}
+	for _, sample := range h.data[:h.Len()] {
+		t.history.Push(sample)
 	}
 
 	stdd := t.history.Stddev()
@@ -280,7 +338,7 @@ func (t *GpioThermometer) Update() error {
 	dev := stdd * 3
 
 	// Throw away bad results
-	if math.Abs(avg-h.Median()) > dev {
+	if !wasClamped && math.Abs(avg-h.Median()) > dev {
 		Info("%s Thermometer update failed: Cur(%0.3f) Med(%0.3f) Avg(%0.3f) Stdd(%0.3f) Dev(%0.3f)",
 			t.Name(),
 			h.Median()/MillisecondFloat,
@@ -295,9 +353,14 @@ func (t *GpioThermometer) Update() error {
 	Debug("Calculating temperature (%f) for %s: %f ohms, median %s", temp, t.name, ohms, time.Duration(int64(h.Median())))
 	t.accessory.TempSensor.CurrentTemperature.SetValue(temp)
 	t.stateMutex.Lock()
+	wasClamped = t.shortPulseClampActive
+	t.shortPulseClampActive = false
 	t.updated = time.Now()
 	t.lastErr = nil
 	t.stateMutex.Unlock()
+	if wasClamped {
+		Info("%s thermometer returned to its measurable range at %0.1fC", t.name, temp)
+	}
 	return nil
 }
 

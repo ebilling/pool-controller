@@ -3,7 +3,20 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/ebilling/pool-controller/internal/rctime"
 )
+
+type fixedChargeEdge struct {
+	duration time.Duration
+}
+
+func (p *fixedChargeEdge) OutputLow()                     {}
+func (p *fixedChargeEdge) InputRisingFloat()              {}
+func (p *fixedChargeEdge) WaitForEdge(time.Duration) bool { return true }
+func (p *fixedChargeEdge) ChargeTime(time.Duration, time.Duration) (time.Duration, error) {
+	return p.duration, nil
+}
 
 func TestGpioThermometer(t *testing.T) {
 	sleeptime := 1 * time.Millisecond
@@ -50,6 +63,39 @@ func TestTemperatureDoesNotSampleGPIO(t *testing.T) {
 	}
 	if got := therm.updated; !got.Before(start) {
 		t.Fatalf("Temperature unexpectedly refreshed reading at %s", got)
+	}
+}
+
+func TestRoofThermometerClampsSustainedShortPulsesAsHot(t *testing.T) {
+	therm := newGpioThermometer("Roof", mftr, &TestPin{})
+	edge := &fixedChargeEdge{duration: rctime.MinTime / 2}
+	therm.edge = edge
+	therm.SetAdjustment(1.75)
+
+	if err := therm.Update(); err == nil {
+		t.Fatal("short pulses should remain an error until high clamping is enabled")
+	}
+
+	therm.ClampShortPulsesAsHot()
+	before := time.Now()
+	if err := therm.Update(); err != nil {
+		t.Fatalf("sustained short pulses were not clamped: %v", err)
+	}
+	want := therm.getTemp(therm.getOhms(rctime.MinTime))
+	if got := therm.Temperature(); got != want {
+		t.Fatalf("clamped temperature = %v, want measurable boundary %v", got, want)
+	}
+	updated, err := therm.ReadingStatus()
+	if err != nil || updated.Before(before) {
+		t.Fatalf("clamped reading status = (%s, %v), want a fresh successful reading", updated, err)
+	}
+
+	edge.duration = 2 * rctime.MinTime
+	if err := therm.Update(); err != nil {
+		t.Fatalf("measurable pulses did not recover immediately: %v", err)
+	}
+	if got := therm.Temperature(); got >= want {
+		t.Fatalf("recovered temperature = %v, want less than clamped %v", got, want)
 	}
 }
 
